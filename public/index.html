@@ -21,6 +21,7 @@
     --accent-soft:#eeeeff;
     --accent-dark:#4747b8;
     --danger:#e05252;
+    --star:#f0ac1f;
     --radius:16px;
     --safe-b: env(safe-area-inset-bottom, 0px);
   }
@@ -30,8 +31,7 @@
     background: var(--bg);
     color: var(--text);
     font-family:'Inter', -apple-system, 'Malgun Gothic', sans-serif;
-    min-height:100vh;
-    min-height:100dvh;
+    min-height:100vh; min-height:100dvh;
     padding-bottom: calc(100px + var(--safe-b));
     -webkit-font-smoothing:antialiased;
     touch-action: manipulation;
@@ -42,59 +42,45 @@
   .subtitle{ color:var(--text-muted); font-size:13px; margin:0 0 22px; font-weight:500; }
 
   .tabs{ display:flex; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:18px; position:sticky; top:10px; z-index:10; }
-  .tab{
-    flex:1; background:none; border:none; color:var(--text-muted); font-family:'Inter',sans-serif;
-    font-size:13.5px; font-weight:600; padding:11px 0; cursor:pointer; border-radius:9px; transition: all .15s;
-  }
+  .tab{ flex:1; background:none; border:none; color:var(--text-muted); font-size:13.5px; font-weight:600; padding:11px 0; cursor:pointer; border-radius:9px; }
   .tab.active{ color:var(--text); background:var(--bg); }
 
-  .panel{
-    background: var(--surface);
-    border:1px solid var(--border);
-    border-radius:var(--radius);
-    padding: 22px 16px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-  }
+  .panel{ background: var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding: 22px 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
 
   .stats{ text-align:center; margin-bottom:22px; }
-  .stats .num{ font-size:38px; font-weight:800; color:var(--text); line-height:1; letter-spacing:-0.02em; font-variant-numeric: tabular-nums; }
+  .stats .num{ font-size:38px; font-weight:800; line-height:1; letter-spacing:-0.02em; font-variant-numeric: tabular-nums; }
   .stats .label{ color:var(--text-muted); font-size:12px; margin-top:8px; font-weight:600; }
   .stats .height{ display:inline-flex; align-items:center; gap:5px; margin-top:12px; padding:6px 12px; background:var(--accent-soft); color:var(--accent-dark); border-radius:20px; font-size:12px; font-weight:700; }
 
+  /* 책 쌓기 - 알약(캡슐) 스타일 */
   .shelf-area{ min-height:70px; }
-  .stack{ display:flex; flex-direction:column-reverse; gap:6px; }
+  .stack{ display:flex; flex-direction:column-reverse; gap:5px; align-items:center; }
   .spine{
-    position:relative;
-    display:flex; align-items:center;
-    border-radius:10px;
-    overflow:hidden;
-    -webkit-user-select:none; user-select:none;
+    position:relative; width:100%;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:999px;
+    cursor:pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
   }
+  .spine:active{ transform: scale(0.99); }
   .spine-label{
-    position:relative; z-index:1; display:flex; align-items:center; gap:8px;
-    padding:0 12px; width:100%; color:#fff;
-    font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden;
+    display:flex; align-items:center; gap:8px; padding:0 22px; width:100%;
+    color:#fff; font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.15);
   }
   .spine-label .t{ overflow:hidden; text-overflow:ellipsis; }
-  .spine-label .p{ margin-left:auto; font-size:11px; opacity:0.85; font-variant-numeric: tabular-nums; flex-shrink:0; }
-  .spine-del{
-    position:relative; flex-shrink:0;
-    background:rgba(0,0,0,0.22); border:none; color:#fff; width:26px; height:26px;
-    border-radius:7px; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center;
-    z-index:2;
-  }
+  .spine-label .p{ margin-left:auto; font-size:11px; opacity:0.9; font-variant-numeric: tabular-nums; flex-shrink:0; }
 
-  .empty-shelf{
-    text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7;
-    padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500;
-  }
+  .empty-shelf{ text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7; padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500; }
 
   .booklist{ margin-top:22px; padding-top:18px; border-top:1px solid var(--border); }
   .booklist .h{ font-size:11px; letter-spacing:0.03em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px; font-weight:700; }
-  .book-row{ display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--border); gap:10px; }
+  .book-row{ display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--border); gap:10px; cursor:pointer; }
   .book-row:last-child{ border-bottom:none; }
   .book-row .bt{ font-size:13.5px; font-weight:600; color:var(--text); }
   .book-row .bd{ font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .book-row .stars{ color:var(--star); font-size:11px; margin-top:3px; letter-spacing:1px; }
+  .book-row .rv{ font-size:11px; color:var(--text-muted); margin-top:3px; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px; }
   .book-row .bp{ font-size:13px; color:var(--accent); font-weight:700; font-variant-numeric: tabular-nums; flex-shrink:0; }
 
   .cal-summary{ display:flex; gap:8px; margin-bottom:18px; }
@@ -107,13 +93,10 @@
   .cal-nav{ background:var(--bg); border:1px solid var(--border); color:var(--text); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:13px; }
   .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:20px; }
   .cal-dow{ text-align:center; font-size:10px; color:var(--text-muted); padding:2px 0 6px; font-weight:600; }
-  .cal-cell{
-    aspect-ratio:1; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    font-size:10.5px; border:1px solid var(--border); position:relative; font-weight:600; overflow:hidden;
-  }
+  .cal-cell{ aspect-ratio:1; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10.5px; border:1px solid var(--border); position:relative; font-weight:600; overflow:hidden; cursor:default; }
   .cal-cell.other{ opacity:0.32; }
   .cal-cell .d{ color:var(--text-muted); position:relative; z-index:1; }
-  .cal-cell.has{ border-color:transparent; }
+  .cal-cell.has{ border-color:transparent; cursor:pointer; }
   .cal-cell.has .d{ color:rgba(255,255,255,0.97); text-shadow:0 1px 3px rgba(0,0,0,0.4); }
   .cal-cell .cover-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
   .cal-cell .cover-shade{ position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.45) 100%); }
@@ -121,81 +104,55 @@
 
   .month-list .h{ font-size:11px; letter-spacing:0.03em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px; font-weight:700; }
   .month-empty{ text-align:center; color:var(--text-muted); font-size:13px; padding:24px 0; font-weight:500; }
-  .month-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+  .month-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer; }
   .month-row:last-child{ border-bottom:none; }
   .month-row .cov{ width:30px; height:42px; border-radius:4px; flex-shrink:0; object-fit:cover; background:var(--border); }
   .month-row .chip{ width:5px; height:30px; border-radius:3px; flex-shrink:0; }
   .month-row .bt{ font-size:13px; font-weight:600; }
   .month-row .bd{ font-size:11px; color:var(--text-muted); margin-top:1px; }
 
-  .fab{
-    position:fixed; right:18px; bottom: calc(20px + var(--safe-b)); width:56px; height:56px; border-radius:50%;
-    background: var(--accent);
-    border:none; color:#fff; font-size:27px; font-weight:500; cursor:pointer;
-    box-shadow: 0 8px 20px rgba(91,91,214,0.35), 0 2px 6px rgba(0,0,0,0.08);
-    display:flex; align-items:center; justify-content:center;
-    z-index:20;
-  }
+  .fab{ position:fixed; right:18px; bottom: calc(20px + var(--safe-b)); width:56px; height:56px; border-radius:50%; background: var(--accent); border:none; color:#fff; font-size:27px; cursor:pointer; box-shadow: 0 8px 20px rgba(91,91,214,0.35), 0 2px 6px rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:center; z-index:20; }
   .fab:active{ transform: scale(0.95); }
 
-  .modal-back{
-    position:fixed; inset:0; background:rgba(24,24,27,0.4); backdrop-filter: blur(3px);
-    display:flex; align-items:flex-end; justify-content:center; z-index:50; padding:0;
-  }
+  .modal-back{ position:fixed; inset:0; background:rgba(24,24,27,0.4); backdrop-filter: blur(3px); display:flex; align-items:flex-end; justify-content:center; z-index:50; }
   @media(min-width:640px){ .modal-back{ align-items:center; padding:20px; } }
-  .card{
-    background: var(--surface); color:var(--text); width:100%; max-width:440px;
-    border-radius:20px 20px 0 0; padding:22px 18px calc(22px + var(--safe-b)); max-height:90vh; max-height:90dvh; overflow-y:auto;
-    box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
-    -webkit-overflow-scrolling: touch;
-  }
+  .card{ background: var(--surface); color:var(--text); width:100%; max-width:440px; border-radius:20px 20px 0 0; padding:22px 18px calc(22px + var(--safe-b)); max-height:90vh; max-height:90dvh; overflow-y:auto; box-shadow: 0 -10px 40px rgba(0,0,0,0.15); -webkit-overflow-scrolling: touch; }
   @media(min-width:640px){ .card{ border-radius:20px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); padding:26px 24px 28px; } }
   .card-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:2px; }
   .card-top .ct{ font-size:17px; font-weight:800; letter-spacing:-0.01em; }
   .card-top .cs{ font-size:12px; color:var(--text-muted); margin-top:4px; font-weight:500; }
-  .card-close{ background:var(--bg); border:none; width:30px; height:30px; border-radius:8px; font-size:18px; color:var(--text-muted); cursor:pointer; line-height:1; flex-shrink:0; }
+  .card-close{ background:var(--bg); border:none; width:30px; height:30px; border-radius:8px; font-size:18px; color:var(--text-muted); cursor:pointer; flex-shrink:0; }
   .card-divider{ border-top:1px solid var(--border); margin:16px 0; }
 
   .field{ margin-bottom:14px; }
   .field label{ display:block; font-size:10.5px; letter-spacing:0.02em; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:6px; }
-  .field input{
-    width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg);
-    padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none;
-  }
-  .field input:focus{ border-color:var(--accent); background:var(--surface); }
+  .field input, .field textarea{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none; }
+  .field textarea{ resize:vertical; min-height:64px; font-size:14px; }
+  .field input:focus, .field textarea:focus{ border-color:var(--accent); background:var(--surface); }
   .search-row{ display:flex; gap:8px; align-items:flex-end; }
   .search-row .field{ flex:1; margin-bottom:0; }
-  .btn-search{
-    background:var(--accent); color:#fff; border:none; border-radius:10px; padding:0 16px;
-    font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap; height:44px;
-  }
+  .btn-search{ background:var(--accent); color:#fff; border:none; border-radius:10px; padding:0 16px; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap; height:44px; }
   .btn-search:disabled{ opacity:0.5; }
 
   .results{ margin-top:12px; max-height:200px; overflow-y:auto; -webkit-overflow-scrolling: touch; }
-  .result-item{
-    display:flex; gap:10px; align-items:center; width:100%; text-align:left;
-    background:var(--bg); border:1.5px solid var(--border); border-radius:12px;
-    padding:8px 10px; margin-bottom:6px; cursor:pointer; font-family:'Inter',sans-serif;
-  }
+  .result-item{ display:flex; gap:10px; align-items:center; width:100%; text-align:left; background:var(--bg); border:1.5px solid var(--border); border-radius:12px; padding:8px 10px; margin-bottom:6px; cursor:pointer; }
   .result-item img{ width:32px; height:46px; object-fit:cover; border-radius:4px; flex-shrink:0; background:var(--border-2); }
   .result-item .rt{ font-size:13px; font-weight:700; color:var(--text); }
   .result-item .ra{ font-size:11px; color:var(--text-muted); margin-top:1px; }
   .no-result{ font-size:12.5px; color:var(--text-muted); padding:10px 2px; }
   .error-msg{ font-size:12.5px; color:var(--danger); background:rgba(224,82,82,0.08); padding:10px; border-radius:8px; }
 
-  .btn-add{
-    width:100%; background: var(--accent); color:#fff; border:none;
-    border-radius:12px; padding:15px; font-size:14.5px; font-weight:700; cursor:pointer; margin-top:4px;
-    font-family:'Inter',sans-serif;
-  }
+  .star-picker{ display:flex; gap:6px; }
+  .star-picker button{ background:none; border:none; font-size:26px; cursor:pointer; padding:0; line-height:1; color:var(--border-2); }
+  .star-picker button.on{ color:var(--star); }
+
+  .btn-row{ display:flex; gap:8px; margin-top:6px; }
+  .btn-add{ flex:1; background: var(--accent); color:#fff; border:none; border-radius:12px; padding:15px; font-size:14.5px; font-weight:700; cursor:pointer; }
   .btn-add:disabled{ opacity:0.4; }
+  .btn-delete{ background: #fdeeee; color:var(--danger); border:none; border-radius:12px; padding:15px 18px; font-size:14.5px; font-weight:700; cursor:pointer; }
 
   .hidden{ display:none !important; }
-
-  @media(max-width:360px){
-    .stats .num{ font-size:32px; }
-    h1.title{ font-size:21px; }
-  }
+  @media(max-width:360px){ .stats .num{ font-size:32px; } h1.title{ font-size:21px; } }
 </style>
 </head>
 <body>
@@ -221,25 +178,25 @@
   <div class="card">
     <div class="card-top">
       <div>
-        <div class="ct">책 기록하기</div>
-        <div class="cs">제목을 검색하면 페이지 수를 자동으로 채워드려요</div>
+        <div class="ct" id="modalTitle">책 기록하기</div>
+        <div class="cs" id="modalSubtitle">제목을 검색하면 페이지 수를 자동으로 채워드려요</div>
       </div>
       <button class="card-close" onclick="closeAddModal()">&times;</button>
     </div>
 
     <div class="card-divider"></div>
 
-    <div class="search-row">
-      <div class="field">
-        <label>책 제목 검색</label>
-        <input id="searchInput" type="text" placeholder="예: 토지" onkeypress="if(event.key==='Enter') searchBooks()">
+    <div id="searchSection">
+      <div class="search-row">
+        <div class="field">
+          <label>책 제목 검색</label>
+          <input id="searchInput" type="text" placeholder="예: 토지" onkeypress="if(event.key==='Enter') searchBooks()">
+        </div>
+        <button class="btn-search" onclick="searchBooks()" id="searchBtn">검색</button>
       </div>
-      <button class="btn-search" onclick="searchBooks()" id="searchBtn">검색</button>
+      <div id="searchResults" class="results"></div>
+      <div class="card-divider"></div>
     </div>
-
-    <div id="searchResults" class="results"></div>
-
-    <div class="card-divider"></div>
 
     <div class="field">
       <label>책 제목</label>
@@ -253,8 +210,25 @@
       <label>완독 날짜</label>
       <input id="dateInput" type="date">
     </div>
+    <div class="field">
+      <label>별점</label>
+      <div class="star-picker" id="starPicker">
+        <button type="button" onclick="setRating(1)">★</button>
+        <button type="button" onclick="setRating(2)">★</button>
+        <button type="button" onclick="setRating(3)">★</button>
+        <button type="button" onclick="setRating(4)">★</button>
+        <button type="button" onclick="setRating(5)">★</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>한줄 리뷰</label>
+      <textarea id="reviewInput" placeholder="이 책에 대한 생각을 남겨보세요 (선택)"></textarea>
+    </div>
 
-    <button class="btn-add" onclick="addBook()">추가하기</button>
+    <div class="btn-row">
+      <button class="btn-delete hidden" id="deleteBtn" onclick="deleteFromModal()">삭제</button>
+      <button class="btn-add" onclick="saveBook()" id="saveBtn">추가하기</button>
+    </div>
   </div>
 </div>
 
@@ -263,6 +237,8 @@ let books = JSON.parse(localStorage.getItem('reading-books') || '[]');
 let currentMonth = new Date();
 let currentView = 'stack';
 let selectedCover = null;
+let currentRating = 0;
+let editingId = null;
 
 const PALETTE = ['#5b5bd6','#e0748c','#3fa88a','#e8a23f','#4a90d9','#9b6fd6','#e0645a','#3fb5b5'];
 function colorFor(seed){
@@ -271,7 +247,40 @@ function colorFor(seed){
   return PALETTE[h % PALETTE.length];
 }
 
-// 페이지 1장 두께를 약 0.075mm로 가정한 대략적인 추정치
+// 표지 이미지에서 대표 색상 추출 (실패하면 null 반환 -> 팔레트색으로 대체)
+function extractDominantColor(url){
+  return new Promise((resolve)=>{
+    try{
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = ()=>{
+        try{
+          const c = document.createElement('canvas');
+          c.width = 16; c.height = 16;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0, 16, 16);
+          const data = ctx.getImageData(0,0,16,16).data;
+          let r=0,g=0,b=0,n=0;
+          for(let i=0;i<data.length;i+=4){
+            const alpha = data[i+3];
+            if(alpha < 100) continue;
+            r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++;
+          }
+          if(n===0){ resolve(null); return; }
+          r=Math.round(r/n); g=Math.round(g/n); b=Math.round(b/n);
+          // 너무 밝거나(흰배경) 너무 어두우면 보정
+          const lum = (r*299+g*587+b*114)/1000;
+          if(lum > 235 || lum < 25){ resolve(null); return; }
+          const hex = '#' + [r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+          resolve(hex);
+        }catch(e){ resolve(null); }
+      };
+      img.onerror = ()=> resolve(null);
+      img.src = url;
+    }catch(e){ resolve(null); }
+  });
+}
+
 const MM_PER_PAGE = 0.075;
 function heightLabel(totalPages){
   const cm = (totalPages * MM_PER_PAGE) / 10;
@@ -290,19 +299,72 @@ function switchView(view){
   render();
 }
 
+function setRating(n){
+  currentRating = (currentRating === n) ? 0 : n;
+  renderStars();
+}
+function renderStars(){
+  document.querySelectorAll('#starPicker button').forEach((btn,i)=>{
+    btn.classList.toggle('on', i < currentRating);
+  });
+}
+
 function openAddModal(){
-  document.getElementById('addModal').classList.remove('hidden');
-  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+  editingId = null;
   selectedCover = null;
+  currentRating = 0;
+  document.getElementById('modalTitle').textContent = '책 기록하기';
+  document.getElementById('modalSubtitle').textContent = '제목을 검색하면 페이지 수를 자동으로 채워드려요';
+  document.getElementById('searchSection').classList.remove('hidden');
+  document.getElementById('deleteBtn').classList.add('hidden');
+  document.getElementById('saveBtn').textContent = '추가하기';
+  document.getElementById('titleInput').value = '';
+  document.getElementById('pagesInput').value = '';
+  document.getElementById('reviewInput').value = '';
+  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+  renderStars();
+  document.getElementById('addModal').classList.remove('hidden');
   setTimeout(()=>document.getElementById('searchInput').focus(), 50);
 }
+
+function openEditModal(id){
+  const book = books.find(b=>b.id===id);
+  if(!book) return;
+  editingId = id;
+  selectedCover = book.cover || null;
+  currentRating = book.rating || 0;
+  document.getElementById('modalTitle').textContent = '책 수정하기';
+  document.getElementById('modalSubtitle').textContent = '내용을 고치거나 삭제할 수 있어요';
+  document.getElementById('searchSection').classList.add('hidden');
+  document.getElementById('deleteBtn').classList.remove('hidden');
+  document.getElementById('saveBtn').textContent = '저장하기';
+  document.getElementById('titleInput').value = book.title;
+  document.getElementById('pagesInput').value = book.pages;
+  document.getElementById('reviewInput').value = book.review || '';
+  document.getElementById('dateInput').value = book.completedDate;
+  renderStars();
+  document.getElementById('addModal').classList.remove('hidden');
+}
+
 function closeAddModal(){
   document.getElementById('addModal').classList.add('hidden');
   document.getElementById('searchInput').value = '';
   document.getElementById('titleInput').value = '';
   document.getElementById('pagesInput').value = '';
+  document.getElementById('reviewInput').value = '';
   document.getElementById('searchResults').innerHTML = '';
   selectedCover = null;
+  currentRating = 0;
+  editingId = null;
+}
+
+function deleteFromModal(){
+  if(editingId === null) return;
+  if(!confirm('이 책을 삭제할까요?')) return;
+  books = books.filter(b=>b.id!==editingId);
+  saveBooks();
+  closeAddModal();
+  render();
 }
 
 async function searchBooks(){
@@ -321,10 +383,7 @@ async function searchBooks(){
     resultsDiv.innerHTML = data.books.map((book,i)=>`
       <button class="result-item" onclick="selectBook(${i})">
         ${book.cover ? `<img src="${book.cover}" loading="lazy"/>` : ''}
-        <div>
-          <div class="rt">${book.title}</div>
-          <div class="ra">${book.author||''}</div>
-        </div>
+        <div><div class="rt">${book.title}</div><div class="ra">${book.author||''}</div></div>
       </button>
     `).join('');
     window._searchResults = data.books;
@@ -353,24 +412,42 @@ async function selectBook(index){
   }
 }
 
-function addBook(){
+async function saveBook(){
   const title = document.getElementById('titleInput').value.trim();
   const pages = parseInt(document.getElementById('pagesInput').value);
   const date = document.getElementById('dateInput').value || new Date().toISOString().split('T')[0];
+  const review = document.getElementById('reviewInput').value.trim();
   if(!title){ alert('책 제목을 입력해주세요!'); return; }
   if(!pages || pages<=0){ alert('올바른 페이지 수를 입력해주세요!'); return; }
 
-  books.push({ id: Date.now(), title, pages, completedDate: date, color: colorFor(title), cover: selectedCover });
+  let color = colorFor(title);
+  if(selectedCover){
+    const extracted = await extractDominantColor(selectedCover);
+    if(extracted) color = extracted;
+  }
+
+  if(editingId !== null){
+    const idx = books.findIndex(b=>b.id===editingId);
+    if(idx > -1){
+      books[idx] = { ...books[idx], title, pages, completedDate: date, rating: currentRating, review, cover: selectedCover || books[idx].cover, color: selectedCover ? color : books[idx].color };
+    }
+  }else{
+    books.push({ id: Date.now(), title, pages, completedDate: date, color, cover: selectedCover, rating: currentRating, review });
+  }
   saveBooks(); closeAddModal(); render();
 }
-function removeBook(id){ books = books.filter(b=>b.id!==id); saveBooks(); render(); }
 
 function render(){ currentView==='stack' ? renderStack() : renderCalendar(); }
+
+function starString(rating){
+  rating = rating || 0;
+  return '★★★★★☆☆☆☆☆'.slice(5-rating, 10-rating);
+}
 
 function renderStack(){
   const totalPages = books.reduce((s,b)=>s+b.pages,0);
   const sorted = [...books].sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
-  const h = books.length>0 ? Math.max(18, Math.min(340/books.length, 44)) : 40;
+  const h = books.length>0 ? Math.max(20, Math.min(340/books.length, 46)) : 40;
   const hLabel = heightLabel(totalPages);
 
   let html = `<div class="stats"><div class="num">${totalPages.toLocaleString()}</div><div class="label">총 읽은 페이지 · ${books.length}권</div>`;
@@ -384,12 +461,11 @@ function renderStack(){
     html += `<div class="stack">`;
     sorted.forEach(book=>{
       html += `
-        <div class="spine" style="height:${h}px;background:${book.color}">
+        <div class="spine" style="height:${h}px;background:${book.color}" onclick="openEditModal(${book.id})">
           <div class="spine-label">
             <span class="t">${book.title}</span>
             <span class="p">${book.pages}p</span>
           </div>
-          <button class="spine-del" onclick="removeBook(${book.id})">✕</button>
         </div>`;
     });
     html += `</div>`;
@@ -399,8 +475,13 @@ function renderStack(){
   if(books.length>0){
     html += `<div class="booklist"><div class="h">읽은 책 목록</div>`;
     [...sorted].reverse().forEach(book=>{
-      html += `<div class="book-row">
-        <div><div class="bt">${book.title}</div><div class="bd">${book.completedDate}</div></div>
+      html += `<div class="book-row" onclick="openEditModal(${book.id})">
+        <div>
+          <div class="bt">${book.title}</div>
+          <div class="bd">${book.completedDate}</div>
+          ${book.rating ? `<div class="stars">${starString(book.rating)}</div>` : ''}
+          ${book.review ? `<div class="rv">${book.review}</div>` : ''}
+        </div>
         <div class="bp">${book.pages}p</div>
       </div>`;
     });
@@ -447,7 +528,7 @@ function renderCalendar(){
     const isOther = day.getMonth()!==month;
     const main = dayBooks[0];
     if(main){
-      html += `<div class="cal-cell has ${isOther?'other':''}" style="${main.cover?'':'background:'+main.color}" title="${dayBooks.map(b=>b.title).join(', ')}">
+      html += `<div class="cal-cell has ${isOther?'other':''}" style="${main.cover?'':'background:'+main.color}" onclick="openEditModal(${main.id})" title="${dayBooks.map(b=>b.title).join(', ')}">
         ${main.cover ? `<img class="cover-img" src="${main.cover}" loading="lazy"/><div class="cover-shade"></div>` : ''}
         <span class="d">${day.getDate()}</span>
         ${dayBooks.length>1 ? `<span class="cal-more">+${dayBooks.length-1}</span>` : ''}
@@ -463,7 +544,7 @@ function renderCalendar(){
     html += `<div class="month-empty">이 달에 완독한 책이 없어요</div>`;
   }else{
     [...monthBooks].sort((a,b)=>new Date(a.completedDate)-new Date(b.completedDate)).forEach(book=>{
-      html += `<div class="month-row">
+      html += `<div class="month-row" onclick="openEditModal(${book.id})">
         ${book.cover ? `<img class="cov" src="${book.cover}" loading="lazy"/>` : `<div class="chip" style="background:${book.color}"></div>`}
         <div><div class="bt">${book.title}</div><div class="bd">${book.pages}p · ${book.completedDate}</div></div>
       </div>`;
