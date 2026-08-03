@@ -252,9 +252,20 @@ function colorFor(seed){
   return PALETTE[h % PALETTE.length];
 }
 function widthFor(seed){
+  // 책 길이(세로)는 페이지 수와 무관하게 거의 고정 - 살짝만 자연스럽게 변주 (70~78%)
   let h = 0;
   for(let i=0;i<seed.length;i++){ h = (h*17 + seed.charCodeAt(i)) >>> 0; }
-  return 60 + (h % 23); // 60% ~ 82% 사이, 책마다 살짝 다른 폭
+  return 70 + (h % 9);
+}
+
+// 실제 책 비율: 종이 한 장 두께 약 0.07mm + 표지 두께 약 3mm
+const MM_PER_PAGE = 0.07;
+const COVER_MM = 3;
+function thicknessMm(pages){ return pages * MM_PER_PAGE + COVER_MM; }
+// mm -> px 변환 (모바일 화면에서 보기 좋은 스케일)
+const PX_PER_MM = 0.95;
+function spineHeightPx(pages){
+  return Math.max(9, Math.min(thicknessMm(pages) * PX_PER_MM, 90));
 }
 
 // 표지 이미지에서 대표 색상 추출 (실패하면 null 반환 -> 팔레트색으로 대체)
@@ -291,9 +302,8 @@ function extractDominantColor(url){
   });
 }
 
-const MM_PER_PAGE = 0.075;
-function heightLabel(totalPages){
-  const cm = (totalPages * MM_PER_PAGE) / 10;
+function heightLabel(totalPages, bookCount){
+  const cm = ((totalPages * MM_PER_PAGE) + (bookCount * COVER_MM)) / 10;
   if(cm < 1) return null;
   return cm >= 100 ? `${(cm/100).toFixed(2)}m` : `${cm.toFixed(1)}cm`;
 }
@@ -457,8 +467,7 @@ function starString(rating){
 function renderStack(){
   const totalPages = books.reduce((s,b)=>s+b.pages,0);
   const sorted = [...books].sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
-  const h = books.length>0 ? Math.max(20, Math.min(340/books.length, 46)) : 40;
-  const hLabel = heightLabel(totalPages);
+  const hLabel = heightLabel(totalPages, books.length);
 
   let html = `<div class="stats"><div class="num">${totalPages.toLocaleString()}</div><div class="label">총 읽은 페이지 · ${books.length}권</div>`;
   if(hLabel) html += `<div class="height">📏 다 쌓으면 약 ${hLabel}</div>`;
@@ -471,11 +480,12 @@ function renderStack(){
     html += `<div class="stack">`;
     sorted.forEach(book=>{
       const w = widthFor(book.title);
+      const h = spineHeightPx(book.pages);
+      const showLabel = h >= 16;
       html += `
         <div class="spine" style="height:${h}px;width:${w}%;background:${book.color}" onclick="openEditModal(${book.id})">
           <div class="spine-label">
-            <span class="t">${book.title}</span>
-            <span class="p">${book.pages}p</span>
+            ${showLabel ? `<span class="t">${book.title}</span><span class="p">${book.pages}p</span>` : ''}
           </div>
         </div>`;
     });
