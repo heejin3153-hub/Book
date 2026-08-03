@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>독서기록</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: light;
+    --bg:#fafafa;
+    --surface:#ffffff;
+    --border:#ececec;
+    --border-2:#e2e2e2;
+    --text:#18181b;
+    --text-muted:#8a8a92;
+    --accent:#5b5bd6;
+    --accent-soft:#eeeeff;
+    --accent-dark:#4747b8;
+    --danger:#e05252;
+    --radius:16px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family:'Inter', -apple-system, 'Malgun Gothic', sans-serif;
+    min-height:100vh;
+    min-height:100dvh;
+    padding-bottom: calc(100px + var(--safe-b));
+    -webkit-font-smoothing:antialiased;
+    touch-action: manipulation;
+  }
+  .wrap{ max-width:600px; margin:0 auto; padding: 28px 16px 0; }
+
+  h1.title{ font-size:23px; margin:0 0 4px; font-weight:800; letter-spacing:-0.02em; }
+  .subtitle{ color:var(--text-muted); font-size:13px; margin:0 0 22px; font-weight:500; }
+
+  .tabs{ display:flex; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:18px; position:sticky; top:10px; z-index:10; }
+  .tab{
+    flex:1; background:none; border:none; color:var(--text-muted); font-family:'Inter',sans-serif;
+    font-size:13.5px; font-weight:600; padding:11px 0; cursor:pointer; border-radius:9px; transition: all .15s;
+  }
+  .tab.active{ color:var(--text); background:var(--bg); }
+
+  .panel{
+    background: var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding: 22px 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  }
+
+  .stats{ text-align:center; margin-bottom:22px; }
+  .stats .num{ font-size:38px; font-weight:800; color:var(--text); line-height:1; letter-spacing:-0.02em; font-variant-numeric: tabular-nums; }
+  .stats .label{ color:var(--text-muted); font-size:12px; margin-top:8px; font-weight:600; }
+  .stats .height{ display:inline-flex; align-items:center; gap:5px; margin-top:12px; padding:6px 12px; background:var(--accent-soft); color:var(--accent-dark); border-radius:20px; font-size:12px; font-weight:700; }
+
+  .shelf-area{ min-height:70px; }
+  .stack{ display:flex; flex-direction:column-reverse; gap:6px; }
+  .spine{
+    position:relative;
+    display:flex; align-items:center;
+    border-radius:10px;
+    overflow:hidden;
+    -webkit-user-select:none; user-select:none;
+  }
+  .spine-label{
+    position:relative; z-index:1; display:flex; align-items:center; gap:8px;
+    padding:0 12px; width:100%; color:#fff;
+    font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden;
+  }
+  .spine-label .t{ overflow:hidden; text-overflow:ellipsis; }
+  .spine-label .p{ margin-left:auto; font-size:11px; opacity:0.85; font-variant-numeric: tabular-nums; flex-shrink:0; }
+  .spine-del{
+    position:relative; flex-shrink:0;
+    background:rgba(0,0,0,0.22); border:none; color:#fff; width:26px; height:26px;
+    border-radius:7px; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    z-index:2;
+  }
+
+  .empty-shelf{
+    text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7;
+    padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500;
+  }
+
+  .booklist{ margin-top:22px; padding-top:18px; border-top:1px solid var(--border); }
+  .booklist .h{ font-size:11px; letter-spacing:0.03em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px; font-weight:700; }
+  .book-row{ display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--border); gap:10px; }
+  .book-row:last-child{ border-bottom:none; }
+  .book-row .bt{ font-size:13.5px; font-weight:600; color:var(--text); }
+  .book-row .bd{ font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .book-row .bp{ font-size:13px; color:var(--accent); font-weight:700; font-variant-numeric: tabular-nums; flex-shrink:0; }
+
+  .cal-summary{ display:flex; gap:8px; margin-bottom:18px; }
+  .cal-summary .box{ flex:1; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px 10px; text-align:center; }
+  .cal-summary .box .v{ font-size:20px; font-weight:800; letter-spacing:-0.01em; font-variant-numeric: tabular-nums; }
+  .cal-summary .box .l{ font-size:10.5px; color:var(--text-muted); font-weight:600; margin-top:3px; }
+
+  .cal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .cal-head .m{ font-size:16px; font-weight:700; letter-spacing:-0.01em; }
+  .cal-nav{ background:var(--bg); border:1px solid var(--border); color:var(--text); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:13px; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:20px; }
+  .cal-dow{ text-align:center; font-size:10px; color:var(--text-muted); padding:2px 0 6px; font-weight:600; }
+  .cal-cell{
+    aspect-ratio:1; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:10.5px; border:1px solid var(--border); position:relative; font-weight:600; overflow:hidden;
+  }
+  .cal-cell.other{ opacity:0.32; }
+  .cal-cell .d{ color:var(--text-muted); position:relative; z-index:1; }
+  .cal-cell.has{ border-color:transparent; }
+  .cal-cell.has .d{ color:rgba(255,255,255,0.97); text-shadow:0 1px 3px rgba(0,0,0,0.4); }
+  .cal-cell .cover-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .cal-cell .cover-shade{ position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.45) 100%); }
+  .cal-more{ position:absolute; bottom:2px; right:3px; font-size:7.5px; color:#fff; font-weight:800; z-index:1; text-shadow:0 1px 2px rgba(0,0,0,0.5); }
+
+  .month-list .h{ font-size:11px; letter-spacing:0.03em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px; font-weight:700; }
+  .month-empty{ text-align:center; color:var(--text-muted); font-size:13px; padding:24px 0; font-weight:500; }
+  .month-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+  .month-row:last-child{ border-bottom:none; }
+  .month-row .cov{ width:30px; height:42px; border-radius:4px; flex-shrink:0; object-fit:cover; background:var(--border); }
+  .month-row .chip{ width:5px; height:30px; border-radius:3px; flex-shrink:0; }
+  .month-row .bt{ font-size:13px; font-weight:600; }
+  .month-row .bd{ font-size:11px; color:var(--text-muted); margin-top:1px; }
+
+  .fab{
+    position:fixed; right:18px; bottom: calc(20px + var(--safe-b)); width:56px; height:56px; border-radius:50%;
+    background: var(--accent);
+    border:none; color:#fff; font-size:27px; font-weight:500; cursor:pointer;
+    box-shadow: 0 8px 20px rgba(91,91,214,0.35), 0 2px 6px rgba(0,0,0,0.08);
+    display:flex; align-items:center; justify-content:center;
+    z-index:20;
+  }
+  .fab:active{ transform: scale(0.95); }
+
+  .modal-back{
+    position:fixed; inset:0; background:rgba(24,24,27,0.4); backdrop-filter: blur(3px);
+    display:flex; align-items:flex-end; justify-content:center; z-index:50; padding:0;
+  }
+  @media(min-width:640px){ .modal-back{ align-items:center; padding:20px; } }
+  .card{
+    background: var(--surface); color:var(--text); width:100%; max-width:440px;
+    border-radius:20px 20px 0 0; padding:22px 18px calc(22px + var(--safe-b)); max-height:90vh; max-height:90dvh; overflow-y:auto;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+    -webkit-overflow-scrolling: touch;
+  }
+  @media(min-width:640px){ .card{ border-radius:20px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); padding:26px 24px 28px; } }
+  .card-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:2px; }
+  .card-top .ct{ font-size:17px; font-weight:800; letter-spacing:-0.01em; }
+  .card-top .cs{ font-size:12px; color:var(--text-muted); margin-top:4px; font-weight:500; }
+  .card-close{ background:var(--bg); border:none; width:30px; height:30px; border-radius:8px; font-size:18px; color:var(--text-muted); cursor:pointer; line-height:1; flex-shrink:0; }
+  .card-divider{ border-top:1px solid var(--border); margin:16px 0; }
+
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:10.5px; letter-spacing:0.02em; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:6px; }
+  .field input{
+    width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg);
+    padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none;
+  }
+  .field input:focus{ border-color:var(--accent); background:var(--surface); }
+  .search-row{ display:flex; gap:8px; align-items:flex-end; }
+  .search-row .field{ flex:1; margin-bottom:0; }
+  .btn-search{
+    background:var(--accent); color:#fff; border:none; border-radius:10px; padding:0 16px;
+    font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap; height:44px;
+  }
+  .btn-search:disabled{ opacity:0.5; }
+
+  .results{ margin-top:12px; max-height:200px; overflow-y:auto; -webkit-overflow-scrolling: touch; }
+  .result-item{
+    display:flex; gap:10px; align-items:center; width:100%; text-align:left;
+    background:var(--bg); border:1.5px solid var(--border); border-radius:12px;
+    padding:8px 10px; margin-bottom:6px; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .result-item img{ width:32px; height:46px; object-fit:cover; border-radius:4px; flex-shrink:0; background:var(--border-2); }
+  .result-item .rt{ font-size:13px; font-weight:700; color:var(--text); }
+  .result-item .ra{ font-size:11px; color:var(--text-muted); margin-top:1px; }
+  .no-result{ font-size:12.5px; color:var(--text-muted); padding:10px 2px; }
+  .error-msg{ font-size:12.5px; color:var(--danger); background:rgba(224,82,82,0.08); padding:10px; border-radius:8px; }
+
+  .btn-add{
+    width:100%; background: var(--accent); color:#fff; border:none;
+    border-radius:12px; padding:15px; font-size:14.5px; font-weight:700; cursor:pointer; margin-top:4px;
+    font-family:'Inter',sans-serif;
+  }
+  .btn-add:disabled{ opacity:0.4; }
+
+  .hidden{ display:none !important; }
+
+  @media(max-width:360px){
+    .stats .num{ font-size:32px; }
+    h1.title{ font-size:21px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1 class="title">독서기록</h1>
+  <p class="subtitle">책을 검색하면 페이지 수를 자동으로 가져와요</p>
+
+  <div class="tabs">
+    <button class="tab active" id="tabStack" onclick="switchView('stack')">책 쌓기</button>
+    <button class="tab" id="tabCalendar" onclick="switchView('calendar')">캘린더</button>
+  </div>
+
+  <div class="panel">
+    <div id="stackView"></div>
+    <div id="calendarView" class="hidden"></div>
+  </div>
+</div>
+
+<button class="fab" onclick="openAddModal()" aria-label="책 추가">+</button>
+
+<div id="addModal" class="modal-back hidden">
+  <div class="card">
+    <div class="card-top">
+      <div>
+        <div class="ct">책 기록하기</div>
+        <div class="cs">제목을 검색하면 페이지 수를 자동으로 채워드려요</div>
+      </div>
+      <button class="card-close" onclick="closeAddModal()">&times;</button>
+    </div>
+
+    <div class="card-divider"></div>
+
+    <div class="search-row">
+      <div class="field">
+        <label>책 제목 검색</label>
+        <input id="searchInput" type="text" placeholder="예: 토지" onkeypress="if(event.key==='Enter') searchBooks()">
+      </div>
+      <button class="btn-search" onclick="searchBooks()" id="searchBtn">검색</button>
+    </div>
+
+    <div id="searchResults" class="results"></div>
+
+    <div class="card-divider"></div>
+
+    <div class="field">
+      <label>책 제목</label>
+      <input id="titleInput" type="text" placeholder="검색해서 선택하거나 직접 입력">
+    </div>
+    <div class="field">
+      <label>페이지 수</label>
+      <input id="pagesInput" type="number" placeholder="예: 472" min="1" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>완독 날짜</label>
+      <input id="dateInput" type="date">
+    </div>
+
+    <button class="btn-add" onclick="addBook()">추가하기</button>
+  </div>
+</div>
+
+<script>
+let books = JSON.parse(localStorage.getItem('reading-books') || '[]');
+let currentMonth = new Date();
+let currentView = 'stack';
+let selectedCover = null;
+
+const PALETTE = ['#5b5bd6','#e0748c','#3fa88a','#e8a23f','#4a90d9','#9b6fd6','#e0645a','#3fb5b5'];
+function colorFor(seed){
+  let h = 0;
+  for(let i=0;i<seed.length;i++){ h = (h*31 + seed.charCodeAt(i)) >>> 0; }
+  return PALETTE[h % PALETTE.length];
+}
+
+// 페이지 1장 두께를 약 0.075mm로 가정한 대략적인 추정치
+const MM_PER_PAGE = 0.075;
+function heightLabel(totalPages){
+  const cm = (totalPages * MM_PER_PAGE) / 10;
+  if(cm < 1) return null;
+  return cm >= 100 ? `${(cm/100).toFixed(2)}m` : `${cm.toFixed(1)}cm`;
+}
+
+function saveBooks(){ localStorage.setItem('reading-books', JSON.stringify(books)); }
+
+function switchView(view){
+  currentView = view;
+  document.getElementById('tabStack').classList.toggle('active', view==='stack');
+  document.getElementById('tabCalendar').classList.toggle('active', view==='calendar');
+  document.getElementById('stackView').classList.toggle('hidden', view!=='stack');
+  document.getElementById('calendarView').classList.toggle('hidden', view!=='calendar');
+  render();
+}
+
+function openAddModal(){
+  document.getElementById('addModal').classList.remove('hidden');
+  document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+  selectedCover = null;
+  setTimeout(()=>document.getElementById('searchInput').focus(), 50);
+}
+function closeAddModal(){
+  document.getElementById('addModal').classList.add('hidden');
+  document.getElementById('searchInput').value = '';
+  document.getElementById('titleInput').value = '';
+  document.getElementById('pagesInput').value = '';
+  document.getElementById('searchResults').innerHTML = '';
+  selectedCover = null;
+}
+
+async function searchBooks(){
+  const query = document.getElementById('searchInput').value.trim();
+  if(!query) return;
+  const btn = document.getElementById('searchBtn');
+  const resultsDiv = document.getElementById('searchResults');
+  btn.textContent = '검색중'; btn.disabled = true; resultsDiv.innerHTML = '';
+
+  try{
+    const res = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    if(data.error){ resultsDiv.innerHTML = `<div class="error-msg">${data.error}</div>`; return; }
+    if(!data.books || data.books.length===0){ resultsDiv.innerHTML = `<div class="no-result">검색 결과가 없어요. 직접 입력해주세요.</div>`; return; }
+
+    resultsDiv.innerHTML = data.books.map((book,i)=>`
+      <button class="result-item" onclick="selectBook(${i})">
+        ${book.cover ? `<img src="${book.cover}" loading="lazy"/>` : ''}
+        <div>
+          <div class="rt">${book.title}</div>
+          <div class="ra">${book.author||''}</div>
+        </div>
+      </button>
+    `).join('');
+    window._searchResults = data.books;
+  }catch(e){
+    resultsDiv.innerHTML = `<div class="error-msg">검색 중 오류가 발생했습니다.</div>`;
+  }finally{
+    btn.textContent = '검색'; btn.disabled = false;
+  }
+}
+
+async function selectBook(index){
+  const book = window._searchResults[index];
+  document.getElementById('titleInput').value = book.title;
+  document.getElementById('pagesInput').value = '';
+  document.getElementById('pagesInput').placeholder = '가져오는 중...';
+  selectedCover = book.cover || null;
+  try{
+    const res = await fetch(`/api/detail/${book.itemId}`);
+    const data = await res.json();
+    if(data.cover) selectedCover = data.cover;
+    if(data.pages && data.pages>0){ document.getElementById('pagesInput').value = data.pages; }
+    else { document.getElementById('pagesInput').placeholder = '예: 472'; alert('페이지 수를 찾을 수 없어요. 직접 입력해주세요.'); }
+  }catch(e){
+    document.getElementById('pagesInput').placeholder = '예: 472';
+    alert('페이지 수 조회 실패. 직접 입력해주세요.');
+  }
+}
+
+function addBook(){
+  const title = document.getElementById('titleInput').value.trim();
+  const pages = parseInt(document.getElementById('pagesInput').value);
+  const date = document.getElementById('dateInput').value || new Date().toISOString().split('T')[0];
+  if(!title){ alert('책 제목을 입력해주세요!'); return; }
+  if(!pages || pages<=0){ alert('올바른 페이지 수를 입력해주세요!'); return; }
+
+  books.push({ id: Date.now(), title, pages, completedDate: date, color: colorFor(title), cover: selectedCover });
+  saveBooks(); closeAddModal(); render();
+}
+function removeBook(id){ books = books.filter(b=>b.id!==id); saveBooks(); render(); }
+
+function render(){ currentView==='stack' ? renderStack() : renderCalendar(); }
+
+function renderStack(){
+  const totalPages = books.reduce((s,b)=>s+b.pages,0);
+  const sorted = [...books].sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
+  const h = books.length>0 ? Math.max(18, Math.min(340/books.length, 44)) : 40;
+  const hLabel = heightLabel(totalPages);
+
+  let html = `<div class="stats"><div class="num">${totalPages.toLocaleString()}</div><div class="label">총 읽은 페이지 · ${books.length}권</div>`;
+  if(hLabel) html += `<div class="height">📏 다 쌓으면 약 ${hLabel}</div>`;
+  html += `</div>`;
+
+  html += `<div class="shelf-area">`;
+  if(books.length===0){
+    html += `<div class="empty-shelf">아직 쌓은 책이 없어요.<br/>오른쪽 아래 + 버튼으로 첫 책을 올려보세요.</div>`;
+  }else{
+    html += `<div class="stack">`;
+    sorted.forEach(book=>{
+      html += `
+        <div class="spine" style="height:${h}px;background:${book.color}">
+          <div class="spine-label">
+            <span class="t">${book.title}</span>
+            <span class="p">${book.pages}p</span>
+          </div>
+          <button class="spine-del" onclick="removeBook(${book.id})">✕</button>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  if(books.length>0){
+    html += `<div class="booklist"><div class="h">읽은 책 목록</div>`;
+    [...sorted].reverse().forEach(book=>{
+      html += `<div class="book-row">
+        <div><div class="bt">${book.title}</div><div class="bd">${book.completedDate}</div></div>
+        <div class="bp">${book.pages}p</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  document.getElementById('stackView').innerHTML = html;
+}
+
+function toLocalDateStr(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function renderCalendar(){
+  const year=currentMonth.getFullYear(), month=currentMonth.getMonth();
+  const firstDay=new Date(year,month,1), lastDay=new Date(year,month+1,0);
+  const startDate=new Date(firstDay); startDate.setDate(startDate.getDate()-firstDay.getDay());
+  const endDate=new Date(lastDay); endDate.setDate(endDate.getDate()+(6-lastDay.getDay()));
+
+  const monthBooks = books.filter(b=>{ const d=new Date(b.completedDate); return d.getFullYear()===year && d.getMonth()===month; });
+  const monthPages = monthBooks.reduce((s,b)=>s+b.pages,0);
+  const byDate = {};
+  monthBooks.forEach(b=>{ (byDate[b.completedDate]=byDate[b.completedDate]||[]).push(b); });
+
+  const days=[]; const cursor=new Date(startDate);
+  while(cursor<=endDate){ days.push(new Date(cursor)); cursor.setDate(cursor.getDate()+1); }
+  const dow=['일','월','화','수','목','금','토'];
+
+  let html = `<div class="cal-summary">
+    <div class="box"><div class="v">${monthBooks.length}권</div><div class="l">이달 완독</div></div>
+    <div class="box"><div class="v">${monthPages.toLocaleString()}p</div><div class="l">이달 읽은 페이지</div></div>
+  </div>`;
+
+  html += `<div class="cal-head">
+    <button class="cal-nav" onclick="changeMonth(-1)">←</button>
+    <div class="m">${year}년 ${month+1}월</div>
+    <button class="cal-nav" onclick="changeMonth(1)">→</button>
+  </div>`;
+  html += `<div class="cal-grid">`;
+  dow.forEach(d=> html += `<div class="cal-dow">${d}</div>`);
+  days.forEach(day=>{
+    const dateStr=toLocalDateStr(day);
+    const dayBooks=byDate[dateStr]||[];
+    const isOther = day.getMonth()!==month;
+    const main = dayBooks[0];
+    if(main){
+      html += `<div class="cal-cell has ${isOther?'other':''}" style="${main.cover?'':'background:'+main.color}" title="${dayBooks.map(b=>b.title).join(', ')}">
+        ${main.cover ? `<img class="cover-img" src="${main.cover}" loading="lazy"/><div class="cover-shade"></div>` : ''}
+        <span class="d">${day.getDate()}</span>
+        ${dayBooks.length>1 ? `<span class="cal-more">+${dayBooks.length-1}</span>` : ''}
+      </div>`;
+    }else{
+      html += `<div class="cal-cell ${isOther?'other':''}"><span class="d">${day.getDate()}</span></div>`;
+    }
+  });
+  html += `</div>`;
+
+  html += `<div class="month-list"><div class="h">이달의 완독</div>`;
+  if(monthBooks.length===0){
+    html += `<div class="month-empty">이 달에 완독한 책이 없어요</div>`;
+  }else{
+    [...monthBooks].sort((a,b)=>new Date(a.completedDate)-new Date(b.completedDate)).forEach(book=>{
+      html += `<div class="month-row">
+        ${book.cover ? `<img class="cov" src="${book.cover}" loading="lazy"/>` : `<div class="chip" style="background:${book.color}"></div>`}
+        <div><div class="bt">${book.title}</div><div class="bd">${book.pages}p · ${book.completedDate}</div></div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+  document.getElementById('calendarView').innerHTML = html;
+}
+
+function changeMonth(delta){
+  currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth()+delta, 1);
+  renderCalendar();
+}
+
+render();
+</script>
+</body>
+</html>
