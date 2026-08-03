@@ -52,19 +52,24 @@
   .stats .label{ color:var(--text-muted); font-size:12px; margin-top:8px; font-weight:600; }
   .stats .height{ display:inline-flex; align-items:center; gap:5px; margin-top:12px; padding:6px 12px; background:var(--accent-soft); color:var(--accent-dark); border-radius:20px; font-size:12px; font-weight:700; }
 
-  /* 책 쌓기 - 알약(캡슐) 스타일 */
+  /* 책 쌓기 - 각진 책 모양 (폭을 좁게 해서 책등 두께처럼 보이게) */
   .shelf-area{ min-height:70px; }
-  .stack{ display:flex; flex-direction:column-reverse; gap:5px; align-items:center; }
+  .stack{ display:flex; flex-direction:column-reverse; gap:4px; align-items:center; }
   .spine{
-    position:relative; width:100%;
+    position:relative;
     display:flex; align-items:center; justify-content:center;
-    border-radius:999px;
+    border-radius:6px;
     cursor:pointer;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.22);
+  }
+  .spine::after{
+    content:''; position:absolute; right:0; top:2px; bottom:2px; width:5px;
+    background:repeating-linear-gradient(180deg,#efe8d8 0px,#efe8d8 1px,#e0d7c1 1px,#e0d7c1 2px);
+    border-radius:0 4px 4px 0;
   }
   .spine:active{ transform: scale(0.99); }
   .spine-label{
-    display:flex; align-items:center; gap:8px; padding:0 22px; width:100%;
+    display:flex; align-items:center; gap:8px; padding:0 14px 0 16px; width:100%; margin-right:5px;
     color:#fff; font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden;
     text-shadow: 0 1px 2px rgba(0,0,0,0.15);
   }
@@ -245,6 +250,11 @@ function colorFor(seed){
   let h = 0;
   for(let i=0;i<seed.length;i++){ h = (h*31 + seed.charCodeAt(i)) >>> 0; }
   return PALETTE[h % PALETTE.length];
+}
+function widthFor(seed){
+  let h = 0;
+  for(let i=0;i<seed.length;i++){ h = (h*17 + seed.charCodeAt(i)) >>> 0; }
+  return 60 + (h % 23); // 60% ~ 82% 사이, 책마다 살짝 다른 폭
 }
 
 // 표지 이미지에서 대표 색상 추출 (실패하면 null 반환 -> 팔레트색으로 대체)
@@ -460,8 +470,9 @@ function renderStack(){
   }else{
     html += `<div class="stack">`;
     sorted.forEach(book=>{
+      const w = widthFor(book.title);
       html += `
-        <div class="spine" style="height:${h}px;background:${book.color}" onclick="openEditModal(${book.id})">
+        <div class="spine" style="height:${h}px;width:${w}%;background:${book.color}" onclick="openEditModal(${book.id})">
           <div class="spine-label">
             <span class="t">${book.title}</span>
             <span class="p">${book.pages}p</span>
