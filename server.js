@@ -76,13 +76,18 @@ app.get('/api/detail/:itemId', async (req, res) => {
     const book = data.item[0];
     // subInfo.itemPage에 페이지 수가 들어있음
     const pages = book.subInfo && book.subInfo.itemPage ? book.subInfo.itemPage : 0;
+    // subInfo.packing에 실제 책 크기(mm)가 들어있음 - 없는 책도 있음
+    const packing = book.subInfo && book.subInfo.packing ? book.subInfo.packing : null;
 
     res.json({
       title: book.title,
       author: book.author,
       pages: pages,
       cover: book.cover,
-      publisher: book.publisher
+      publisher: book.publisher,
+      depthMm: packing && packing.sizeDepth ? Number(packing.sizeDepth) : null,   // 두께
+      heightMm: packing && packing.sizeHeight ? Number(packing.sizeHeight) : null, // 세로(책등 길이)
+      widthMm: packing && packing.sizeWidth ? Number(packing.sizeWidth) : null     // 가로
     });
   } catch (error) {
     console.error('상세 조회 오류:', error);
