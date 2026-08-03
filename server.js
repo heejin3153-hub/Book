@@ -1,0 +1,95 @@
+require('dotenv').config();
+const express = require('express');
+const fetch = require('node-fetch');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const TTB_KEY = process.env.ALADIN_TTB_KEY;
+
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+
+// 책 검색 API (국내도서만, e-book 제외)
+app.get('/api/search', async (req, res) => {
+  const { query } = req.query;
+
+  if (!query) {
+    return res.status(400).json({ error: '검색어를 입력해주세요.' });
+  }
+
+  if (!TTB_KEY) {
+    return res.status(500).json({
+      error: 'ALADIN_TTB_KEY가 설정되지 않았습니다. .env 파일을 확인해주세요.'
+    });
+  }
+
+  try {
+    // SearchTarget=Book -> 국내도서만 검색 (eBook, Foreign 제외)
+    const url = `https://www.aladin.co.kr/ttb/api/ItemSearch.aspx?ttbkey=${TTB_KEY}&Query=${encodeURIComponent(query)}&QueryType=Title&MaxResults=10&start=1&SearchTarget=Book&output=js&Version=20131101`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.item) {
+      return res.json({ books: [] });
+    }
+
+    // 필요한 정보만 추려서 반환
+    const books = data.item.map(book => ({
+      title: book.title,
+      author: book.author,
+      isbn: book.isbn13 || book.isbn,
+      publisher: book.publisher,
+      pubDate: book.pubDate,
+      cover: book.cover,
+      itemId: book.itemId
+    }));
+
+    res.json({ books });
+  } catch (error) {
+    console.error('검색 오류:', error);
+    res.status(500).json({ error: '검색 중 오류가 발생했습니다.' });
+  }
+});
+
+// 책 상세 정보 (페이지 수 포함) 조회 API
+app.get('/api/detail/:itemId', async (req, res) => {
+  const { itemId } = req.params;
+
+  if (!TTB_KEY) {
+    return res.status(500).json({
+      error: 'ALADIN_TTB_KEY가 설정되지 않았습니다.'
+    });
+  }
+
+  try {
+    const url = `https://www.aladin.co.kr/ttb/api/ItemLookUp.aspx?ttbkey=${TTB_KEY}&itemId=${itemId}&itemIdType=ItemId&output=js&Version=20131101&OptResult=packing`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.item || data.item.length === 0) {
+      return res.status(404).json({ error: '책을 찾을 수 없습니다.' });
+    }
+
+    const book = data.item[0];
+    // subInfo.itemPage에 페이지 수가 들어있음
+    const pages = book.subInfo && book.subInfo.itemPage ? book.subInfo.itemPage : 0;
+
+    res.json({
+      title: book.title,
+      author: book.author,
+      pages: pages,
+      cover: book.cover,
+      publisher: book.publisher
+    });
+  } catch (error) {
+    console.error('상세 조회 오류:', error);
+    res.status(500).json({ error: '상세 정보 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`독서기록 앱이 http://localhost:${PORT} 에서 실행 중입니다.`);
+});

@@ -1,0 +1,15 @@
+{
+  "name": "reading-tracker",
+  "version": "1.0.0",
+  "description": "독서기록 웹앱 - 알라딘 API로 책 페이지 수 자동 검색",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
+    "dotenv": "^16.3.1"
+  }
+}
