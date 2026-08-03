@@ -38,6 +38,9 @@
   }
   .wrap{ max-width:600px; margin:0 auto; padding: 28px 16px 0; }
 
+  .header-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .header-menu{ background:var(--surface); border:1px solid var(--border); color:var(--text-muted); width:34px; height:34px; border-radius:10px; font-size:17px; cursor:pointer; flex-shrink:0; line-height:1; }
+  .header-menu:active{ background:var(--bg); }
   h1.title{ font-size:23px; margin:0 0 4px; font-weight:800; letter-spacing:-0.02em; }
   .subtitle{ color:var(--text-muted); font-size:13px; margin:0 0 22px; font-weight:500; }
 
@@ -163,8 +166,13 @@
 <body>
 
 <div class="wrap">
-  <h1 class="title">독서기록</h1>
-  <p class="subtitle">책을 검색하면 페이지 수를 자동으로 가져와요</p>
+  <div class="header-row">
+    <div>
+      <h1 class="title" id="appTitle">독서기록</h1>
+      <p class="subtitle" id="appSubtitle">책을 검색하면 페이지 수를 자동으로 가져와요</p>
+    </div>
+    <button class="header-menu" onclick="openTitleModal()" aria-label="제목 편집">⋯</button>
+  </div>
 
   <div class="tabs">
     <button class="tab active" id="tabStack" onclick="switchView('stack')">책 쌓기</button>
@@ -178,6 +186,28 @@
 </div>
 
 <button class="fab" onclick="openAddModal()" aria-label="책 추가">+</button>
+
+<div id="titleModal" class="modal-back hidden">
+  <div class="card">
+    <div class="card-top">
+      <div><div class="ct">화면 문구 편집</div><div class="cs">제목과 부제목을 자유롭게 바꿔보세요</div></div>
+      <button class="card-close" onclick="closeTitleModal()">&times;</button>
+    </div>
+    <div class="card-divider"></div>
+    <div class="field">
+      <label>제목</label>
+      <input id="titleEditInput" type="text" placeholder="독서기록">
+    </div>
+    <div class="field">
+      <label>부제목</label>
+      <input id="subtitleEditInput" type="text" placeholder="책을 검색하면 페이지 수를 자동으로 가져와요">
+    </div>
+    <div class="btn-row">
+      <button class="btn-delete" onclick="resetTitle()">기본값으로</button>
+      <button class="btn-add" onclick="saveTitle()">저장하기</button>
+    </div>
+  </div>
+</div>
 
 <div id="addModal" class="modal-back hidden">
   <div class="card">
@@ -239,9 +269,42 @@
 
 <script>
 let books = JSON.parse(localStorage.getItem('reading-books') || '[]');
+const DEFAULT_TITLE = '독서기록';
+const DEFAULT_SUBTITLE = '책을 검색하면 페이지 수를 자동으로 가져와요';
+
+function applyTitleFromStorage(){
+  const t = localStorage.getItem('app-title') || DEFAULT_TITLE;
+  const s = localStorage.getItem('app-subtitle') || DEFAULT_SUBTITLE;
+  document.getElementById('appTitle').textContent = t;
+  document.getElementById('appSubtitle').textContent = s;
+}
+function openTitleModal(){
+  document.getElementById('titleEditInput').value = localStorage.getItem('app-title') || DEFAULT_TITLE;
+  document.getElementById('subtitleEditInput').value = localStorage.getItem('app-subtitle') || DEFAULT_SUBTITLE;
+  document.getElementById('titleModal').classList.remove('hidden');
+}
+function closeTitleModal(){ document.getElementById('titleModal').classList.add('hidden'); }
+function saveTitle(){
+  const t = document.getElementById('titleEditInput').value.trim() || DEFAULT_TITLE;
+  const s = document.getElementById('subtitleEditInput').value.trim() || DEFAULT_SUBTITLE;
+  localStorage.setItem('app-title', t);
+  localStorage.setItem('app-subtitle', s);
+  applyTitleFromStorage();
+  closeTitleModal();
+}
+function resetTitle(){
+  localStorage.removeItem('app-title');
+  localStorage.removeItem('app-subtitle');
+  applyTitleFromStorage();
+  closeTitleModal();
+}
+applyTitleFromStorage();
+
 let currentMonth = new Date();
 let currentView = 'stack';
 let selectedCover = null;
+let selectedDepthMm = null;
+let selectedSpineMm = null;
 let currentRating = 0;
 let editingId = null;
 
@@ -251,21 +314,28 @@ function colorFor(seed){
   for(let i=0;i<seed.length;i++){ h = (h*31 + seed.charCodeAt(i)) >>> 0; }
   return PALETTE[h % PALETTE.length];
 }
-function widthFor(seed){
-  // 책 길이(세로)는 페이지 수와 무관하게 거의 고정 - 살짝만 자연스럽게 변주 (70~78%)
+function widthFor(book){
+  // 알라딘에서 실제 세로(책등 길이) 값을 받았으면 그걸 기준으로 비율 계산
+  if(book.spineMm){
+    const pct = 50 + (book.spineMm - 150) * 0.13;
+    return Math.max(55, Math.min(pct, 88));
+  }
+  // 없으면 제목 기반으로 자연스럽게 변주 (70~78%)
   let h = 0;
+  const seed = book.title;
   for(let i=0;i<seed.length;i++){ h = (h*17 + seed.charCodeAt(i)) >>> 0; }
   return 70 + (h % 9);
 }
 
-// 실제 책 비율: 종이 한 장 두께 약 0.07mm + 표지 두께 약 3mm
+// 실제 책 비율: 종이 한 장 두께 약 0.07mm + 표지 두께 약 3mm (알라딘에서 실제 두께를 못 받았을 때의 추정치)
 const MM_PER_PAGE = 0.07;
 const COVER_MM = 3;
 function thicknessMm(pages){ return pages * MM_PER_PAGE + COVER_MM; }
 // mm -> px 변환 (모바일 화면에서 보기 좋은 스케일)
-const PX_PER_MM = 0.95;
-function spineHeightPx(pages){
-  return Math.max(9, Math.min(thicknessMm(pages) * PX_PER_MM, 90));
+const PX_PER_MM = 2.3;
+function spineHeightPx(book){
+  const mm = book.depthMm || thicknessMm(book.pages);
+  return Math.max(26, Math.min(mm * PX_PER_MM, 150));
 }
 
 // 표지 이미지에서 대표 색상 추출 (실패하면 null 반환 -> 팔레트색으로 대체)
@@ -332,6 +402,8 @@ function renderStars(){
 function openAddModal(){
   editingId = null;
   selectedCover = null;
+  selectedDepthMm = null;
+  selectedSpineMm = null;
   currentRating = 0;
   document.getElementById('modalTitle').textContent = '책 기록하기';
   document.getElementById('modalSubtitle').textContent = '제목을 검색하면 페이지 수를 자동으로 채워드려요';
@@ -352,6 +424,8 @@ function openEditModal(id){
   if(!book) return;
   editingId = id;
   selectedCover = book.cover || null;
+  selectedDepthMm = book.depthMm || null;
+  selectedSpineMm = book.spineMm || null;
   currentRating = book.rating || 0;
   document.getElementById('modalTitle').textContent = '책 수정하기';
   document.getElementById('modalSubtitle').textContent = '내용을 고치거나 삭제할 수 있어요';
@@ -374,6 +448,8 @@ function closeAddModal(){
   document.getElementById('reviewInput').value = '';
   document.getElementById('searchResults').innerHTML = '';
   selectedCover = null;
+  selectedDepthMm = null;
+  selectedSpineMm = null;
   currentRating = 0;
   editingId = null;
 }
@@ -420,10 +496,14 @@ async function selectBook(index){
   document.getElementById('pagesInput').value = '';
   document.getElementById('pagesInput').placeholder = '가져오는 중...';
   selectedCover = book.cover || null;
+  selectedDepthMm = null;
+  selectedSpineMm = null;
   try{
     const res = await fetch(`/api/detail/${book.itemId}`);
     const data = await res.json();
     if(data.cover) selectedCover = data.cover;
+    if(data.depthMm) selectedDepthMm = data.depthMm;
+    if(data.heightMm) selectedSpineMm = data.heightMm;
     if(data.pages && data.pages>0){ document.getElementById('pagesInput').value = data.pages; }
     else { document.getElementById('pagesInput').placeholder = '예: 472'; alert('페이지 수를 찾을 수 없어요. 직접 입력해주세요.'); }
   }catch(e){
@@ -449,10 +529,12 @@ async function saveBook(){
   if(editingId !== null){
     const idx = books.findIndex(b=>b.id===editingId);
     if(idx > -1){
-      books[idx] = { ...books[idx], title, pages, completedDate: date, rating: currentRating, review, cover: selectedCover || books[idx].cover, color: selectedCover ? color : books[idx].color };
+      books[idx] = { ...books[idx], title, pages, completedDate: date, rating: currentRating, review,
+        cover: selectedCover || books[idx].cover, color: selectedCover ? color : books[idx].color,
+        depthMm: selectedDepthMm || books[idx].depthMm, spineMm: selectedSpineMm || books[idx].spineMm };
     }
   }else{
-    books.push({ id: Date.now(), title, pages, completedDate: date, color, cover: selectedCover, rating: currentRating, review });
+    books.push({ id: Date.now(), title, pages, completedDate: date, color, cover: selectedCover, rating: currentRating, review, depthMm: selectedDepthMm, spineMm: selectedSpineMm });
   }
   saveBooks(); closeAddModal(); render();
 }
@@ -479,8 +561,8 @@ function renderStack(){
   }else{
     html += `<div class="stack">`;
     sorted.forEach(book=>{
-      const w = widthFor(book.title);
-      const h = spineHeightPx(book.pages);
+      const w = widthFor(book);
+      const h = spineHeightPx(book);
       const showLabel = h >= 16;
       html += `
         <div class="spine" style="height:${h}px;width:${w}%;background:${book.color}" onclick="openEditModal(${book.id})">
