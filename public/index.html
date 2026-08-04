@@ -1396,7 +1396,10 @@ function initFirebase(){
     fbApp = firebase.initializeApp(cfg);
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
-    fbAuth.getRedirectResult().catch(err=> console.error('redirect result error', err));
+    fbAuth.getRedirectResult().catch(err=>{
+      console.error('redirect result error', err);
+      if(err && err.code) alert('로그인 처리 중 오류: ' + err.code);
+    });
     fbAuth.onAuthStateChanged(user=>{
       currentUser = user;
       renderSyncArea();
@@ -1443,7 +1446,10 @@ function disconnectFirebase(){
 function signInGoogle(){
   if(!fbAuth){ alert('먼저 Firebase를 연결해주세요.'); return; }
   const provider = new firebase.auth.GoogleAuthProvider();
-  fbAuth.signInWithRedirect(provider);
+  fbAuth.signInWithRedirect(provider).catch(err=>{
+    alert('로그인 중 오류가 발생했어요:\n' + err.code + '\n' + err.message);
+    console.error(err);
+  });
 }
 function signOutGoogle(){ if(fbAuth) fbAuth.signOut(); }
 
