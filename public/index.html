@@ -75,7 +75,9 @@
   .empty-shelf{ text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7; padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500; }
 
   .booklist{ margin-top:22px; padding-top:18px; border-top:1px solid var(--border); }
-  .book-row{ display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-bottom:1px solid var(--border); gap:10px; cursor:pointer; }
+  .book-item{ border-bottom:1px solid var(--border); padding:11px 0; }
+  .book-item:last-child{ border-bottom:none; }
+  .book-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; cursor:pointer; }
   .book-row:last-child{ border-bottom:none; }
   .book-row .bt{ font-size:13.5px; font-weight:600; color:var(--text); }
   .book-row .bd{ font-size:11px; color:var(--text-muted); margin-top:2px; }
@@ -141,9 +143,12 @@
 
   .modal-back{ position:fixed; inset:0; background:rgba(24,24,27,0.4); backdrop-filter:blur(3px); display:flex; align-items:flex-end; justify-content:center; z-index:50; }
   @media(min-width:640px){ .modal-back{ align-items:center; padding:20px; } }
-  .card{ background:var(--surface); color:var(--text); width:100%; max-width:440px; border-radius:20px 20px 0 0; padding:22px 18px calc(22px + var(--safe-b)); max-height:90vh; max-height:90dvh; overflow-y:auto; box-shadow:0 -10px 40px rgba(0,0,0,0.15); -webkit-overflow-scrolling:touch; }
-  @media(min-width:640px){ .card{ border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,0.2); padding:26px 24px 28px; } }
-  .card-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:2px; }
+  .card{ background:var(--surface); color:var(--text); width:100%; max-width:440px; border-radius:20px 20px 0 0; max-height:90vh; max-height:90dvh; box-shadow:0 -10px 40px rgba(0,0,0,0.15); display:flex; flex-direction:column; overflow:hidden; }
+  @media(min-width:640px){ .card{ border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,0.2); } }
+  .card-top{ display:flex; justify-content:space-between; align-items:flex-start; padding:22px 18px 14px; flex-shrink:0; background:var(--surface); box-shadow:0 1px 0 var(--border); position:relative; z-index:2; }
+  @media(min-width:640px){ .card-top{ padding:26px 24px 16px; } }
+  .card-body{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px 18px calc(22px + var(--safe-b)); }
+  @media(min-width:640px){ .card-body{ padding:16px 24px 28px; } }
   .card-top .ct{ font-size:17px; font-weight:800; letter-spacing:-0.01em; }
   .card-top .cs{ font-size:12px; color:var(--text-muted); margin-top:4px; font-weight:500; }
   .card-close{ background:var(--bg); border:none; width:30px; height:30px; border-radius:8px; font-size:18px; color:var(--text-muted); cursor:pointer; flex-shrink:0; }
@@ -172,6 +177,14 @@
   .no-result{ font-size:12.5px; color:var(--text-muted); padding:10px 2px; }
   .error-msg{ font-size:12.5px; color:var(--danger); background:rgba(224,82,82,0.08); padding:10px; border-radius:8px; }
 
+  .quote-entry{ background:var(--bg); border:1px solid var(--border-2); border-radius:10px; padding:10px; margin-bottom:8px; }
+  .quote-entry input{ width:100%; border:none; background:transparent; font-size:12px; font-weight:600; color:var(--text-muted); padding:0 0 6px; outline:none; }
+  .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:vertical; min-height:40px; font-family:'Inter',sans-serif; }
+  .quote-remove{ background:none; border:none; color:var(--danger); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0 0; }
+  .quote-toggle{ background:none; border:none; color:var(--accent); font-size:11.5px; font-weight:700; cursor:pointer; padding:6px 0 0; }
+  .quote-list{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); }
+  .quote-item{ font-size:12.5px; color:var(--text); line-height:1.6; margin-bottom:8px; font-style:italic; }
+  .quote-item .src{ display:block; font-size:11px; color:var(--text-muted); font-style:normal; font-weight:600; margin-top:2px; }
   .star-picker{ position:relative; display:inline-block; font-size:30px; letter-spacing:5px; cursor:pointer; line-height:1; -webkit-user-select:none; user-select:none; }
   .star-picker .bg{ color:var(--border-2); }
   .star-picker .fg{ position:absolute; top:0; left:0; overflow:hidden; color:var(--star); white-space:nowrap; width:0%; }
@@ -238,6 +251,7 @@
       <div><div class="ct" id="modalTitle">책 기록하기</div><div class="cs" id="modalSubtitle">제목을 검색하면 페이지 수를 자동으로 채워드려요</div></div>
       <button class="card-close" onclick="closeAddModal()">&times;</button>
     </div>
+    <div class="card-body">
     <div class="card-divider"></div>
 
     <div class="field">
@@ -271,12 +285,18 @@
       </div>
     </div>
     <div class="field" id="reviewField"><label>한줄 리뷰</label><textarea id="reviewInput" placeholder="이 책에 대한 생각을 남겨보세요 (선택)"></textarea></div>
+    <div class="field" id="quotesField">
+      <label>인상 깊은 문구</label>
+      <div id="quotesContainer"></div>
+      <button type="button" class="btn-secondary" style="margin-top:4px" onclick="addQuoteField()">+ 문구 추가</button>
+    </div>
 
     <button class="btn-secondary hidden" id="finishBtn" onclick="finishReading()">📖 지금 완독으로 표시하기</button>
 
     <div class="btn-row">
       <button class="btn-delete hidden" id="deleteBtn" onclick="deleteFromModal()">삭제</button>
       <button class="btn-add" onclick="saveBook()" id="saveBtn">추가하기</button>
+    </div>
     </div>
   </div>
 </div>
@@ -288,12 +308,21 @@
       <div><div class="ct">설정</div><div class="cs">화면 문구, 데이터 백업을 관리해요</div></div>
       <button class="card-close" onclick="closeTitleModal()">&times;</button>
     </div>
+    <div class="card-body">
     <div class="card-divider"></div>
     <div class="field"><label>제목</label><input id="titleEditInput" type="text" placeholder="독서기록"></div>
     <div class="field"><label>부제목</label><input id="subtitleEditInput" type="text" placeholder="책을 검색하면 페이지 수를 자동으로 가져와요"></div>
     <div class="btn-row">
       <button class="btn-delete" onclick="resetTitle()">기본값으로</button>
       <button class="btn-add" onclick="saveTitle()">저장하기</button>
+    </div>
+
+    <div class="card-divider"></div>
+    <div class="field"><label>책 쌓기 모드</label>
+      <div class="status-picker" id="stackStylePicker">
+        <button type="button" onclick="setStackStyle('color')" data-v="color">🎨 단색보기</button>
+        <button type="button" onclick="setStackStyle('cover')" data-v="cover">🖼️ 표지이미지보기</button>
+      </div>
     </div>
 
     <div class="card-divider"></div>
@@ -307,6 +336,7 @@
     <div class="card-divider"></div>
     <div class="field"><label>클라우드 동기화</label></div>
     <div id="syncArea"></div>
+    </div>
   </div>
 </div>
 
@@ -317,6 +347,7 @@
       <div><div class="ct">Firebase 연결</div><div class="cs">Firebase 콘솔에서 복사한 firebaseConfig 코드를 통째로 붙여넣으세요</div></div>
       <button class="card-close" onclick="closeFirebaseSetup()">&times;</button>
     </div>
+    <div class="card-body">
     <div class="card-divider"></div>
     <div class="field">
       <label>firebaseConfig 코드</label>
@@ -328,6 +359,7 @@
 };'></textarea>
     </div>
     <button class="btn-add" onclick="saveFirebaseConfig()">연결하기</button>
+    </div>
   </div>
 </div>
 
@@ -338,6 +370,7 @@
       <div><div class="ct">이미지로 저장</div><div class="cs">공유하거나 저장할 수 있어요</div></div>
       <button class="card-close" onclick="closeShareModal()">&times;</button>
     </div>
+    <div class="card-body">
     <div class="card-divider"></div>
     <div class="share-preview">
       <canvas id="shareCanvas"></canvas>
@@ -345,6 +378,7 @@
         <button class="btn-secondary" onclick="downloadShareImage()" style="margin-top:0">⬇ 저장</button>
         <button class="btn-add" onclick="shareImage()" id="shareBtn">공유하기</button>
       </div>
+    </div>
     </div>
   </div>
 </div>
@@ -364,6 +398,8 @@ let currentMonth = new Date();
 let currentView = 'shelf';
 let selectedCover = null, selectedDepthMm = null, selectedSpineMm = null;
 let currentRating = 0, currentStatus = 'completed', editingId = null;
+let currentQuotes = [];
+let expandedBooks = new Set();
 let startDateManuallyEdited = false;
 let activeTags = [];
 
@@ -420,6 +456,9 @@ function heightObjectLabel(totalPages,bookCount){
   if(ratio>1.35) return `${best.emoji} ${best.name} ${ratio.toFixed(1)}개를 쌓은 높이예요`;
   return `${best.emoji} ${best.name} 높이의 ${Math.round(ratio*100)}% 정도예요`;
 }
+function escapeHtml(str){
+  return String(str||'').replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 function starHtml(rating){
   rating = rating||0;
   const pct = Math.max(0, Math.min(100, (rating/5)*100));
@@ -468,11 +507,23 @@ function applyTitleFromStorage(){
   document.getElementById('appTitle').textContent = localStorage.getItem('app-title') || DEFAULT_TITLE;
   document.getElementById('appSubtitle').textContent = localStorage.getItem('app-subtitle') || DEFAULT_SUBTITLE;
 }
+function getStackStyle(){ return localStorage.getItem('stack-style') || 'cover'; }
+function setStackStyle(v){
+  localStorage.setItem('stack-style', v);
+  renderStackStylePicker();
+  if(currentView==='shelf') renderShelf();
+}
+function renderStackStylePicker(){
+  const cur = getStackStyle();
+  document.querySelectorAll('#stackStylePicker button').forEach(btn=> btn.classList.toggle('on', btn.dataset.v===cur));
+}
+
 function openTitleModal(){
   document.getElementById('titleEditInput').value = localStorage.getItem('app-title') || DEFAULT_TITLE;
   document.getElementById('subtitleEditInput').value = localStorage.getItem('app-subtitle') || DEFAULT_SUBTITLE;
   document.getElementById('titleModal').classList.remove('hidden');
   renderSyncArea();
+  renderStackStylePicker();
 }
 function closeTitleModal(){ document.getElementById('titleModal').classList.add('hidden'); }
 function saveTitle(){
@@ -535,6 +586,27 @@ function renderStars(){
   document.getElementById('ratingLabel').textContent = currentRating>0 ? `${currentRating}` : '';
 }
 
+function renderQuotesContainer(){
+  const el = document.getElementById('quotesContainer');
+  if(!el) return;
+  el.innerHTML = currentQuotes.map((q,i)=>`
+    <div class="quote-entry">
+      <input type="text" placeholder="페이지 또는 챕터 (예: p.152, 3장)" value="${(q.page||'').replace(/"/g,'&quot;')}" oninput="updateQuote(${i},'page',this.value)">
+      <textarea placeholder="인상 깊었던 문장을 적어보세요" oninput="updateQuote(${i},'text',this.value)">${(q.text||'')}</textarea>
+      <button type="button" class="quote-remove" onclick="removeQuote(${i})">이 문구 삭제</button>
+    </div>
+  `).join('');
+}
+function addQuoteField(){ currentQuotes.push({page:'', text:''}); renderQuotesContainer(); }
+function updateQuote(i, field, val){ if(currentQuotes[i]) currentQuotes[i][field]=val; }
+function removeQuote(i){ currentQuotes.splice(i,1); renderQuotesContainer(); }
+
+function toggleBookExpand(id, event){
+  if(event) event.stopPropagation();
+  if(expandedBooks.has(id)) expandedBooks.delete(id); else expandedBooks.add(id);
+  renderShelf();
+}
+
 function setStatus(s){
   currentStatus = s;
   document.querySelectorAll('#statusPicker button').forEach(btn=> btn.classList.toggle('on', btn.dataset.s===s));
@@ -545,6 +617,7 @@ function setStatus(s){
   document.getElementById('dateField').style.display = showDate;
   document.getElementById('ratingField').style.display = showRatingReview;
   document.getElementById('reviewField').style.display = showRatingReview;
+  document.getElementById('quotesField').style.display = showRatingReview;
   document.getElementById('pagesField').style.display = s==='wishlist' ? 'none' : '';
   document.getElementById('tagsField').style.display = '';
   document.getElementById('finishBtn').classList.add('hidden'); // 새로 추가할 때는 안 보임(수정時만)
@@ -565,6 +638,7 @@ function resetModalFields(){
 
 function openAddModal(defaultStatus){
   editingId=null; selectedCover=null; selectedDepthMm=null; selectedSpineMm=null; currentRating=0;
+  currentQuotes=[];
   startDateManuallyEdited=false;
   document.getElementById('modalTitle').textContent='책 기록하기';
   document.getElementById('modalSubtitle').textContent='제목을 검색하면 페이지 수를 자동으로 채워드려요';
@@ -575,6 +649,7 @@ function openAddModal(defaultStatus){
   document.getElementById('startDateInput').value = ''; // 완독일 입력 시 자동으로 전날로 채워짐
   autoFillStartDate();
   renderStars();
+  renderQuotesContainer();
   setStatus(defaultStatus || (currentView==='wishlist' ? 'wishlist' : 'completed'));
   document.getElementById('addModal').classList.remove('hidden');
   setTimeout(()=>document.getElementById('searchInput').focus(),50);
@@ -596,6 +671,7 @@ function openEditModal(id){
   if(!book) return;
   editingId=id; selectedCover=book.cover||null; selectedDepthMm=book.depthMm||null; selectedSpineMm=book.spineMm||null;
   currentRating=book.rating||0;
+  currentQuotes=(book.quotes||[]).map(q=>({...q}));
   startDateManuallyEdited=false;
   document.getElementById('modalTitle').textContent='책 수정하기';
   document.getElementById('modalSubtitle').textContent='내용을 고치거나 삭제할 수 있어요';
@@ -608,6 +684,7 @@ function openEditModal(id){
   document.getElementById('dateInput').value=book.completedDate||'';
   document.getElementById('reviewInput').value=book.review||'';
   renderStars();
+  renderQuotesContainer();
   setStatus(book.status||'completed');
   document.getElementById('finishBtn').classList.toggle('hidden', book.status!=='reading');
   document.getElementById('addModal').classList.remove('hidden');
@@ -617,6 +694,7 @@ function closeAddModal(){
   document.getElementById('addModal').classList.add('hidden');
   resetModalFields();
   selectedCover=null; selectedDepthMm=null; selectedSpineMm=null; currentRating=0; editingId=null;
+  currentQuotes=[];
 }
 
 function finishReading(){
@@ -697,6 +775,7 @@ async function saveBook(){
   const startDate = document.getElementById('startDateInput').value || null;
   const completedDate = document.getElementById('dateInput').value || null;
   const review = document.getElementById('reviewInput').value.trim();
+  const quotes = currentStatus==='completed' ? currentQuotes.filter(q=>q.text && q.text.trim()).map(q=>({page:(q.page||'').trim(), text:q.text.trim()})) : [];
 
   if(currentStatus==='completed' && !completedDate){ alert('완독 날짜를 입력해주세요!'); return; }
 
@@ -709,6 +788,7 @@ async function saveBook(){
     completedDate: currentStatus==='completed' ? completedDate : null,
     rating: currentStatus==='completed' ? currentRating : 0,
     review: currentStatus==='completed' ? review : '',
+    quotes,
     cover: selectedCover, color,
     depthMm: selectedDepthMm, spineMm: selectedSpineMm
   };
@@ -834,7 +914,7 @@ function renderShelf(){
     html += `<div class="stack">`;
     sorted.forEach(book=>{
       const w = widthFor(book), h = spineHeightPx(book);
-      const bgStyle = book.cover
+      const bgStyle = (book.cover && getStackStyle()==='cover')
         ? `background-image:linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.6)), url('${book.cover}'); background-size:cover; background-position:center;`
         : `background:${book.color};`;
       html += `<div class="spine" style="height:${h}px;width:${w}%;${bgStyle}" onclick="openEditModal(${book.id})">
@@ -865,15 +945,21 @@ function renderShelf(){
         </select>
       </div>`;
     sortedBookList(filtered).forEach(book=>{
-      html += `<div class="book-row" onclick="openEditModal(${book.id})">
-        <div>
-          <div class="bt">${book.title}</div>
-          <div class="bd">${book.completedDate||''}</div>
-          ${book.tags&&book.tags.length?`<div class="tags">${book.tags.map(t=>`<span>#${t}</span>`).join('')}</div>`:''}
-          ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
-          ${book.review?`<div class="rv">${book.review}</div>`:''}
+      const hasQuotes = book.quotes && book.quotes.length>0;
+      const isExpanded = expandedBooks.has(book.id);
+      html += `<div class="book-item">
+        <div class="book-row" onclick="openEditModal(${book.id})">
+          <div>
+            <div class="bt">${book.title}</div>
+            <div class="bd">${book.completedDate||''}</div>
+            ${book.tags&&book.tags.length?`<div class="tags">${book.tags.map(t=>`<span>#${t}</span>`).join('')}</div>`:''}
+            ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
+            ${book.review?`<div class="rv">${book.review}</div>`:''}
+          </div>
+          <div class="bp">${book.pages}p</div>
         </div>
-        <div class="bp">${book.pages}p</div>
+        ${hasQuotes ? `<button type="button" class="quote-toggle" onclick="toggleBookExpand(${book.id}, event)">${isExpanded ? '접기 ▲' : `인용구 ${book.quotes.length}개 보기 ▼`}</button>` : ''}
+        ${hasQuotes && isExpanded ? `<div class="quote-list">${book.quotes.map(q=>`<div class="quote-item">“${escapeHtml(q.text)}”${q.page?`<span class="src">— ${escapeHtml(q.page)}</span>`:''}</div>`).join('')}</div>` : ''}
       </div>`;
     });
     html += `</div>`;
@@ -1037,7 +1123,8 @@ async function openShareStackCard(){
   lctx.fillStyle='#8a8a92'; lctx.font='500 16px Inter, sans-serif'; lctx.textAlign='center';
   lctx.fillText('이미지를 준비하는 중...', 400, 100); lctx.textAlign='left';
 
-  const uniqueCovers = [...new Set(sorted.map(b=>b.cover).filter(Boolean))];
+  const useCover = getStackStyle()==='cover';
+  const uniqueCovers = useCover ? [...new Set(sorted.map(b=>b.cover).filter(Boolean))] : [];
   const loadedPairs = await Promise.all(uniqueCovers.map(async url => [url, await loadImage(proxied(url))]));
   const imageMap = new Map(loadedPairs);
 
@@ -1074,7 +1161,7 @@ async function openShareStackCard(){
     const w = maxW * wPct;
     const rowH = spineHeightPx(book) * SCALE;
     const x = padX + (maxW-w)/2;
-    const img = book.cover ? imageMap.get(book.cover) : null;
+    const img = (useCover && book.cover) ? imageMap.get(book.cover) : null;
 
     roundRect(ctx, x, y, w, rowH, 6);
     if(img){
