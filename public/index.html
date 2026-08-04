@@ -434,12 +434,20 @@ const PALETTE = ['#5b5bd6','#e0748c','#3fa88a','#e8a23f','#4a90d9','#9b6fd6','#e
 
 function colorFor(seed){ let h=0; for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; } return PALETTE[h%PALETTE.length]; }
 function widthFor(book){
-  if(book.spineMm){ const pct = (50 + (book.spineMm-150)*0.13) * 1.15; return Math.max(63, Math.min(pct,95)); }
-  let h=0; const seed=book.title; for(let i=0;i<seed.length;i++){ h=(h*17+seed.charCodeAt(i))>>>0; } return 80+(h%10);
+  // 폭은 대충 고정 (78~86% 사이 살짝만 변주) - 지그재그는 offsetFor가 담당
+  let h=0; const seed=book.title;
+  for(let i=0;i<seed.length;i++){ h=(h*17+seed.charCodeAt(i))>>>0; }
+  return 78 + (h%9);
+}
+function offsetFor(book){
+  // 책마다 좌우로 살짝 어긋나게 배치해서 지그재그로 쌓인 느낌을 줌 (-9% ~ +9%)
+  let h=0; const seed='zz'+book.title;
+  for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; }
+  return (h%19) - 9;
 }
 const MM_PER_PAGE=0.07, COVER_MM=3;
 function thicknessMm(pages){ return pages*MM_PER_PAGE+COVER_MM; }
-const PX_PER_MM=2.3;
+const PX_PER_MM=1.5;
 function spineHeightPx(book){ const mm=book.depthMm||thicknessMm(book.pages); return Math.max(26, Math.min(mm*PX_PER_MM,150)); }
 function heightLabel(totalPages,bookCount){
   const cm=((totalPages*MM_PER_PAGE)+(bookCount*COVER_MM))/10;
@@ -942,11 +950,11 @@ function renderShelf(){
   }else{
     html += `<div class="stack">`;
     sorted.forEach(book=>{
-      const w = widthFor(book), h = spineHeightPx(book);
+      const w = widthFor(book), h = spineHeightPx(book), off = offsetFor(book);
       const bgStyle = (book.cover && getStackStyle()==='cover')
         ? `background-image:linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.6)), url('${book.cover}'); background-size:cover; background-position:center;`
         : `background:${book.color};`;
-      html += `<div class="spine" style="height:${h}px;width:${w}%;${bgStyle}" onclick="openEditModal(${book.id})">
+      html += `<div class="spine" style="height:${h}px;width:${w}%;transform:translateX(${off}%);${bgStyle}" onclick="openEditModal(${book.id})">
         <div class="spine-label"><span class="t">${book.title}</span><span class="p">${book.pages}p</span></div>
       </div>`;
     });
@@ -1190,7 +1198,8 @@ async function openShareStackCard(){
     const wPct = widthFor(book)/100;
     const w = maxW * wPct;
     const rowH = spineHeightPx(book) * SCALE;
-    const x = padX + (maxW-w)/2;
+    const off = offsetFor(book)/100;
+    const x = padX + (maxW-w)/2 + maxW*off*0.5;
     const img = (useCover && book.cover) ? imageMap.get(book.cover) : null;
 
     roundRect(ctx, x, y, w, rowH, 6);
