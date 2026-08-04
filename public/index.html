@@ -953,59 +953,91 @@ async function openShareCalendarCard(){
   const loadedPairs = await Promise.all(uniqueCovers.map(async url => [url, await loadImage(proxied(url))]));
   const imageMap = new Map(loadedPairs);
 
-  const W=800, padX=44, top=170, cellGap=8;
-  const cellSize = (W-padX*2-cellGap*6)/7;
-  const H = top + weeks*(cellSize+cellGap) + 90;
+  const W = 800, padX = 50;
+  const dowY = 210, gridTop = 260;
+  const colW = (W - padX*2) / 7;
+  const bookW = colW * 0.74, bookH = bookW * 1.42;
+  const emptyRowH = 70, bookRowH = bookH + 30;
+
+  // 행별 높이 계산 (책이 있는 주는 표지 높이만큼, 없으면 숫자만 들어갈 낮은 높이)
+  const rows = [];
+  for(let w=0; w<weeks; w++){
+    const rowDays = days.slice(w*7, w*7+7);
+    const hasBook = rowDays.some(d => (byDate[toLocalDateStr(d)]||[]).length>0);
+    rows.push({ days: rowDays, height: hasBook ? bookRowH : emptyRowH });
+  }
+  const gridH = rows.reduce((s,r)=>s+r.height, 0);
+  const H = gridTop + gridH + 90;
 
   const canvas = document.getElementById('shareCanvas');
-  canvas.width=W; canvas.height=H;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle='#fafafa'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,W,H);
 
-  ctx.fillStyle='#18181b'; ctx.font='800 36px Inter, sans-serif';
-  ctx.fillText(`${year}년 ${month+1}월`, padX, 66);
-  ctx.fillStyle='#8a8a92'; ctx.font='500 19px Inter, sans-serif';
-  ctx.fillText(`이달 완독 ${monthBooks.length}권 · ${monthPages.toLocaleString()}페이지`, padX, 98);
+  // 큰 날짜 타이틀 "YYYY.MM."
+  ctx.fillStyle = '#18181b'; ctx.font = '800 52px Inter, sans-serif';
+  ctx.fillText(`${year}.${String(month+1).padStart(2,'0')}.`, padX, 88);
+  ctx.fillStyle = '#8a8a92'; ctx.font = '600 17px Inter, sans-serif';
+  ctx.fillText(`이달 완독 ${monthBooks.length}권 · ${monthPages.toLocaleString()}페이지`, padX, 122);
 
-  const dow=['일','월','화','수','목','금','토'];
-  ctx.font='700 14px Inter, sans-serif'; ctx.fillStyle='#8a8a92'; ctx.textAlign='center';
-  dow.forEach((d,i)=> ctx.fillText(d, padX + i*(cellSize+cellGap) + cellSize/2, top-14));
+  const dow = ['일','월','화','수','목','금','토'];
+  ctx.font = '700 16px Inter, sans-serif'; ctx.fillStyle = '#a8a8b0'; ctx.textAlign = 'center';
+  dow.forEach((d,i)=> ctx.fillText(d, padX + i*colW + colW/2, dowY));
 
-  days.forEach((day,i)=>{
-    const col = i%7, row = Math.floor(i/7);
-    const x = padX + col*(cellSize+cellGap), y = top + row*(cellSize+cellGap);
-    const dateStr = toLocalDateStr(day);
-    const dayBooks = byDate[dateStr]||[];
-    const isOther = day.getMonth()!==month;
-    const main = dayBooks[0];
-    const img = main ? imageMap.get(main.cover) : null;
+  let y = gridTop;
+  rows.forEach(row=>{
+    row.days.forEach((day,col)=>{
+      const centerX = padX + col*colW + colW/2;
+      const dateStr = toLocalDateStr(day);
+      const dayBooks = (byDate[dateStr]||[]).slice(0,2); // 최대 2권까지 표시
+      const isOther = day.getMonth()!==month;
 
-    roundRect(ctx, x, y, cellSize, cellSize, 10);
-    if(img){
-      ctx.save(); ctx.clip();
-      // object-fit: cover 방식으로 이미지 채우기
-      const scale = Math.max(cellSize/img.width, cellSize/img.height);
-      const iw = img.width*scale, ih = img.height*scale;
-      ctx.drawImage(img, x+(cellSize-iw)/2, y+(cellSize-ih)/2, iw, ih);
-      const grad = ctx.createLinearGradient(x,y,x,y+cellSize);
-      grad.addColorStop(0.4,'rgba(0,0,0,0)'); grad.addColorStop(1,'rgba(0,0,0,0.45)');
-      ctx.fillStyle = grad; ctx.fillRect(x,y,cellSize,cellSize);
-      ctx.restore();
-    }else{
-      ctx.fillStyle = main ? main.color : '#ffffff';
-      ctx.fill();
-      if(!main){ ctx.strokeStyle='#ececec'; ctx.lineWidth=1.5; ctx.stroke(); }
-    }
-    ctx.fillStyle = main ? 'rgba(255,255,255,0.97)' : (isOther?'#d4d4d8':'#8a8a92');
-    ctx.font='600 15px Inter, sans-serif'; ctx.textAlign='center';
-    if(main){ ctx.shadowColor='rgba(0,0,0,0.4)'; ctx.shadowBlur=4; }
-    ctx.fillText(String(day.getDate()), x+cellSize/2, y+cellSize/2+5);
-    ctx.shadowBlur=0;
+      if(dayBooks.length===0){
+        // 책 없는 날: 숫자만 표시
+        ctx.fillStyle = isOther ? '#e4e4e8' : '#c4c4cc';
+        ctx.font = '600 20px Inter, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(String(day.getDate()), centerX, y + emptyRowH/2 + 7);
+        return;
+      }
+
+      // 책 있는 날: 세로형 표지 이미지 (겹치지 않게 나란히)
+      const n = dayBooks.length;
+      const w = n===1 ? bookW : bookW*0.62;
+      const h = w*1.42;
+      const gap = 5;
+      const groupW = w*n + gap*(n-1);
+      let bx = centerX - groupW/2;
+      const by = y + (row.height-30-h)/2 + 6;
+
+      dayBooks.forEach(book=>{
+        const img = book.cover ? imageMap.get(book.cover) : null;
+        roundRect(ctx, bx, by, w, h, 8);
+        ctx.save(); ctx.clip();
+        if(img){
+          const scale = Math.max(w/img.width, h/img.height);
+          const iw=img.width*scale, ih=img.height*scale;
+          ctx.drawImage(img, bx+(w-iw)/2, by+(h-ih)/2, iw, ih);
+        }else{
+          ctx.fillStyle = book.color; ctx.fillRect(bx,by,w,h);
+        }
+        ctx.restore();
+        ctx.strokeStyle='rgba(0,0,0,0.06)'; ctx.lineWidth=1;
+        roundRect(ctx, bx, by, w, h, 8); ctx.stroke();
+        bx += w+gap;
+      });
+
+      // 날짜 숫자 - 표지 그룹 아래에 작게
+      ctx.fillStyle = '#b4b4bc'; ctx.font='600 13px Inter, sans-serif'; ctx.textAlign='center';
+      ctx.fillText(String(day.getDate()), centerX, by+h+18);
+    });
+    y += row.height;
   });
-  ctx.textAlign='left';
+  ctx.textAlign = 'left';
 
-  ctx.fillStyle='#c4c4cc'; ctx.font='500 13px Inter, sans-serif';
-  ctx.fillText(`Made with 독서기록`, padX, H-28);
+  const brand = document.getElementById('appTitle').textContent;
+  ctx.fillStyle = '#18181b'; ctx.font = '800 22px Inter, sans-serif'; ctx.textAlign='right';
+  ctx.fillText(brand, W-padX, H-34);
+  ctx.textAlign='left';
 
   document.getElementById('shareModal').classList.remove('hidden');
   canvas.toBlob(blob=> currentShareBlob = blob, 'image/png');
