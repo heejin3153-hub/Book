@@ -834,7 +834,10 @@ function renderShelf(){
     html += `<div class="stack">`;
     sorted.forEach(book=>{
       const w = widthFor(book), h = spineHeightPx(book);
-      html += `<div class="spine" style="height:${h}px;width:${w}%;background:${book.color}" onclick="openEditModal(${book.id})">
+      const bgStyle = book.cover
+        ? `background-image:linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.6)), url('${book.cover}'); background-size:cover; background-position:center;`
+        : `background:${book.color};`;
+      html += `<div class="spine" style="height:${h}px;width:${w}%;${bgStyle}" onclick="openEditModal(${book.id})">
         <div class="spine-label"><span class="t">${book.title}</span><span class="p">${book.pages}p</span></div>
       </div>`;
     });
@@ -1017,14 +1020,26 @@ function roundRect(ctx,x,y,w,h,r){
 
 let currentShareBlob = null;
 
-function openShareStackCard(){
+async function openShareStackCard(){
   const completed = books.filter(b=>b.status==='completed');
   if(completed.length===0){ alert('완독한 책이 있어야 이미지를 만들 수 있어요.'); return; }
   const sorted = [...completed].sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
   const totalPages = completed.reduce((s,b)=>s+b.pages,0);
   const hLabel = heightLabel(totalPages, completed.length);
   const hObjLabel = heightObjectLabel(totalPages, completed.length);
-  const appTitle = document.getElementById('appTitle').textContent;
+
+  // 표지 이미지를 서버 프록시로 미리 로드 (캔버스에 안전하게 그리기 위함)
+  document.getElementById('shareModal').classList.remove('hidden');
+  const loadingCanvas = document.getElementById('shareCanvas');
+  loadingCanvas.width=800; loadingCanvas.height=200;
+  const lctx = loadingCanvas.getContext('2d');
+  lctx.fillStyle='#fafafa'; lctx.fillRect(0,0,800,200);
+  lctx.fillStyle='#8a8a92'; lctx.font='500 16px Inter, sans-serif'; lctx.textAlign='center';
+  lctx.fillText('이미지를 준비하는 중...', 400, 100); lctx.textAlign='left';
+
+  const uniqueCovers = [...new Set(sorted.map(b=>b.cover).filter(Boolean))];
+  const loadedPairs = await Promise.all(uniqueCovers.map(async url => [url, await loadImage(proxied(url))]));
+  const imageMap = new Map(loadedPairs);
 
   const W = 800, padX=56;
   const SCALE = W/420; // 폰 화면 대비 캔버스가 넓은 만큼 두께도 비례해서 키움 (화면과 동일한 비율 유지)
@@ -1059,8 +1074,24 @@ function openShareStackCard(){
     const w = maxW * wPct;
     const rowH = spineHeightPx(book) * SCALE;
     const x = padX + (maxW-w)/2;
-    ctx.fillStyle = book.color;
-    roundRect(ctx, x, y, w, rowH, 6); ctx.fill();
+    const img = book.cover ? imageMap.get(book.cover) : null;
+
+    roundRect(ctx, x, y, w, rowH, 6);
+    if(img){
+      ctx.save(); ctx.clip();
+      // 표지 이미지에서 가운데 부분을 크롭해서 채움 (object-fit: cover)
+      const scale = Math.max(w/img.width, rowH/img.height);
+      const iw=img.width*scale, ih=img.height*scale;
+      ctx.drawImage(img, x+(w-iw)/2, y+(rowH-ih)/2, iw, ih);
+      // 텍스트 가독성을 위한 어두운 그라데이션
+      const grad = ctx.createLinearGradient(x,y,x,y+rowH);
+      grad.addColorStop(0,'rgba(0,0,0,0.05)'); grad.addColorStop(1,'rgba(0,0,0,0.6)');
+      ctx.fillStyle=grad; ctx.fillRect(x,y,w,rowH);
+      ctx.restore();
+    }else{
+      ctx.fillStyle = book.color; ctx.fill();
+    }
+
     if(rowH >= 24){
       ctx.fillStyle = 'rgba(255,255,255,0.97)';
       ctx.font = '700 19px Inter, sans-serif';
