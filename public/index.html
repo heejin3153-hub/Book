@@ -90,7 +90,7 @@
   .cal-nav{ background:var(--bg); border:1px solid var(--border); color:var(--text); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:13px; }
   .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:20px; }
   .cal-dow{ text-align:center; font-size:10px; color:var(--text-muted); padding:2px 0 6px; font-weight:600; }
-  .cal-cell{ aspect-ratio:1; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10.5px; border:1px solid var(--border); position:relative; font-weight:600; overflow:hidden; cursor:default; }
+  .cal-cell{ aspect-ratio:2/3; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10.5px; border:1px solid var(--border); position:relative; font-weight:600; overflow:hidden; cursor:default; }
   .cal-cell.other{ opacity:0.32; }
   .cal-cell .d{ color:var(--text-muted); position:relative; z-index:1; }
   .cal-cell.has{ border-color:transparent; cursor:pointer; }
@@ -967,7 +967,7 @@ async function openShareCalendarCard(){
     rows.push({ days: rowDays, height: hasBook ? bookRowH : emptyRowH });
   }
   const gridH = rows.reduce((s,r)=>s+r.height, 0);
-  const H = gridTop + gridH + 90;
+  const H = gridTop + gridH + 36;
 
   const canvas = document.getElementById('shareCanvas');
   canvas.width = W; canvas.height = H;
@@ -1033,11 +1033,6 @@ async function openShareCalendarCard(){
     y += row.height;
   });
   ctx.textAlign = 'left';
-
-  const brand = document.getElementById('appTitle').textContent;
-  ctx.fillStyle = '#18181b'; ctx.font = '800 22px Inter, sans-serif'; ctx.textAlign='right';
-  ctx.fillText(brand, W-padX, H-34);
-  ctx.textAlign='left';
 
   document.getElementById('shareModal').classList.remove('hidden');
   canvas.toBlob(blob=> currentShareBlob = blob, 'image/png');
