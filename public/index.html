@@ -1569,8 +1569,14 @@ async function pullFromCloud(){
       if(Array.isArray(data.books)){
         const cloudBooks = data.books.map(b => ({ status:'completed', tags:[], startDate:null, ...b, tags: b.tags||[] }));
         // 로그인 직전 로컬에만 있던(아직 클라우드에 안 올라간) 책은 잃어버리지 않도록 병합
+        // 단, 제목+완독날짜가 이미 클라우드에 있는 책과 같으면 "같은 책"으로 보고 중복 추가하지 않음
         const cloudIds = new Set(cloudBooks.map(b=>b.id));
-        const localOnly = books.filter(b=>!cloudIds.has(b.id));
+        const cloudSignatures = new Set(cloudBooks.map(b=> `${(b.title||'').trim().toLowerCase()}|${b.completedDate||''}`));
+        const localOnly = books.filter(b=>{
+          if(cloudIds.has(b.id)) return false;
+          const sig = `${(b.title||'').trim().toLowerCase()}|${b.completedDate||''}`;
+          return !cloudSignatures.has(sig);
+        });
         books = [...cloudBooks, ...localOnly];
         saveBooksRaw();
         if(localOnly.length>0) pushToCloud(); // 병합 결과를 다시 클라우드에 반영
