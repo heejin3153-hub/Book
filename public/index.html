@@ -1411,7 +1411,16 @@ function initFirebase(){
 function signInGoogle(){
   if(!fbAuth){ alert('클라우드 기능을 아직 불러오는 중이거나 실패했어요. 잠시 후 다시 시도하거나 새로고침해주세요.'); return; }
   const provider = new firebase.auth.GoogleAuthProvider();
-  fbAuth.signInWithRedirect(provider).catch(err=>{
+  fbAuth.signInWithPopup(provider).catch(err=>{
+    if(err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request'){
+      // 팝업이 막혔으면 리다이렉트 방식으로 대체 시도
+      fbAuth.signInWithRedirect(provider).catch(err2=>{
+        alert('로그인 중 오류가 발생했어요:\n' + err2.code + '\n' + err2.message);
+        console.error(err2);
+      });
+      return;
+    }
+    if(err.code === 'auth/popup-closed-by-user') return; // 사용자가 직접 닫은 경우는 조용히 무시
     alert('로그인 중 오류가 발생했어요:\n' + err.code + '\n' + err.message);
     console.error(err);
   });
