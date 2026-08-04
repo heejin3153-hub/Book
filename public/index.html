@@ -141,13 +141,13 @@
   .fab{ position:fixed; right:18px; bottom:calc(20px + var(--safe-b)); width:56px; height:56px; border-radius:50%; background:var(--accent); border:none; color:#fff; font-size:27px; cursor:pointer; box-shadow:0 8px 20px rgba(91,91,214,0.35), 0 2px 6px rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:center; z-index:20; }
   .fab:active{ transform:scale(0.95); }
 
-  .modal-back{ position:fixed; inset:0; background:rgba(24,24,27,0.4); backdrop-filter:blur(3px); display:flex; align-items:flex-end; justify-content:center; z-index:50; }
+  .modal-back{ position:fixed; inset:0; background:rgba(24,24,27,0.4); backdrop-filter:blur(3px); display:flex; align-items:flex-end; justify-content:center; z-index:50; overscroll-behavior:contain; touch-action:none; }
   @media(min-width:640px){ .modal-back{ align-items:center; padding:20px; } }
-  .card{ background:var(--surface); color:var(--text); width:100%; max-width:440px; border-radius:20px 20px 0 0; max-height:90vh; max-height:90dvh; box-shadow:0 -10px 40px rgba(0,0,0,0.15); display:flex; flex-direction:column; overflow:hidden; }
+  .card{ background:var(--surface); color:var(--text); width:100%; max-width:440px; border-radius:20px 20px 0 0; max-height:90vh; max-height:90dvh; box-shadow:0 -10px 40px rgba(0,0,0,0.15); display:flex; flex-direction:column; overflow:hidden; touch-action:pan-y; }
   @media(min-width:640px){ .card{ border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,0.2); } }
   .card-top{ display:flex; justify-content:space-between; align-items:flex-start; padding:22px 18px 14px; flex-shrink:0; background:var(--surface); box-shadow:0 1px 0 var(--border); position:relative; z-index:2; }
   @media(min-width:640px){ .card-top{ padding:26px 24px 16px; } }
-  .card-body{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px 18px calc(22px + var(--safe-b)); }
+  .card-body{ flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y; padding:14px 18px calc(22px + var(--safe-b)); }
   @media(min-width:640px){ .card-body{ padding:16px 24px 28px; } }
   .card-top .ct{ font-size:17px; font-weight:800; letter-spacing:-0.01em; }
   .card-top .cs{ font-size:12px; color:var(--text-muted); margin-top:4px; font-weight:500; }
@@ -398,6 +398,31 @@ let currentMonth = new Date();
 let currentView = 'shelf';
 let selectedCover = null, selectedDepthMm = null, selectedSpineMm = null;
 let currentRating = 0, currentStatus = 'completed', editingId = null;
+
+// 팝업이 열려있는 동안 배경(body) 스크롤을 막고, 팝업 안에서만 스크롤되게 함
+let lockedScrollY = 0, modalLockCount = 0;
+function lockBodyScroll(){
+  if(modalLockCount===0){
+    lockedScrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${lockedScrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  }
+  modalLockCount++;
+}
+function unlockBodyScroll(){
+  modalLockCount = Math.max(0, modalLockCount-1);
+  if(modalLockCount===0){
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, lockedScrollY);
+  }
+}
 let currentQuotes = [];
 let expandedBooks = new Set();
 let startDateManuallyEdited = false;
@@ -522,10 +547,11 @@ function openTitleModal(){
   document.getElementById('titleEditInput').value = localStorage.getItem('app-title') || DEFAULT_TITLE;
   document.getElementById('subtitleEditInput').value = localStorage.getItem('app-subtitle') || DEFAULT_SUBTITLE;
   document.getElementById('titleModal').classList.remove('hidden');
+  lockBodyScroll();
   renderSyncArea();
   renderStackStylePicker();
 }
-function closeTitleModal(){ document.getElementById('titleModal').classList.add('hidden'); }
+function closeTitleModal(){ document.getElementById('titleModal').classList.add('hidden'); unlockBodyScroll(); }
 function saveTitle(){
   localStorage.setItem('app-title', document.getElementById('titleEditInput').value.trim() || DEFAULT_TITLE);
   localStorage.setItem('app-subtitle', document.getElementById('subtitleEditInput').value.trim() || DEFAULT_SUBTITLE);
@@ -652,6 +678,7 @@ function openAddModal(defaultStatus){
   renderQuotesContainer();
   setStatus(defaultStatus || (currentView==='wishlist' ? 'wishlist' : 'completed'));
   document.getElementById('addModal').classList.remove('hidden');
+  lockBodyScroll();
   setTimeout(()=>document.getElementById('searchInput').focus(),50);
 }
 
@@ -688,6 +715,7 @@ function openEditModal(id){
   setStatus(book.status||'completed');
   document.getElementById('finishBtn').classList.toggle('hidden', book.status!=='reading');
   document.getElementById('addModal').classList.remove('hidden');
+  lockBodyScroll();
 }
 
 function closeAddModal(){
@@ -695,6 +723,7 @@ function closeAddModal(){
   resetModalFields();
   selectedCover=null; selectedDepthMm=null; selectedSpineMm=null; currentRating=0; editingId=null;
   currentQuotes=[];
+  unlockBodyScroll();
 }
 
 function finishReading(){
@@ -1116,6 +1145,7 @@ async function openShareStackCard(){
 
   // 표지 이미지를 서버 프록시로 미리 로드 (캔버스에 안전하게 그리기 위함)
   document.getElementById('shareModal').classList.remove('hidden');
+  lockBodyScroll();
   const loadingCanvas = document.getElementById('shareCanvas');
   loadingCanvas.width=800; loadingCanvas.height=200;
   const lctx = loadingCanvas.getContext('2d');
@@ -1227,6 +1257,7 @@ async function openShareCalendarCard(){
   // 표지 이미지를 서버 프록시를 통해 미리 로드 (CORS 문제 없이 캔버스에 그리기 위함)
   const uniqueCovers = [...new Set(monthBooks.map(b=>b.cover).filter(Boolean))];
   document.getElementById('shareModal').classList.remove('hidden');
+  lockBodyScroll();
   const canvasLoading = document.getElementById('shareCanvas');
   canvasLoading.width=800; canvasLoading.height=200;
   const lctx = canvasLoading.getContext('2d');
@@ -1322,7 +1353,7 @@ async function openShareCalendarCard(){
   canvas.toBlob(blob=> currentShareBlob = blob, 'image/png');
 }
 
-function closeShareModal(){ document.getElementById('shareModal').classList.add('hidden'); currentShareBlob=null; }
+function closeShareModal(){ document.getElementById('shareModal').classList.add('hidden'); currentShareBlob=null; unlockBodyScroll(); }
 
 function downloadShareImage(){
   const canvas = document.getElementById('shareCanvas');
@@ -1370,8 +1401,9 @@ function initFirebase(){
 function openFirebaseSetup(){
   document.getElementById('firebaseConfigInput').value='';
   document.getElementById('firebaseSetupModal').classList.remove('hidden');
+  lockBodyScroll();
 }
-function closeFirebaseSetup(){ document.getElementById('firebaseSetupModal').classList.add('hidden'); }
+function closeFirebaseSetup(){ document.getElementById('firebaseSetupModal').classList.add('hidden'); unlockBodyScroll(); }
 
 function saveFirebaseConfig(){
   const text = document.getElementById('firebaseConfigInput').value.trim();
