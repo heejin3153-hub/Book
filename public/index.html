@@ -64,7 +64,7 @@
   .tag-chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
 
   /* 책 쌓기 */
-  .shelf-area{ min-height:70px; }
+  .shelf-area{ min-height:70px; overflow-x:hidden; }
   .stack{ display:flex; flex-direction:column-reverse; gap:4px; align-items:center; }
   .spine{ position:relative; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; box-shadow:0 2px 3px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.22); }
   .spine::after{ content:''; position:absolute; right:0; top:2px; bottom:2px; width:5px; background:repeating-linear-gradient(180deg,#efe8d8 0px,#efe8d8 1px,#e0d7c1 1px,#e0d7c1 2px); border-radius:0 4px 4px 0; }
@@ -83,9 +83,9 @@
   .book-row .bd{ font-size:11px; color:var(--text-muted); margin-top:2px; }
   .book-row .tags{ margin-top:4px; }
   .book-row .tags span{ font-size:10px; background:var(--accent-soft); color:var(--accent-dark); padding:2px 7px; border-radius:8px; margin-right:4px; font-weight:600; }
-  .book-row .stars{ color:var(--star); font-size:11px; margin-top:3px; letter-spacing:1px; }
-  .book-row .rv{ font-size:11px; color:var(--text-muted); margin-top:3px; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px; }
-  .book-row .bp{ font-size:13px; color:var(--accent); font-weight:700; font-variant-numeric:tabular-nums; flex-shrink:0; }
+  .book-row .stars{ color:var(--star); font-size:14px; margin-top:3px; letter-spacing:1px; flex-shrink:0; text-align:right; }
+  .book-row .rv{ font-size:12.5px; color:var(--text-muted); margin-top:4px; font-style:italic; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; max-width:100%; }
+  .book-row .bp{ font-size:11px; color:var(--text-muted); font-weight:600; font-variant-numeric:tabular-nums; }
 
   /* 캘린더 */
   .cal-summary{ display:flex; gap:8px; margin-bottom:18px; }
@@ -137,6 +137,9 @@
   .wish-row .bt{ font-size:13px; font-weight:700; cursor:pointer; }
   .wish-row .bd{ font-size:11px; color:var(--text-muted); margin-top:1px; }
   .wish-row .start-btn{ margin-left:auto; background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 12px; font-size:11.5px; font-weight:700; cursor:pointer; flex-shrink:0; }
+  .wish-comment{ font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .folder-edit{ margin-left:4px; opacity:0.85; }
+  .folder-add{ border-style:dashed; color:var(--accent); }
 
   .fab{ position:fixed; right:18px; bottom:calc(20px + var(--safe-b)); width:56px; height:56px; border-radius:50%; background:var(--accent); border:none; color:#fff; font-size:27px; cursor:pointer; box-shadow:0 8px 20px rgba(91,91,214,0.35), 0 2px 6px rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:center; z-index:20; }
   .fab:active{ transform:scale(0.95); }
@@ -155,8 +158,10 @@
   .card-divider{ border-top:1px solid var(--border); margin:16px 0; }
 
   .field{ margin-bottom:14px; }
+  .field-row{ display:flex; gap:10px; }
+  .field-row .field{ flex:1; min-width:0; }
   .field label{ display:block; font-size:10.5px; letter-spacing:0.02em; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:6px; }
-  .field input, .field textarea{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none; }
+  .field input, .field textarea, .field select{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none; }
   .field textarea{ resize:vertical; min-height:64px; font-size:14px; }
   .field input:focus, .field textarea:focus{ border-color:var(--accent); background:var(--surface); }
 
@@ -275,10 +280,16 @@
     </div>
 
     <div class="field"><label>책 제목</label><input id="titleInput" type="text" placeholder="검색해서 선택하거나 직접 입력"></div>
-    <div class="field" id="pagesField"><label>페이지 수</label><input id="pagesInput" type="number" placeholder="예: 472" min="1" inputmode="numeric"></div>
-    <div class="field" id="tagsField"><label>태그 / 장르</label><input id="tagsInput" type="text" placeholder="검색하면 알라딘 분류로 자동 입력돼요 (수정 가능)"></div>
-    <div class="field" id="startDateField"><label>읽기 시작한 날짜</label><input id="startDateInput" type="date"></div>
-    <div class="field" id="dateField"><label>완독 날짜</label><input id="dateInput" type="date"></div>
+    <div class="field-row">
+      <div class="field" id="pagesField"><label>페이지 수</label><input id="pagesInput" type="number" placeholder="예: 472" min="1" inputmode="numeric"></div>
+      <div class="field" id="tagsField"><label>태그 / 장르</label><input id="tagsInput" type="text" placeholder="알라딘 자동입력 (수정가능)"></div>
+    </div>
+    <div class="field hidden" id="wishFolderField"><label>폴더</label><select id="wishFolderSelectField"></select></div>
+    <div class="field hidden" id="wishCommentField"><label>코멘트</label><textarea id="wishCommentInput" placeholder="왜 읽고 싶은지, 누가 추천했는지 등을 적어보세요 (선택)"></textarea></div>
+    <div class="field-row">
+      <div class="field" id="startDateField"><label>읽기 시작한 날짜</label><input id="startDateInput" type="date"></div>
+      <div class="field" id="dateField"><label>완독 날짜</label><input id="dateInput" type="date"></div>
+    </div>
     <div class="field" id="ratingField"><label>별점 <span id="ratingLabel" style="text-transform:none;color:var(--text);font-weight:600"></span></label>
       <div class="star-picker" id="starPicker" onclick="pickStar(event)">
         <span class="bg">★★★★★</span><span class="fg" id="starFg">★★★★★</span>
@@ -405,6 +416,48 @@ let expandedBooks = new Set();
 let startDateManuallyEdited = false;
 let activeTags = [];
 
+/* ---------------- 위시리스트 폴더 ---------------- */
+let wishFolders = JSON.parse(localStorage.getItem('wish-folders') || '[]');
+let activeWishFolder = 'all';
+function saveFolders(){ localStorage.setItem('wish-folders', JSON.stringify(wishFolders)); pushToCloud(); }
+
+function addWishFolder(){
+  const name = prompt('새 폴더 이름을 입력해주세요');
+  if(name===null) return;
+  const trimmed = name.trim();
+  if(!trimmed) return;
+  wishFolders.push({ id: Date.now(), name: trimmed });
+  saveFolders();
+  renderWishlist();
+}
+function editWishFolder(id, event){
+  if(event) event.stopPropagation();
+  const folder = wishFolders.find(f=>f.id===id);
+  if(!folder) return;
+  const name = prompt('폴더 이름 수정 (빈 칸으로 저장하면 삭제돼요)', folder.name);
+  if(name===null) return;
+  const trimmed = name.trim();
+  if(!trimmed){
+    if(!confirm(`"${folder.name}" 폴더를 삭제할까요? 안에 있던 책은 삭제되지 않고 미분류로 이동해요.`)) return;
+    wishFolders = wishFolders.filter(f=>f.id!==id);
+    books.forEach(b=>{ if(b.folderId===id) b.folderId=null; });
+    if(activeWishFolder===id) activeWishFolder='all';
+    saveFolders(); saveBooks(); renderWishlist();
+    return;
+  }
+  folder.name = trimmed;
+  saveFolders();
+  renderWishlist();
+}
+function selectWishFolder(id){ activeWishFolder = id; renderWishlist(); }
+function renderWishFolderOptions(selectedId){
+  const el = document.getElementById('wishFolderSelectField');
+  if(!el) return;
+  el.innerHTML = `<option value="">미분류</option>` +
+    wishFolders.map(f=>`<option value="${f.id}" ${String(selectedId)===String(f.id)?'selected':''}>${escapeHtml(f.name)}</option>`).join('');
+}
+
+
 const DEFAULT_TITLE = '독서기록';
 const DEFAULT_SUBTITLE = '책을 검색하면 페이지 수를 자동으로 가져와요';
 const PALETTE = ['#5b5bd6','#e0748c','#3fa88a','#e8a23f','#4a90d9','#9b6fd6','#e0645a','#3fb5b5'];
@@ -424,8 +477,14 @@ function offsetFor(book){
 }
 const MM_PER_PAGE=0.07, COVER_MM=3;
 function thicknessMm(pages){ return pages*MM_PER_PAGE+COVER_MM; }
-const PX_PER_MM=1.7;
+const PX_PER_MM=1.8;
 function spineHeightPx(book){ const mm=book.depthMm||thicknessMm(book.pages); return Math.max(26, Math.min(mm*PX_PER_MM,150)); }
+// 화면(패널) 실제 폭에 맞춰 두께를 비례 확대/축소 - 아이패드처럼 폭이 넓어져도 비율이 그대로 유지되게 함
+function currentPanelScale(){
+  const panel = document.querySelector('.panel');
+  if(!panel || !panel.clientWidth) return 1;
+  return panel.clientWidth / 340; // 340px를 기준 폭으로 삼음 (일반적인 모바일 폭)
+}
 function heightLabel(totalPages,bookCount){
   const cm=((totalPages*MM_PER_PAGE)+(bookCount*COVER_MM))/10;
   if(cm<1) return null;
@@ -497,7 +556,8 @@ function extractDominantColor(url){
           resolve('#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join(''));
         }catch(e){ resolve(null); }
       };
-      img.onerror=()=>resolve(null); img.src=url;
+      img.onerror=()=>resolve(null);
+      img.src = url ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url; // 프록시를 거쳐야 CORS 문제 없이 픽셀을 읽을 수 있음
     }catch(e){ resolve(null); }
   });
 }
@@ -631,6 +691,10 @@ function setStatus(s){
   document.getElementById('quotesField').style.display = showRatingReview;
   document.getElementById('pagesField').style.display = s==='wishlist' ? 'none' : '';
   document.getElementById('tagsField').style.display = '';
+  const showWish = s==='wishlist' ? '' : 'none';
+  document.getElementById('wishFolderField').classList.toggle('hidden', s!=='wishlist');
+  document.getElementById('wishCommentField').classList.toggle('hidden', s!=='wishlist');
+  if(s==='wishlist') renderWishFolderOptions();
   document.getElementById('finishBtn').classList.add('hidden'); // 새로 추가할 때는 안 보임(수정時만)
   document.getElementById('saveBtn').textContent = editingId!==null ? '저장하기' : (s==='wishlist' ? '위시리스트에 추가' : '추가하기');
 }
@@ -643,6 +707,7 @@ function resetModalFields(){
   document.getElementById('startDateInput').value='';
   document.getElementById('dateInput').value='';
   document.getElementById('reviewInput').value='';
+  document.getElementById('wishCommentInput').value='';
   document.getElementById('searchResults').innerHTML='';
   document.getElementById('searchInput').value='';
 }
@@ -695,9 +760,11 @@ function openEditModal(id){
   document.getElementById('startDateInput').value=book.startDate||'';
   document.getElementById('dateInput').value=book.completedDate||'';
   document.getElementById('reviewInput').value=book.review||'';
+  document.getElementById('wishCommentInput').value=book.wishComment||'';
   renderStars();
   renderQuotesContainer();
   setStatus(book.status||'completed');
+  if((book.status||'completed')==='wishlist') renderWishFolderOptions(book.folderId);
   document.getElementById('finishBtn').classList.toggle('hidden', book.status!=='reading');
   document.getElementById('addModal').classList.remove('hidden');
   lockBodyScroll();
@@ -789,6 +856,9 @@ async function saveBook(){
   const startDate = document.getElementById('startDateInput').value || null;
   const completedDate = document.getElementById('dateInput').value || null;
   const review = document.getElementById('reviewInput').value.trim();
+  const wishComment = document.getElementById('wishCommentInput').value.trim();
+  const folderSelect = document.getElementById('wishFolderSelectField');
+  const folderId = (currentStatus==='wishlist' && folderSelect.value) ? Number(folderSelect.value) : null;
   const quotes = currentStatus==='completed' ? currentQuotes.filter(q=>q.text && q.text.trim()).map(q=>({page:(q.page||'').trim(), text:q.text.trim()})) : [];
 
   if(currentStatus==='completed' && !completedDate){ alert('완독 날짜를 입력해주세요!'); return; }
@@ -802,6 +872,8 @@ async function saveBook(){
     completedDate: currentStatus==='completed' ? completedDate : null,
     rating: currentStatus==='completed' ? currentRating : 0,
     review: currentStatus==='completed' ? review : '',
+    wishComment: currentStatus==='wishlist' ? wishComment : (books.find(b=>b.id===editingId)?.wishComment || ''),
+    folderId: currentStatus==='wishlist' ? folderId : (books.find(b=>b.id===editingId)?.folderId ?? null),
     quotes,
     cover: selectedCover, color,
     depthMm: selectedDepthMm, spineMm: selectedSpineMm
@@ -926,8 +998,9 @@ function renderShelf(){
     html += `<div class="empty-shelf">${completed.length===0 ? '아직 쌓은 책이 없어요.<br/>오른쪽 아래 + 버튼으로 첫 책을 올려보세요.' : '이 조건에 해당하는 책이 없어요.'}</div>`;
   }else{
     html += `<div class="stack">`;
+    const panelScale = currentPanelScale();
     sorted.forEach(book=>{
-      const w = widthFor(book), h = spineHeightPx(book), off = offsetFor(book);
+      const w = widthFor(book), h = spineHeightPx(book)*panelScale, off = offsetFor(book);
       const bgStyle = (book.cover && getStackStyle()==='cover')
         ? `background-image:linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.6)), url('${book.cover}'); background-size:cover; background-position:center;`
         : `background:${book.color};`;
@@ -963,14 +1036,13 @@ function renderShelf(){
       const isExpanded = expandedBooks.has(book.id);
       html += `<div class="book-item">
         <div class="book-row" onclick="openEditModal(${book.id})">
-          <div>
+          <div style="min-width:0;flex:1">
             <div class="bt">${book.title}</div>
-            <div class="bd">${book.completedDate||''}</div>
+            <div class="bd">${book.completedDate||''}${book.pages?` · <span class="bp">${book.pages}p</span>`:''}</div>
             ${book.tags&&book.tags.length?`<div class="tags">${book.tags.map(t=>`<span>#${t}</span>`).join('')}</div>`:''}
-            ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
-            ${book.review?`<div class="rv">${book.review}</div>`:''}
+            ${book.review?`<div class="rv">${escapeHtml(book.review)}</div>`:''}
           </div>
-          <div class="bp">${book.pages}p</div>
+          ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
         </div>
         ${hasQuotes ? `<button type="button" class="quote-toggle" onclick="toggleBookExpand(${book.id}, event)">${isExpanded ? '접기 ▲' : `인용구 ${book.quotes.length}개 보기 ▼`}</button>` : ''}
         ${hasQuotes && isExpanded ? `<div class="quote-list">${book.quotes.map(q=>`<div class="quote-item">“${escapeHtml(q.text)}”${q.page?`<span class="src">— ${escapeHtml(q.page)}</span>`:''}</div>`).join('')}</div>` : ''}
@@ -1004,8 +1076,8 @@ function renderCalendar(){
 
   let html = `<div class="section-h"><div class="h">캘린더</div><button class="icon-btn" onclick="openShareCalendarCard()">📤 이미지</button></div>`;
   html += `<div class="cal-summary">
-    <div class="box"><div class="v">${monthBooks.length}권</div><div class="l">이달 완독</div></div>
-    <div class="box"><div class="v">${monthPages.toLocaleString()}p</div><div class="l">이달 읽은 페이지</div></div>
+    <div class="box"><div class="v">${monthBooks.length}권</div><div class="l">이번 달 완독</div></div>
+    <div class="box"><div class="v">${monthPages.toLocaleString()}p</div><div class="l">이번 달 읽은 페이지</div></div>
   </div>`;
   html += `<div class="cal-head"><button class="cal-nav" onclick="changeMonth(-1)">←</button><div class="m">${year}년 ${month+1}월</div><button class="cal-nav" onclick="changeMonth(1)">→</button></div>`;
   html += `<div class="cal-grid">`;
@@ -1023,7 +1095,7 @@ function renderCalendar(){
   });
   html += `</div>`;
 
-  html += `<div class="month-list"><div class="h" style="margin-bottom:10px;font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--text-muted);font-weight:700">이달의 완독</div>`;
+  html += `<div class="month-list"><div class="h" style="margin-bottom:10px;font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--text-muted);font-weight:700">이번 달의 완독</div>`;
   if(monthBooks.length===0){ html += `<div class="month-empty">이 달에 완독한 책이 없어요</div>`; }
   else{
     [...monthBooks].sort((a,b)=>new Date(a.completedDate)-new Date(b.completedDate)).forEach(book=>{
@@ -1039,46 +1111,65 @@ function renderCalendar(){
 function changeMonth(delta){ currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth()+delta, 1); renderCalendar(); }
 
 /* ---------------- 통계 ---------------- */
+let statsYear = 'all';
+function onStatsYearChange(v){ statsYear=v; renderStats(); }
+
 function renderStats(){
   const completed = books.filter(b=>b.status==='completed' && b.completedDate);
   if(completed.length===0){
     document.getElementById('statsView').innerHTML = `<div class="stat-empty">아직 완독한 책이 없어요.<br/>책을 기록하면 통계가 보여요.</div>`;
     return;
   }
-  const now = new Date();
-  const thisYear = now.getFullYear();
-  const yearBooks = completed.filter(b=> new Date(b.completedDate).getFullYear()===thisYear);
-  const totalPages = completed.reduce((s,b)=>s+b.pages,0);
-  const yearPages = yearBooks.reduce((s,b)=>s+b.pages,0);
-  const rated = completed.filter(b=>b.rating>0);
+  const availableYears = getAvailableYears(completed);
+  const scoped = statsYear==='all' ? completed : completed.filter(b=> new Date(b.completedDate).getFullYear()===Number(statsYear));
+
+  const totalPages = scoped.reduce((s,b)=>s+b.pages,0);
+  const rated = scoped.filter(b=>b.rating>0);
   const avgRating = rated.length ? (rated.reduce((s,b)=>s+b.rating,0)/rated.length).toFixed(1) : '-';
-  const longest = completed.reduce((a,b)=> b.pages>(a?a.pages:0) ? b : a, null);
+  const longest = scoped.reduce((a,b)=> b.pages>(a?a.pages:0) ? b : a, null);
 
-  const monthCounts = Array(12).fill(0);
-  yearBooks.forEach(b=>{ monthCounts[new Date(b.completedDate).getMonth()]++; });
-  const maxMonth = Math.max(...monthCounts, 1);
+  let html = `<div class="period-row">
+    <select class="period-select" onchange="onStatsYearChange(this.value)">
+      <option value="all" ${statsYear==='all'?'selected':''}>전체 기간</option>
+      ${availableYears.map(y=>`<option value="${y}" ${statsYear===String(y)?'selected':''}>${y}년</option>`).join('')}
+    </select>
+  </div>`;
 
-  const tagCounts = {};
-  completed.forEach(b=> (b.tags||[]).forEach(t=> tagCounts[t]=(tagCounts[t]||0)+1));
-  const topTags = Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
-
-  let html = `<div class="stat-grid">
-    <div class="stat-box"><div class="v">${completed.length}권</div><div class="l">전체 완독</div></div>
-    <div class="stat-box"><div class="v">${totalPages.toLocaleString()}p</div><div class="l">전체 읽은 페이지</div></div>
-    <div class="stat-box"><div class="v">${yearBooks.length}권</div><div class="l">${thisYear}년 완독</div></div>
-    <div class="stat-box"><div class="v">${yearPages.toLocaleString()}p</div><div class="l">${thisYear}년 페이지</div></div>
+  html += `<div class="stat-grid">
+    <div class="stat-box"><div class="v">${scoped.length}권</div><div class="l">${statsYear==='all'?'전체':statsYear+'년'} 완독</div></div>
+    <div class="stat-box"><div class="v">${totalPages.toLocaleString()}p</div><div class="l">${statsYear==='all'?'전체':statsYear+'년'} 페이지</div></div>
     <div class="stat-box"><div class="v">${avgRating}${avgRating!=='-'?' ★':''}</div><div class="l">평균 별점</div></div>
     <div class="stat-box"><div class="v">${longest?longest.pages:'-'}p</div><div class="l">가장 두꺼운 책</div></div>
   </div>`;
 
-  html += `<div class="section-h"><div class="h">${thisYear}년 월별 완독</div></div>`;
-  html += `<div class="bar-chart">`;
-  monthCounts.forEach((c,i)=>{
-    const pct = Math.max((c/maxMonth)*100, c>0?8:0);
-    html += `<div class="bar-wrap"><div class="bar" style="height:${pct}%"></div><div class="bn">${i+1}</div></div>`;
-  });
-  html += `</div>`;
+  if(statsYear==='all'){
+    // 연도별 막대
+    const yearCounts = {};
+    completed.forEach(b=>{ const y=new Date(b.completedDate).getFullYear(); yearCounts[y]=(yearCounts[y]||0)+1; });
+    const years = Object.keys(yearCounts).map(Number).sort((a,b)=>a-b);
+    const maxY = Math.max(...years.map(y=>yearCounts[y]), 1);
+    html += `<div class="section-h"><div class="h">연도별 완독</div></div><div class="bar-chart">`;
+    years.forEach(y=>{
+      const pct = Math.max((yearCounts[y]/maxY)*100, 8);
+      html += `<div class="bar-wrap"><div class="bar" style="height:${pct}%" title="${y}년 ${yearCounts[y]}권"></div><div class="bn">${String(y).slice(2)}</div></div>`;
+    });
+    html += `</div>`;
+  }else{
+    // 선택한 연도의 월별 막대
+    const monthCounts = Array(12).fill(0);
+    scoped.forEach(b=>{ monthCounts[new Date(b.completedDate).getMonth()]++; });
+    const maxMonth = Math.max(...monthCounts, 1);
+    html += `<div class="section-h"><div class="h">${statsYear}년 월별 완독</div></div><div class="bar-chart">`;
+    monthCounts.forEach((c,i)=>{
+      const pct = Math.max((c/maxMonth)*100, c>0?8:0);
+      html += `<div class="bar-wrap"><div class="bar" style="height:${pct}%" title="${i+1}월 ${c}권"></div><div class="bn">${i+1}</div></div>`;
+    });
+    html += `</div>`;
+  }
 
+  const tagCounts = {};
+  scoped.forEach(b=> (b.tags||[]).forEach(t=> tagCounts[t]=(tagCounts[t]||0)+1));
+  const topTags = Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
   if(topTags.length>0){
     html += `<div class="card-divider"></div><div class="section-h"><div class="h">많이 읽은 태그</div></div><div class="taglist">`;
     topTags.forEach(([t,c])=>{ html += `<div class="tagrow"><span class="name">#${t}</span><span class="cnt">${c}권</span></div>`; });
@@ -1090,16 +1181,29 @@ function renderStats(){
 
 /* ---------------- 위시리스트 ---------------- */
 function renderWishlist(){
-  const wishlist = books.filter(b=>b.status==='wishlist');
-  let html = `<div class="section-h"><div class="h">위시리스트 · ${wishlist.length}권</div></div>`;
+  const allWishlist = books.filter(b=>b.status==='wishlist');
+  const wishlist = activeWishFolder==='all' ? allWishlist : allWishlist.filter(b=> String(b.folderId||'')===String(activeWishFolder));
+
+  let html = `<div class="section-h"><div class="h">위시리스트 · ${allWishlist.length}권</div></div>`;
+
+  html += `<div class="tag-filters">
+    <button class="tag-chip ${activeWishFolder==='all'?'on':''}" onclick="selectWishFolder('all')">전체</button>`;
+  wishFolders.forEach(f=>{
+    const isOn = String(activeWishFolder)===String(f.id);
+    html += `<button class="tag-chip folder-chip ${isOn?'on':''}" onclick="selectWishFolder(${f.id})">${escapeHtml(f.name)}${isOn?` <span class="folder-edit" onclick="editWishFolder(${f.id}, event)">✎</span>`:''}</button>`;
+  });
+  html += `<button class="tag-chip folder-add" onclick="addWishFolder()">+ 폴더</button></div>`;
+
   if(wishlist.length===0){
-    html += `<div class="empty-shelf">읽고 싶은 책을 미리 등록해보세요.<br/>오른쪽 아래 + 버튼으로 추가할 수 있어요.</div>`;
+    html += `<div class="empty-shelf">${allWishlist.length===0 ? '읽고 싶은 책을 미리 등록해보세요.<br/>오른쪽 아래 + 버튼으로 추가할 수 있어요.' : '이 폴더에는 책이 없어요.'}</div>`;
   }else{
     wishlist.forEach(book=>{
       html += `<div class="wish-row">
         ${book.cover?`<img class="cov" src="${book.cover}" loading="lazy" onclick="openEditModal(${book.id})"/>`:`<div class="covph" style="background:${book.color}" onclick="openEditModal(${book.id})"></div>`}
-        <div style="flex:1;min-width:0"><div class="bt" onclick="openEditModal(${book.id})">${book.title}</div>
-        ${book.tags&&book.tags.length?`<div class="tags">${book.tags.map(t=>`<span>#${t}</span>`).join('')}</div>`:''}</div>
+        <div style="flex:1;min-width:0">
+          <div class="bt" onclick="openEditModal(${book.id})">${book.title}</div>
+          ${book.wishComment?`<div class="wish-comment">${escapeHtml(book.wishComment)}</div>`:''}
+        </div>
         <button class="start-btn" onclick="markWishStart(${book.id})">읽기 시작</button>
       </div>`;
     });
@@ -1279,7 +1383,7 @@ async function openShareCalendarCard(){
   ctx.fillStyle = '#18181b'; ctx.font = '800 52px Inter, sans-serif';
   ctx.fillText(`${year}.${String(month+1).padStart(2,'0')}.`, padX, 88);
   ctx.fillStyle = '#8a8a92'; ctx.font = '600 17px Inter, sans-serif';
-  ctx.fillText(`이달 완독 ${monthBooks.length}권 · ${monthPages.toLocaleString()}페이지`, padX, 122);
+  ctx.fillText(`이번 달 완독 ${monthBooks.length}권 · ${monthPages.toLocaleString()}페이지`, padX, 122);
 
   const dow = ['일','월','화','수','목','금','토'];
   ctx.font = '700 18px Inter, sans-serif'; ctx.fillStyle = '#a8a8b0'; ctx.textAlign = 'center';
@@ -1433,6 +1537,7 @@ async function pushToCloud(){
   try{
     await fbDb.collection('users').doc(currentUser.uid).set({
       books,
+      wishFolders,
       appTitle: localStorage.getItem('app-title') || null,
       appSubtitle: localStorage.getItem('app-subtitle') || null,
       updatedAt: Date.now()
@@ -1453,8 +1558,19 @@ async function pullFromCloud(){
     if(snap.exists){
       const data = snap.data();
       if(Array.isArray(data.books)){
-        books = data.books.map(b => ({ status:'completed', tags:[], startDate:null, ...b, tags: b.tags||[] }));
+        const cloudBooks = data.books.map(b => ({ status:'completed', tags:[], startDate:null, ...b, tags: b.tags||[] }));
+        // 로그인 직전 로컬에만 있던(아직 클라우드에 안 올라간) 책은 잃어버리지 않도록 병합
+        const cloudIds = new Set(cloudBooks.map(b=>b.id));
+        const localOnly = books.filter(b=>!cloudIds.has(b.id));
+        books = [...cloudBooks, ...localOnly];
         saveBooksRaw();
+        if(localOnly.length>0) pushToCloud(); // 병합 결과를 다시 클라우드에 반영
+      }
+      if(Array.isArray(data.wishFolders)){
+        const cloudFolderIds = new Set(data.wishFolders.map(f=>f.id));
+        const localOnlyFolders = wishFolders.filter(f=>!cloudFolderIds.has(f.id));
+        wishFolders = [...data.wishFolders, ...localOnlyFolders];
+        localStorage.setItem('wish-folders', JSON.stringify(wishFolders));
       }
       if(data.appTitle) localStorage.setItem('app-title', data.appTitle);
       if(data.appSubtitle) localStorage.setItem('app-subtitle', data.appSubtitle);
