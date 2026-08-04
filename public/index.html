@@ -85,7 +85,7 @@
   .book-row .tags{ margin-top:4px; }
   .book-row .tags span{ font-size:10px; background:var(--accent-soft); color:var(--accent-dark); padding:2px 7px; border-radius:8px; margin-right:4px; font-weight:600; }
   .book-row .stars{ color:var(--star); font-size:14px; margin-top:3px; letter-spacing:1px; flex-shrink:0; text-align:right; }
-  .book-row .rv{ font-size:12.5px; color:var(--text-muted); margin-top:4px; font-style:italic; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; max-width:100%; }
+  .book-row .rv{ font-size:12.5px; color:var(--text-muted); margin-top:4px; font-style:italic; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; max-width:100%; white-space:pre-line; }
   .book-row .bp{ font-size:11px; color:var(--text-muted); font-weight:600; font-variant-numeric:tabular-nums; }
 
   /* 캘린더 */
@@ -147,12 +147,14 @@
 
   .modal-back{ position:fixed; inset:0; background:rgba(24,24,27,0.4); backdrop-filter:blur(3px); display:flex; align-items:flex-end; justify-content:center; z-index:50; overscroll-behavior:contain; touch-action:none; }
   @media(min-width:640px){ .modal-back{ align-items:center; padding:20px; } }
-  .card{ background:var(--surface); color:var(--text); width:100%; max-width:440px; border-radius:20px 20px 0 0; max-height:90vh; max-height:90dvh; box-shadow:0 -10px 40px rgba(0,0,0,0.15); display:flex; flex-direction:column; overflow:hidden; touch-action:pan-y; }
+  .card{ background:var(--surface); color:var(--text); width:100%; max-width:440px; border-radius:20px 20px 0 0; max-height:94vh; max-height:94dvh; box-shadow:0 -10px 40px rgba(0,0,0,0.15); display:flex; flex-direction:column; overflow:hidden; touch-action:pan-y; }
   @media(min-width:640px){ .card{ border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,0.2); } }
   .card-top{ display:flex; justify-content:space-between; align-items:flex-start; padding:22px 18px 14px; flex-shrink:0; background:var(--surface); box-shadow:0 1px 0 var(--border); position:relative; z-index:2; }
   @media(min-width:640px){ .card-top{ padding:26px 24px 16px; } }
-  .card-body{ flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y; padding:14px 18px calc(22px + var(--safe-b)); }
-  @media(min-width:640px){ .card-body{ padding:16px 24px 28px; } }
+  .card-body{ flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y; padding:14px 18px 18px; }
+  @media(min-width:640px){ .card-body{ padding:16px 24px 20px; } }
+  .card-footer{ flex-shrink:0; padding:12px 18px calc(14px + var(--safe-b)); border-top:1px solid var(--border); background:var(--surface); }
+  @media(min-width:640px){ .card-footer{ padding:14px 24px 20px; } }
   .card-top .ct{ font-size:17px; font-weight:800; letter-spacing:-0.01em; }
   .card-top .cs{ font-size:12px; color:var(--text-muted); margin-top:4px; font-weight:500; }
   .card-close{ background:var(--bg); border:none; width:30px; height:30px; border-radius:8px; font-size:18px; color:var(--text-muted); cursor:pointer; flex-shrink:0; }
@@ -192,10 +194,10 @@
   .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:vertical; min-height:80px; font-family:'Inter',sans-serif; line-height:1.5; }
   .quote-remove{ background:none; border:none; color:var(--danger); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0 0; }
   .quote-toggle{ background:none; border:none; color:var(--accent); font-size:11.5px; font-weight:700; cursor:pointer; padding:6px 0 0; }
-  .quote-list{ margin-top:16px; padding-top:20px; border-top:1px dashed var(--border); }
+  .quote-list{ margin-top:16px; padding-top:20px; border-top:1px dashed var(--border); cursor:pointer; }
   .quote-item{ position:relative; padding-left:16px; padding-top:2px; border-left:3px solid var(--accent); margin-bottom:20px; }
   .quote-item .mark{ display:block; font-size:34px; font-weight:800; color:var(--accent); line-height:1; font-family:Georgia,'Times New Roman',serif; margin-bottom:2px; margin-top:-6px; }
-  .quote-item .text{ font-size:13px; color:var(--text); line-height:1.65; }
+  .quote-item .text{ font-size:13px; color:var(--text); line-height:1.65; white-space:pre-line; }
   .quote-item .src{ display:block; font-size:11px; color:var(--text-muted); font-weight:600; margin-top:6px; }
   .star-picker{ position:relative; display:inline-block; font-size:30px; letter-spacing:5px; cursor:pointer; line-height:1; -webkit-user-select:none; user-select:none; }
   .star-picker .bg{ color:var(--border-2); }
@@ -310,11 +312,12 @@
     </div>
 
     <button class="btn-secondary hidden" id="finishBtn" onclick="finishReading()">📖 지금 완독으로 표시하기</button>
-
-    <div class="btn-row">
-      <button class="btn-delete hidden" id="deleteBtn" onclick="deleteFromModal()">삭제</button>
-      <button class="btn-add" onclick="saveBook()" id="saveBtn">추가하기</button>
     </div>
+    <div class="card-footer">
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn-delete hidden" id="deleteBtn" onclick="deleteFromModal()">삭제</button>
+        <button class="btn-add" onclick="saveBook()" id="saveBtn">추가하기</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1051,7 +1054,7 @@ function renderShelf(){
           ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
         </div>
         ${hasQuotes ? `<button type="button" class="quote-toggle" onclick="toggleBookExpand(${book.id}, event)">${isExpanded ? '접기 ▲' : `인용구 ${book.quotes.length}개 보기 ▼`}</button>` : ''}
-        ${hasQuotes && isExpanded ? `<div class="quote-list">${book.quotes.map(q=>`<div class="quote-item"><span class="mark">&ldquo;</span><div class="text">${escapeHtml(q.text)}</div>${q.page?`<span class="src">${escapeHtml(q.page)}</span>`:''}</div>`).join('')}</div>` : ''}
+        ${hasQuotes && isExpanded ? `<div class="quote-list" onclick="openEditModal(${book.id})">${book.quotes.map(q=>`<div class="quote-item"><span class="mark">&ldquo;</span><div class="text">${escapeHtml(q.text)}</div>${q.page?`<span class="src">${escapeHtml(q.page)}</span>`:''}</div>`).join('')}</div>` : ''}
       </div>`;
     });
     html += `</div>`;
