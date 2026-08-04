@@ -43,7 +43,8 @@ app.get('/api/search', async (req, res) => {
       publisher: book.publisher,
       pubDate: book.pubDate,
       cover: book.cover,
-      itemId: book.itemId
+      itemId: book.itemId,
+      categoryName: book.categoryName || ''
     }));
 
     res.json({ books });
@@ -85,6 +86,7 @@ app.get('/api/detail/:itemId', async (req, res) => {
       pages: pages,
       cover: book.cover,
       publisher: book.publisher,
+      categoryName: book.categoryName || '',
       depthMm: packing && packing.sizeDepth ? Number(packing.sizeDepth) : null,   // 두께
       heightMm: packing && packing.sizeHeight ? Number(packing.sizeHeight) : null, // 세로(책등 길이)
       widthMm: packing && packing.sizeWidth ? Number(packing.sizeWidth) : null     // 가로
@@ -92,6 +94,30 @@ app.get('/api/detail/:itemId', async (req, res) => {
   } catch (error) {
     console.error('상세 조회 오류:', error);
     res.status(500).json({ error: '상세 정보 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 표지 이미지 프록시 - 캔버스(이미지 카드 생성)에서 CORS 제약 없이 그릴 수 있도록 서버가 대신 가져옴
+app.get('/api/image-proxy', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).send('url이 필요합니다.');
+
+  try {
+    const parsed = new URL(url);
+    const allowedHosts = ['image.aladin.co.kr', 'www.aladin.co.kr', 'image1.aladin.co.kr', 'image2.aladin.co.kr', 'image3.aladin.co.kr', 'image4.aladin.co.kr'];
+    const isAllowed = allowedHosts.some(h => parsed.hostname === h || parsed.hostname.endsWith('.aladin.co.kr'));
+    if (!isAllowed) return res.status(400).send('허용되지 않은 도메인입니다.');
+
+    const imgRes = await fetch(url);
+    if (!imgRes.ok) return res.status(502).send('이미지를 가져올 수 없습니다.');
+
+    res.set('Content-Type', imgRes.headers.get('content-type') || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.set('Access-Control-Allow-Origin', '*');
+    imgRes.body.pipe(res);
+  } catch (error) {
+    console.error('이미지 프록시 오류:', error);
+    res.status(500).send('이미지 프록시 오류');
   }
 });
 
