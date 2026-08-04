@@ -8,6 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     color-scheme: light;
@@ -55,6 +58,8 @@
 
   /* 태그 필터 */
   .tag-filters{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
+  .period-row{ display:flex; gap:8px; margin-bottom:16px; }
+  .period-select{ background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:12px; font-weight:600; color:var(--text); font-family:'Inter',sans-serif; }
   .tag-chip{ background:var(--bg); border:1px solid var(--border); color:var(--text-muted); border-radius:20px; padding:6px 12px; font-size:11.5px; font-weight:600; cursor:pointer; }
   .tag-chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
 
@@ -181,6 +186,13 @@
   .btn-secondary{ width:100%; background:var(--bg); border:1.5px solid var(--border-2); color:var(--text); border-radius:12px; padding:13px; font-size:13.5px; font-weight:700; cursor:pointer; margin-top:8px; }
 
   .settings-row{ display:flex; gap:8px; margin-top:6px; }
+  .sync-card{ background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:14px; }
+  .sync-card .row{ display:flex; align-items:center; gap:10px; }
+  .sync-card .avatar{ width:34px; height:34px; border-radius:50%; background:var(--accent-soft); flex-shrink:0; object-fit:cover; }
+  .sync-card .name{ font-size:13px; font-weight:700; }
+  .sync-card .email{ font-size:11px; color:var(--text-muted); }
+  .sync-card .status{ font-size:11px; color:var(--green); font-weight:600; margin-top:6px; }
+  .google-btn{ width:100%; background:#fff; border:1.5px solid var(--border-2); color:var(--text); border-radius:10px; padding:12px; font-size:13.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
   .settings-row button{ flex:1; }
 
   .share-preview{ text-align:center; }
@@ -291,6 +303,31 @@
       <button class="btn-secondary" onclick="document.getElementById('importFile').click()" style="margin-top:0">⬆ 가져오기</button>
     </div>
     <input type="file" id="importFile" accept="application/json" class="hidden" onchange="importData(event)">
+
+    <div class="card-divider"></div>
+    <div class="field"><label>클라우드 동기화</label></div>
+    <div id="syncArea"></div>
+  </div>
+</div>
+
+<!-- Firebase 설정값 입력 모달 -->
+<div id="firebaseSetupModal" class="modal-back hidden">
+  <div class="card">
+    <div class="card-top">
+      <div><div class="ct">Firebase 연결</div><div class="cs">Firebase 콘솔에서 복사한 firebaseConfig 코드를 통째로 붙여넣으세요</div></div>
+      <button class="card-close" onclick="closeFirebaseSetup()">&times;</button>
+    </div>
+    <div class="card-divider"></div>
+    <div class="field">
+      <label>firebaseConfig 코드</label>
+      <textarea id="firebaseConfigInput" style="min-height:140px;font-family:monospace;font-size:12px" placeholder='const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  ...
+};'></textarea>
+    </div>
+    <button class="btn-add" onclick="saveFirebaseConfig()">연결하기</button>
   </div>
 </div>
 
@@ -348,6 +385,41 @@ function heightLabel(totalPages,bookCount){
   if(cm<1) return null;
   return cm>=100 ? `${(cm/100).toFixed(2)}m` : `${cm.toFixed(1)}cm`;
 }
+
+const HEIGHT_OBJECTS = [
+  {name:'아이폰', emoji:'📱', cm:15},
+  {name:'아이패드', emoji:'📱', cm:25},
+  {name:'A4 용지', emoji:'📄', cm:30},
+  {name:'볼링핀', emoji:'🎳', cm:38},
+  {name:'신생아 키', emoji:'👶', cm:50},
+  {name:'우산', emoji:'☂️', cm:85},
+  {name:'킥보드', emoji:'🛴', cm:85},
+  {name:'기타', emoji:'🎸', cm:100},
+  {name:'초등학생 1학년 키', emoji:'🎒', cm:120},
+  {name:'스노보드', emoji:'🏂', cm:150},
+  {name:'성인 키', emoji:'🧍', cm:165},
+  {name:'냉장고', emoji:'🧊', cm:180},
+  {name:'현관문', emoji:'🚪', cm:200},
+  {name:'농구 골대', emoji:'🏀', cm:305},
+  {name:'버스 높이', emoji:'🚌', cm:330},
+  {name:'2층 건물', emoji:'🏠', cm:600},
+  {name:'전봇대', emoji:'🔌', cm:800},
+];
+
+function heightObjectLabel(totalPages,bookCount){
+  const cm=((totalPages*MM_PER_PAGE)+(bookCount*COVER_MM))/10;
+  if(cm<8) return null;
+  let best=null, bestDiff=Infinity;
+  HEIGHT_OBJECTS.forEach(o=>{
+    const diff = Math.abs(Math.log(cm/o.cm));
+    if(diff<bestDiff){ bestDiff=diff; best=o; }
+  });
+  if(!best) return null;
+  const ratio = cm/best.cm;
+  if(ratio>=0.8 && ratio<=1.35) return `${best.emoji} ${best.name} 높이만큼이에요`;
+  if(ratio>1.35) return `${best.emoji} ${best.name} ${ratio.toFixed(1)}개를 쌓은 높이예요`;
+  return `${best.emoji} ${best.name} 높이의 ${Math.round(ratio*100)}% 정도예요`;
+}
 function starHtml(rating){
   rating = rating||0;
   const pct = Math.max(0, Math.min(100, (rating/5)*100));
@@ -356,7 +428,7 @@ function starHtml(rating){
 function toLocalDateStr(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
 
 function saveBooksRaw(){ localStorage.setItem('reading-books', JSON.stringify(books)); }
-function saveBooks(){ saveBooksRaw(); }
+function saveBooks(){ saveBooksRaw(); pushToCloud(); }
 
 function extractDominantColor(url){
   return new Promise((resolve)=>{
@@ -400,6 +472,7 @@ function openTitleModal(){
   document.getElementById('titleEditInput').value = localStorage.getItem('app-title') || DEFAULT_TITLE;
   document.getElementById('subtitleEditInput').value = localStorage.getItem('app-subtitle') || DEFAULT_SUBTITLE;
   document.getElementById('titleModal').classList.remove('hidden');
+  renderSyncArea();
 }
 function closeTitleModal(){ document.getElementById('titleModal').classList.add('hidden'); }
 function saveTitle(){
@@ -677,15 +750,44 @@ function allTags(list){
 }
 
 /* ---------------- 책장 (책쌓기) ---------------- */
+let periodYear = 'all', periodMonth = 'all', bookListSort = 'recent';
+
+function getAvailableYears(list){
+  const s = new Set();
+  list.forEach(b=>{ if(b.completedDate) s.add(new Date(b.completedDate).getFullYear()); });
+  return [...s].sort((a,b)=>b-a);
+}
+function inPeriod(book){
+  if(periodYear==='all') return true;
+  if(!book.completedDate) return false;
+  const d = new Date(book.completedDate);
+  if(String(d.getFullYear())!==periodYear) return false;
+  if(periodMonth!=='all' && String(d.getMonth()+1)!==periodMonth) return false;
+  return true;
+}
+function onPeriodYearChange(v){ periodYear=v; periodMonth='all'; renderShelf(); }
+function onPeriodMonthChange(v){ periodMonth=v; renderShelf(); }
+function setBookListSort(v){ bookListSort=v; renderShelf(); }
+function sortedBookList(list){
+  const arr=[...list];
+  if(bookListSort==='recent') arr.sort((a,b)=> new Date(b.completedDate)-new Date(a.completedDate));
+  else if(bookListSort==='oldest') arr.sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
+  else if(bookListSort==='title') arr.sort((a,b)=> a.title.localeCompare(b.title,'ko'));
+  else if(bookListSort==='rating') arr.sort((a,b)=> (b.rating||0)-(a.rating||0));
+  return arr;
+}
+
 function renderShelf(){
   const completed = books.filter(b=>b.status==='completed');
   const reading = books.filter(b=>b.status==='reading');
-  const tags = allTags(completed);
-  const filtered = activeTags.length ? completed.filter(b=>(b.tags||[]).some(t=>activeTags.includes(t))) : completed;
+  const periodFiltered = completed.filter(inPeriod);
+  const tags = allTags(periodFiltered);
+  const filtered = activeTags.length ? periodFiltered.filter(b=>(b.tags||[]).some(t=>activeTags.includes(t))) : periodFiltered;
 
   const totalPages = filtered.reduce((s,b)=>s+b.pages,0);
   const sorted = [...filtered].sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
   const hLabel = heightLabel(totalPages, filtered.length);
+  const availableYears = getAvailableYears(completed);
 
   let html = '';
 
@@ -706,21 +808,28 @@ function renderShelf(){
 
   html += `<div class="section-h"><div class="h">책 쌓기</div><button class="icon-btn" onclick="openShareStackCard()">📤 이미지</button></div>`;
 
-  html += `<div class="stats"><div class="num">${totalPages.toLocaleString()}</div><div class="label">총 읽은 페이지 · ${filtered.length}권</div>`;
-  if(hLabel) html += `<div class="height">📏 다 쌓으면 약 ${hLabel}</div>`;
-  html += `</div>`;
-
-  if(tags.length>0){
-    html += `<div class="tag-filters">`;
-    tags.forEach(t=>{
-      html += `<button class="tag-chip ${activeTags.includes(t)?'on':''}" onclick="toggleTag('${t.replace(/'/g,"\\'")}')">#${t}</button>`;
-    });
-    html += `</div>`;
+  if(availableYears.length>0){
+    html += `<div class="period-row">
+      <select class="period-select" onchange="onPeriodYearChange(this.value)">
+        <option value="all" ${periodYear==='all'?'selected':''}>전체 기간</option>
+        ${availableYears.map(y=>`<option value="${y}" ${periodYear===String(y)?'selected':''}>${y}년</option>`).join('')}
+      </select>
+      ${periodYear!=='all' ? `<select class="period-select" onchange="onPeriodMonthChange(this.value)">
+        <option value="all" ${periodMonth==='all'?'selected':''}>${periodYear}년 전체</option>
+        ${Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${periodMonth===String(m)?'selected':''}>${m}월</option>`).join('')}
+      </select>` : ''}
+    </div>`;
   }
+
+  const hObjLabel = heightObjectLabel(totalPages, filtered.length);
+  html += `<div class="stats"><div class="num">${filtered.length.toLocaleString()}</div><div class="label">읽은 책 · 총 ${totalPages.toLocaleString()}페이지</div>`;
+  if(hLabel) html += `<div class="height">📏 다 쌓으면 약 ${hLabel}</div>`;
+  if(hObjLabel) html += `<div style="font-size:12px;color:var(--text-muted);margin-top:8px;font-weight:500">${hObjLabel}</div>`;
+  html += `</div>`;
 
   html += `<div class="shelf-area">`;
   if(filtered.length===0){
-    html += `<div class="empty-shelf">${completed.length===0 ? '아직 쌓은 책이 없어요.<br/>오른쪽 아래 + 버튼으로 첫 책을 올려보세요.' : '이 태그에 해당하는 책이 없어요.'}</div>`;
+    html += `<div class="empty-shelf">${completed.length===0 ? '아직 쌓은 책이 없어요.<br/>오른쪽 아래 + 버튼으로 첫 책을 올려보세요.' : '이 조건에 해당하는 책이 없어요.'}</div>`;
   }else{
     html += `<div class="stack">`;
     sorted.forEach(book=>{
@@ -733,9 +842,26 @@ function renderShelf(){
   }
   html += `</div>`;
 
+  if(tags.length>0){
+    html += `<div class="tag-filters" style="margin-top:16px">`;
+    tags.forEach(t=>{
+      html += `<button class="tag-chip ${activeTags.includes(t)?'on':''}" onclick="toggleTag('${t.replace(/'/g,"\\'")}')">#${t}</button>`;
+    });
+    html += `</div>`;
+  }
+
   if(filtered.length>0){
-    html += `<div class="booklist"><div class="h" style="margin-bottom:12px">읽은 책 목록</div>`;
-    [...sorted].reverse().forEach(book=>{
+    html += `<div class="booklist">
+      <div class="section-h" style="margin-bottom:12px">
+        <div class="h">읽은 책 목록</div>
+        <select class="period-select" onchange="setBookListSort(this.value)">
+          <option value="recent" ${bookListSort==='recent'?'selected':''}>최신순</option>
+          <option value="oldest" ${bookListSort==='oldest'?'selected':''}>오래된순</option>
+          <option value="title" ${bookListSort==='title'?'selected':''}>가나다순</option>
+          <option value="rating" ${bookListSort==='rating'?'selected':''}>별점순</option>
+        </select>
+      </div>`;
+    sortedBookList(filtered).forEach(book=>{
       html += `<div class="book-row" onclick="openEditModal(${book.id})">
         <div>
           <div class="bt">${book.title}</div>
@@ -897,13 +1023,14 @@ function openShareStackCard(){
   const sorted = [...completed].sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
   const totalPages = completed.reduce((s,b)=>s+b.pages,0);
   const hLabel = heightLabel(totalPages, completed.length);
+  const hObjLabel = heightObjectLabel(totalPages, completed.length);
   const appTitle = document.getElementById('appTitle').textContent;
 
   const W = 800, padX=56;
   const SCALE = W/420; // 폰 화면 대비 캔버스가 넓은 만큼 두께도 비례해서 키움 (화면과 동일한 비율 유지)
   const gap=5;
   const stackH = sorted.reduce((s,b)=> s + spineHeightPx(b)*SCALE + gap, 0);
-  const H = 300 + stackH + 100;
+  const H = 340 + stackH + 100;
 
   const canvas = document.getElementById('shareCanvas');
   canvas.width = W; canvas.height = H;
@@ -912,16 +1039,20 @@ function openShareStackCard(){
   // 배경
   ctx.fillStyle = '#fafafa'; ctx.fillRect(0,0,W,H);
   ctx.fillStyle = '#18181b';
-  ctx.font = '800 40px Inter, sans-serif';
-  ctx.fillText(appTitle, padX, 90);
+  ctx.font = '800 44px Inter, sans-serif';
+  ctx.fillText(`${completed.length}권`, padX, 90);
   ctx.fillStyle = '#8a8a92'; ctx.font='500 20px Inter, sans-serif';
-  ctx.fillText(`총 ${totalPages.toLocaleString()}페이지 · ${completed.length}권`, padX, 126);
+  ctx.fillText(`읽은 책 · 총 ${totalPages.toLocaleString()}페이지`, padX, 126);
   if(hLabel){
     ctx.fillStyle = '#5b5bd6'; ctx.font='700 20px Inter, sans-serif';
     ctx.fillText(`📏 다 쌓으면 약 ${hLabel}`, padX, 160);
   }
+  if(hObjLabel){
+    ctx.fillStyle = '#8a8a92'; ctx.font='500 17px Inter, sans-serif';
+    ctx.fillText(hObjLabel, padX, 190);
+  }
 
-  let y = 210;
+  let y = 240;
   const maxW = W - padX*2;
   [...sorted].reverse().forEach(book=>{
     const wPct = widthFor(book)/100;
@@ -930,15 +1061,15 @@ function openShareStackCard(){
     const x = padX + (maxW-w)/2;
     ctx.fillStyle = book.color;
     roundRect(ctx, x, y, w, rowH, 6); ctx.fill();
-    if(rowH >= 20){
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.font = '700 15px Inter, sans-serif';
+    if(rowH >= 24){
+      ctx.fillStyle = 'rgba(255,255,255,0.97)';
+      ctx.font = '700 19px Inter, sans-serif';
       let title = book.title;
-      while(ctx.measureText(title).width > w-100 && title.length>3){ title = title.slice(0,-2); }
+      while(ctx.measureText(title).width > w-130 && title.length>3){ title = title.slice(0,-2); }
       if(title !== book.title) title += '…';
-      ctx.fillText(title, x+18, y+rowH/2+5);
-      ctx.textAlign='right'; ctx.font='600 13px Inter, sans-serif';
-      ctx.fillText(`${book.pages}p`, x+w-14, y+rowH/2+5);
+      ctx.fillText(title, x+20, y+rowH/2+6);
+      ctx.textAlign='right'; ctx.font='700 16px Inter, sans-serif';
+      ctx.fillText(`${book.pages}p`, x+w-16, y+rowH/2+6);
       ctx.textAlign='left';
     }
     y += rowH+gap;
@@ -1016,7 +1147,7 @@ async function openShareCalendarCard(){
   ctx.fillText(`이달 완독 ${monthBooks.length}권 · ${monthPages.toLocaleString()}페이지`, padX, 122);
 
   const dow = ['일','월','화','수','목','금','토'];
-  ctx.font = '700 16px Inter, sans-serif'; ctx.fillStyle = '#a8a8b0'; ctx.textAlign = 'center';
+  ctx.font = '700 18px Inter, sans-serif'; ctx.fillStyle = '#a8a8b0'; ctx.textAlign = 'center';
   dow.forEach((d,i)=> ctx.fillText(d, padX + i*colW + colW/2, dowY));
 
   let y = gridTop;
@@ -1030,8 +1161,8 @@ async function openShareCalendarCard(){
       if(dayBooks.length===0){
         // 책 없는 날: 숫자만 표시
         ctx.fillStyle = isOther ? '#e4e4e8' : '#c4c4cc';
-        ctx.font = '600 20px Inter, sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText(String(day.getDate()), centerX, y + emptyRowH/2 + 7);
+        ctx.font = '700 23px Inter, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(String(day.getDate()), centerX, y + emptyRowH/2 + 8);
         return;
       }
 
@@ -1062,8 +1193,8 @@ async function openShareCalendarCard(){
       });
 
       // 날짜 숫자 - 표지 그룹 아래에 작게
-      ctx.fillStyle = '#b4b4bc'; ctx.font='600 13px Inter, sans-serif'; ctx.textAlign='center';
-      ctx.fillText(String(day.getDate()), centerX, by+h+18);
+      ctx.fillStyle = '#9a9aa4'; ctx.font='700 15px Inter, sans-serif'; ctx.textAlign='center';
+      ctx.fillText(String(day.getDate()), centerX, by+h+21);
     });
     y += row.height;
   });
@@ -1096,6 +1227,153 @@ async function shareImage(){
   }
 }
 
+/* ---------------- Firebase 클라우드 동기화 ---------------- */
+let fbApp=null, fbAuth=null, fbDb=null, currentUser=null, syncing=false;
+
+function initFirebase(){
+  let cfg = null;
+  try{ cfg = JSON.parse(localStorage.getItem('firebase-config')||'null'); }catch(e){}
+  if(!cfg) return;
+  try{
+    fbApp = firebase.initializeApp(cfg);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+    fbAuth.getRedirectResult().catch(err=> console.error('redirect result error', err));
+    fbAuth.onAuthStateChanged(user=>{
+      currentUser = user;
+      renderSyncArea();
+      if(user) pullFromCloud();
+    });
+  }catch(e){
+    console.error('Firebase 초기화 실패', e);
+  }
+}
+
+function openFirebaseSetup(){
+  document.getElementById('firebaseConfigInput').value='';
+  document.getElementById('firebaseSetupModal').classList.remove('hidden');
+}
+function closeFirebaseSetup(){ document.getElementById('firebaseSetupModal').classList.add('hidden'); }
+
+function saveFirebaseConfig(){
+  const text = document.getElementById('firebaseConfigInput').value.trim();
+  if(!text){ alert('firebaseConfig 코드를 붙여넣어주세요.'); return; }
+  try{
+    const match = text.match(/\{[\s\S]*\}/);
+    if(!match) throw new Error('중괄호로 감싼 설정 객체를 찾을 수 없어요.');
+    const cfg = new Function('return ' + match[0])();
+    if(!cfg.apiKey || !cfg.projectId) throw new Error('apiKey 또는 projectId가 없어요.');
+    localStorage.setItem('firebase-config', JSON.stringify(cfg));
+    closeFirebaseSetup();
+    initFirebase();
+    renderSyncArea();
+    alert('연결되었어요! 이제 Google로 로그인해보세요.');
+  }catch(e){
+    alert('설정값을 읽을 수 없어요. Firebase 콘솔에서 복사한 코드 그대로 붙여넣어주세요.\n\n('+e.message+')');
+  }
+}
+
+function disconnectFirebase(){
+  if(!confirm('클라우드 연결을 해제할까요? (기기에 저장된 데이터는 그대로 남아요)')) return;
+  if(fbAuth) fbAuth.signOut();
+  localStorage.removeItem('firebase-config');
+  fbApp=null; fbAuth=null; fbDb=null; currentUser=null;
+  renderSyncArea();
+}
+
+function signInGoogle(){
+  if(!fbAuth){ alert('먼저 Firebase를 연결해주세요.'); return; }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  fbAuth.signInWithRedirect(provider);
+}
+function signOutGoogle(){ if(fbAuth) fbAuth.signOut(); }
+
+async function pushToCloud(){
+  if(!currentUser || !fbDb || syncing) return;
+  syncing = true;
+  try{
+    await fbDb.collection('users').doc(currentUser.uid).set({
+      books,
+      appTitle: localStorage.getItem('app-title') || null,
+      appSubtitle: localStorage.getItem('app-subtitle') || null,
+      updatedAt: Date.now()
+    });
+    localStorage.setItem('last-sync', new Date().toISOString());
+  }catch(e){
+    console.error('클라우드 저장 실패', e);
+  }finally{
+    syncing = false;
+    renderSyncArea();
+  }
+}
+
+async function pullFromCloud(){
+  if(!currentUser || !fbDb) return;
+  try{
+    const snap = await fbDb.collection('users').doc(currentUser.uid).get();
+    if(snap.exists){
+      const data = snap.data();
+      if(Array.isArray(data.books)){
+        books = data.books.map(b => ({ status:'completed', tags:[], startDate:null, ...b, tags: b.tags||[] }));
+        saveBooksRaw();
+      }
+      if(data.appTitle) localStorage.setItem('app-title', data.appTitle);
+      if(data.appSubtitle) localStorage.setItem('app-subtitle', data.appSubtitle);
+      applyTitleFromStorage();
+      render();
+    }else{
+      // 클라우드에 데이터가 없으면 지금 기기의 데이터를 최초 업로드
+      pushToCloud();
+    }
+    localStorage.setItem('last-sync', new Date().toISOString());
+    renderSyncArea();
+  }catch(e){
+    console.error('클라우드 불러오기 실패', e);
+  }
+}
+
+function renderSyncArea(){
+  const el = document.getElementById('syncArea');
+  if(!el) return;
+  const hasConfig = !!localStorage.getItem('firebase-config');
+
+  if(!hasConfig){
+    el.innerHTML = `
+      <div class="sync-card">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">기기가 바뀌어도 데이터를 이어보려면 Google 계정으로 동기화할 수 있어요.</div>
+        <button class="btn-secondary" style="margin-top:0" onclick="openFirebaseSetup()">🔥 Firebase 연결하기</button>
+      </div>`;
+    return;
+  }
+
+  if(!currentUser){
+    el.innerHTML = `
+      <div class="sync-card">
+        <button class="google-btn" onclick="signInGoogle()">Google로 로그인</button>
+        <button class="btn-delete" style="width:100%;margin-top:8px" onclick="disconnectFirebase()">연결 해제</button>
+      </div>`;
+    return;
+  }
+
+  const lastSync = localStorage.getItem('last-sync');
+  const lastSyncLabel = lastSync ? new Date(lastSync).toLocaleString('ko-KR') : '아직 없음';
+  el.innerHTML = `
+    <div class="sync-card">
+      <div class="row">
+        ${currentUser.photoURL ? `<img class="avatar" src="${currentUser.photoURL}"/>` : `<div class="avatar"></div>`}
+        <div>
+          <div class="name">${currentUser.displayName||'사용자'}</div>
+          <div class="email">${currentUser.email||''}</div>
+        </div>
+      </div>
+      <div class="status">${syncing ? '동기화 중...' : `✓ 동기화됨 · 마지막: ${lastSyncLabel}`}</div>
+      <div class="settings-row">
+        <button class="btn-secondary" style="margin-top:0" onclick="pullFromCloud()">⬇ 클라우드에서 불러오기</button>
+        <button class="btn-delete" style="margin-top:0" onclick="signOutGoogle()">로그아웃</button>
+      </div>
+    </div>`;
+}
+
 /* ---------------- 초기화 ---------------- */
 document.getElementById('dateInput').addEventListener('input', autoFillStartDate);
 document.getElementById('dateInput').addEventListener('change', autoFillStartDate);
@@ -1104,6 +1382,7 @@ document.getElementById('startDateInput').addEventListener('change', ()=>{ start
 
 applyTitleFromStorage();
 render();
+initFirebase();
 </script>
 </body>
 </html>
