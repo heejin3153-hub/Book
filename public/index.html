@@ -158,11 +158,12 @@
   .card-divider{ border-top:1px solid var(--border); margin:16px 0; }
 
   .field{ margin-bottom:14px; }
-  .field-row{ display:flex; gap:10px; }
-  .field-row .field{ flex:1; min-width:0; }
+  .field-row{ display:flex; gap:10px; align-items:flex-start; }
+  .field-row .field{ flex:1 1 0; min-width:0; }
   .field label{ display:block; font-size:10.5px; letter-spacing:0.02em; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:6px; }
-  .field input, .field textarea, .field select{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none; }
-  .field textarea{ resize:vertical; min-height:64px; font-size:14px; }
+  .field input, .field textarea, .field select{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none; box-sizing:border-box; -webkit-appearance:none; appearance:none; }
+  .field input[type="date"]{ min-width:0; padding:11px 10px; }
+  .field textarea{ resize:vertical; min-height:96px; font-size:14px; line-height:1.5; }
   .field input:focus, .field textarea:focus{ border-color:var(--accent); background:var(--surface); }
 
   .status-picker{ display:flex; gap:6px; }
@@ -184,12 +185,14 @@
 
   .quote-entry{ background:var(--bg); border:1px solid var(--border-2); border-radius:10px; padding:10px; margin-bottom:8px; }
   .quote-entry input{ width:100%; border:none; background:transparent; font-size:12px; font-weight:600; color:var(--text-muted); padding:0 0 6px; outline:none; }
-  .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:vertical; min-height:40px; font-family:'Inter',sans-serif; }
+  .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:vertical; min-height:80px; font-family:'Inter',sans-serif; line-height:1.5; }
   .quote-remove{ background:none; border:none; color:var(--danger); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0 0; }
   .quote-toggle{ background:none; border:none; color:var(--accent); font-size:11.5px; font-weight:700; cursor:pointer; padding:6px 0 0; }
   .quote-list{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); }
-  .quote-item{ font-size:12.5px; color:var(--text); line-height:1.6; margin-bottom:8px; font-style:italic; }
-  .quote-item .src{ display:block; font-size:11px; color:var(--text-muted); font-style:normal; font-weight:600; margin-top:2px; }
+  .quote-item{ position:relative; padding-left:14px; border-left:3px solid var(--accent); margin-bottom:16px; }
+  .quote-item .mark{ display:block; font-size:30px; font-weight:800; color:var(--accent); line-height:0.5; font-family:Georgia,'Times New Roman',serif; margin-bottom:4px; }
+  .quote-item .text{ font-size:13px; color:var(--text); line-height:1.65; }
+  .quote-item .src{ display:block; font-size:11px; color:var(--text-muted); font-weight:600; margin-top:6px; }
   .star-picker{ position:relative; display:inline-block; font-size:30px; letter-spacing:5px; cursor:pointer; line-height:1; -webkit-user-select:none; user-select:none; }
   .star-picker .bg{ color:var(--border-2); }
   .star-picker .fg{ position:absolute; top:0; left:0; overflow:hidden; color:var(--star); white-space:nowrap; width:0%; }
@@ -1045,7 +1048,7 @@ function renderShelf(){
           ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
         </div>
         ${hasQuotes ? `<button type="button" class="quote-toggle" onclick="toggleBookExpand(${book.id}, event)">${isExpanded ? '접기 ▲' : `인용구 ${book.quotes.length}개 보기 ▼`}</button>` : ''}
-        ${hasQuotes && isExpanded ? `<div class="quote-list">${book.quotes.map(q=>`<div class="quote-item">“${escapeHtml(q.text)}”${q.page?`<span class="src">— ${escapeHtml(q.page)}</span>`:''}</div>`).join('')}</div>` : ''}
+        ${hasQuotes && isExpanded ? `<div class="quote-list">${book.quotes.map(q=>`<div class="quote-item"><span class="mark">"</span><div class="text">${escapeHtml(q.text)}</div>${q.page?`<span class="src">${escapeHtml(q.page)}</span>`:''}</div>`).join('')}</div>` : ''}
       </div>`;
     });
     html += `</div>`;
