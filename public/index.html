@@ -680,7 +680,7 @@ function renderQuotesContainer(){
 }
 function addQuoteField(){ currentQuotes.push({page:'', text:''}); renderQuotesContainer(); }
 function updateQuote(i, field, val){ if(currentQuotes[i]) currentQuotes[i][field]=val; }
-function removeQuote(i){ currentQuotes.splice(i,1); renderQuotesContainer(); }
+function removeQuote(i){ if(!confirm('이 문구를 삭제할까요?')) return; currentQuotes.splice(i,1); renderQuotesContainer(); }
 
 function toggleBookExpand(id, event){
   if(event) event.stopPropagation();
