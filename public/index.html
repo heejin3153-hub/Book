@@ -434,8 +434,8 @@ const PALETTE = ['#5b5bd6','#e0748c','#3fa88a','#e8a23f','#4a90d9','#9b6fd6','#e
 
 function colorFor(seed){ let h=0; for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; } return PALETTE[h%PALETTE.length]; }
 function widthFor(book){
-  if(book.spineMm){ const pct = 50 + (book.spineMm-150)*0.13; return Math.max(55, Math.min(pct,88)); }
-  let h=0; const seed=book.title; for(let i=0;i<seed.length;i++){ h=(h*17+seed.charCodeAt(i))>>>0; } return 70+(h%9);
+  if(book.spineMm){ const pct = (50 + (book.spineMm-150)*0.13) * 1.15; return Math.max(63, Math.min(pct,95)); }
+  let h=0; const seed=book.title; for(let i=0;i<seed.length;i++){ h=(h*17+seed.charCodeAt(i))>>>0; } return 80+(h%10);
 }
 const MM_PER_PAGE=0.07, COVER_MM=3;
 function thicknessMm(pages){ return pages*MM_PER_PAGE+COVER_MM; }
