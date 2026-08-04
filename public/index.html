@@ -66,9 +66,10 @@
   /* 책 쌓기 */
   .shelf-area{ min-height:70px; overflow-x:hidden; }
   .stack{ display:flex; flex-direction:column-reverse; gap:4px; align-items:center; }
-  .spine{ position:relative; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; box-shadow:0 2px 3px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.22); }
-  .spine::after{ content:''; position:absolute; right:0; top:2px; bottom:2px; width:5px; background:repeating-linear-gradient(180deg,#efe8d8 0px,#efe8d8 1px,#e0d7c1 1px,#e0d7c1 2px); border-radius:0 4px 4px 0; }
-  .spine-label{ display:flex; align-items:center; gap:8px; padding:0 14px 0 16px; width:100%; margin-right:5px; color:#fff; font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-shadow:0 1px 2px rgba(0,0,0,0.15); }
+  .spine{ position:relative; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; overflow:hidden; box-shadow:0 2px 3px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.22); }
+  .spine-cover{ position:absolute; inset:-4px; background-size:cover; background-position:center; filter:blur(4px) brightness(0.7) saturate(1.05); z-index:0; }
+  .spine::after{ content:''; position:absolute; right:0; top:2px; bottom:2px; width:5px; background:repeating-linear-gradient(180deg,#efe8d8 0px,#efe8d8 1px,#e0d7c1 1px,#e0d7c1 2px); border-radius:0 4px 4px 0; z-index:1; }
+  .spine-label{ position:relative; z-index:2; display:flex; align-items:center; gap:8px; padding:0 14px 0 16px; width:100%; margin-right:5px; color:#fff; font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-shadow:0 1px 3px rgba(0,0,0,0.4); }
   .spine-label .t{ overflow:hidden; text-overflow:ellipsis; }
   .spine-label .p{ margin-left:auto; font-size:11px; opacity:0.9; font-variant-numeric:tabular-nums; flex-shrink:0; }
 
@@ -160,9 +161,12 @@
   .field{ margin-bottom:14px; }
   .field-row{ display:flex; gap:10px; align-items:flex-start; }
   .field-row .field{ flex:1 1 0; min-width:0; }
+  .field-row .field input{ text-align:center; }
   .field label{ display:block; font-size:10.5px; letter-spacing:0.02em; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:6px; }
-  .field input, .field textarea, .field select{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none; box-sizing:border-box; -webkit-appearance:none; appearance:none; }
-  .field input[type="date"]{ min-width:0; padding:11px 10px; }
+  .field input, .field select{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none; box-sizing:border-box; -webkit-appearance:none; appearance:none; text-align:center; }
+  .field textarea{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none; box-sizing:border-box; }
+  .field input[type="date"]{ min-width:0; padding:11px 10px; text-align:center; }
+  #pagesInput, #tagsInput{ text-align:center; }
   .field textarea{ resize:vertical; min-height:96px; font-size:14px; line-height:1.5; }
   .field input:focus, .field textarea:focus{ border-color:var(--accent); background:var(--surface); }
 
@@ -188,9 +192,9 @@
   .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:vertical; min-height:80px; font-family:'Inter',sans-serif; line-height:1.5; }
   .quote-remove{ background:none; border:none; color:var(--danger); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0 0; }
   .quote-toggle{ background:none; border:none; color:var(--accent); font-size:11.5px; font-weight:700; cursor:pointer; padding:6px 0 0; }
-  .quote-list{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); }
-  .quote-item{ position:relative; padding-left:14px; border-left:3px solid var(--accent); margin-bottom:16px; }
-  .quote-item .mark{ display:block; font-size:30px; font-weight:800; color:var(--accent); line-height:0.5; font-family:Georgia,'Times New Roman',serif; margin-bottom:4px; }
+  .quote-list{ margin-top:16px; padding-top:20px; border-top:1px dashed var(--border); }
+  .quote-item{ position:relative; padding-left:16px; padding-top:2px; border-left:3px solid var(--accent); margin-bottom:20px; }
+  .quote-item .mark{ display:block; font-size:34px; font-weight:800; color:var(--accent); line-height:1; font-family:Georgia,'Times New Roman',serif; margin-bottom:2px; margin-top:-6px; }
   .quote-item .text{ font-size:13px; color:var(--text); line-height:1.65; }
   .quote-item .src{ display:block; font-size:11px; color:var(--text-muted); font-weight:600; margin-top:6px; }
   .star-picker{ position:relative; display:inline-block; font-size:30px; letter-spacing:5px; cursor:pointer; line-height:1; -webkit-user-select:none; user-select:none; }
@@ -1004,10 +1008,9 @@ function renderShelf(){
     const panelScale = currentPanelScale();
     sorted.forEach(book=>{
       const w = widthFor(book), h = spineHeightPx(book)*panelScale, off = offsetFor(book);
-      const bgStyle = (book.cover && getStackStyle()==='cover')
-        ? `background-image:linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.6)), url('${book.cover}'); background-size:cover; background-position:center;`
-        : `background:${book.color};`;
-      html += `<div class="spine" style="height:${h}px;width:${w}%;transform:translateX(${off}%);${bgStyle}" onclick="openEditModal(${book.id})">
+      const useCoverBg = book.cover && getStackStyle()==='cover';
+      html += `<div class="spine" style="height:${h}px;width:${w}%;transform:translateX(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
+        ${useCoverBg ? `<div class="spine-cover" style="background-image:url('${book.cover}')"></div>` : ''}
         <div class="spine-label"><span class="t">${book.title}</span><span class="p">${book.pages}p</span></div>
       </div>`;
     });
@@ -1048,7 +1051,7 @@ function renderShelf(){
           ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
         </div>
         ${hasQuotes ? `<button type="button" class="quote-toggle" onclick="toggleBookExpand(${book.id}, event)">${isExpanded ? '접기 ▲' : `인용구 ${book.quotes.length}개 보기 ▼`}</button>` : ''}
-        ${hasQuotes && isExpanded ? `<div class="quote-list">${book.quotes.map(q=>`<div class="quote-item"><span class="mark">"</span><div class="text">${escapeHtml(q.text)}</div>${q.page?`<span class="src">${escapeHtml(q.page)}</span>`:''}</div>`).join('')}</div>` : ''}
+        ${hasQuotes && isExpanded ? `<div class="quote-list">${book.quotes.map(q=>`<div class="quote-item"><span class="mark">&ldquo;</span><div class="text">${escapeHtml(q.text)}</div>${q.page?`<span class="src">${escapeHtml(q.page)}</span>`:''}</div>`).join('')}</div>` : ''}
       </div>`;
     });
     html += `</div>`;
