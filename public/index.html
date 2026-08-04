@@ -340,29 +340,6 @@
   </div>
 </div>
 
-<!-- Firebase 설정값 입력 모달 -->
-<div id="firebaseSetupModal" class="modal-back hidden">
-  <div class="card">
-    <div class="card-top">
-      <div><div class="ct">Firebase 연결</div><div class="cs">Firebase 콘솔에서 복사한 firebaseConfig 코드를 통째로 붙여넣으세요</div></div>
-      <button class="card-close" onclick="closeFirebaseSetup()">&times;</button>
-    </div>
-    <div class="card-body">
-    <div class="card-divider"></div>
-    <div class="field">
-      <label>firebaseConfig 코드</label>
-      <textarea id="firebaseConfigInput" style="min-height:140px;font-family:monospace;font-size:12px" placeholder='const firebaseConfig = {
-  apiKey: "...",
-  authDomain: "...",
-  projectId: "...",
-  ...
-};'></textarea>
-    </div>
-    <button class="btn-add" onclick="saveFirebaseConfig()">연결하기</button>
-    </div>
-  </div>
-</div>
-
 <!-- 공유 이미지 카드 모달 -->
 <div id="shareModal" class="modal-back hidden">
   <div class="card">
@@ -1388,12 +1365,33 @@ async function shareImage(){
 /* ---------------- Firebase 클라우드 동기화 ---------------- */
 let fbApp=null, fbAuth=null, fbDb=null, currentUser=null, syncing=false;
 
+// 앱에 고정된 Firebase 설정값 - 어느 기기에서 접속해도 다시 입력할 필요 없음
+// (firebaseConfig 값 자체는 비밀키가 아니라 공개돼도 안전함, 실제 보안은 Firestore 규칙이 담당)
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDO1Kpx3OTLzw58C7EEbrou-7rWWHghwq0",
+  authDomain: "book-8e4be.firebaseapp.com",
+  projectId: "book-8e4be",
+  storageBucket: "book-8e4be.firebasestorage.app",
+  messagingSenderId: "1005262003227",
+  appId: "1:1005262003227:web:5df34ffbe4f72d279c2cbe"
+};
+
+let firebaseInitAttempts = 0;
 function initFirebase(){
-  let cfg = null;
-  try{ cfg = JSON.parse(localStorage.getItem('firebase-config')||'null'); }catch(e){}
-  if(!cfg) return;
+  if(typeof firebase === 'undefined'){
+    firebaseInitAttempts++;
+    if(firebaseInitAttempts <= 10){
+      // SDK 스크립트가 아직 로딩 중일 수 있으니 잠시 후 재시도
+      setTimeout(initFirebase, 400);
+    }else{
+      console.error('Firebase SDK 로딩 실패 - 네트워크 또는 콘텐츠 차단 확장 프로그램을 확인해주세요.');
+      const el = document.getElementById('syncArea');
+      if(el) el.innerHTML = `<div class="sync-card"><div style="font-size:12px;color:var(--danger);line-height:1.6">클라우드 기능을 불러오지 못했어요.<br/>네트워크 상태를 확인하거나, 사파리의 콘텐츠 차단 확장 프로그램을 잠시 꺼보고 새로고침해주세요.</div></div>`;
+    }
+    return;
+  }
   try{
-    fbApp = firebase.initializeApp(cfg);
+    fbApp = firebase.initializeApp(FIREBASE_CONFIG);
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
     fbAuth.getRedirectResult().catch(err=>{
@@ -1410,41 +1408,8 @@ function initFirebase(){
   }
 }
 
-function openFirebaseSetup(){
-  document.getElementById('firebaseConfigInput').value='';
-  document.getElementById('firebaseSetupModal').classList.remove('hidden');
-  lockBodyScroll();
-}
-function closeFirebaseSetup(){ document.getElementById('firebaseSetupModal').classList.add('hidden'); unlockBodyScroll(); }
-
-function saveFirebaseConfig(){
-  const text = document.getElementById('firebaseConfigInput').value.trim();
-  if(!text){ alert('firebaseConfig 코드를 붙여넣어주세요.'); return; }
-  try{
-    const match = text.match(/\{[\s\S]*\}/);
-    if(!match) throw new Error('중괄호로 감싼 설정 객체를 찾을 수 없어요.');
-    const cfg = new Function('return ' + match[0])();
-    if(!cfg.apiKey || !cfg.projectId) throw new Error('apiKey 또는 projectId가 없어요.');
-    localStorage.setItem('firebase-config', JSON.stringify(cfg));
-    closeFirebaseSetup();
-    initFirebase();
-    renderSyncArea();
-    alert('연결되었어요! 이제 Google로 로그인해보세요.');
-  }catch(e){
-    alert('설정값을 읽을 수 없어요. Firebase 콘솔에서 복사한 코드 그대로 붙여넣어주세요.\n\n('+e.message+')');
-  }
-}
-
-function disconnectFirebase(){
-  if(!confirm('클라우드 연결을 해제할까요? (기기에 저장된 데이터는 그대로 남아요)')) return;
-  if(fbAuth) fbAuth.signOut();
-  localStorage.removeItem('firebase-config');
-  fbApp=null; fbAuth=null; fbDb=null; currentUser=null;
-  renderSyncArea();
-}
-
 function signInGoogle(){
-  if(!fbAuth){ alert('먼저 Firebase를 연결해주세요.'); return; }
+  if(!fbAuth){ alert('클라우드 기능을 아직 불러오는 중이거나 실패했어요. 잠시 후 다시 시도하거나 새로고침해주세요.'); return; }
   const provider = new firebase.auth.GoogleAuthProvider();
   fbAuth.signInWithRedirect(provider).catch(err=>{
     alert('로그인 중 오류가 발생했어요:\n' + err.code + '\n' + err.message);
@@ -1500,22 +1465,12 @@ async function pullFromCloud(){
 function renderSyncArea(){
   const el = document.getElementById('syncArea');
   if(!el) return;
-  const hasConfig = !!localStorage.getItem('firebase-config');
-
-  if(!hasConfig){
-    el.innerHTML = `
-      <div class="sync-card">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">기기가 바뀌어도 데이터를 이어보려면 Google 계정으로 동기화할 수 있어요.</div>
-        <button class="btn-secondary" style="margin-top:0" onclick="openFirebaseSetup()">🔥 Firebase 연결하기</button>
-      </div>`;
-    return;
-  }
 
   if(!currentUser){
     el.innerHTML = `
       <div class="sync-card">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">Google 계정으로 로그인하면 기기가 바뀌어도 독서 기록이 그대로 이어져요.</div>
         <button class="google-btn" onclick="signInGoogle()">Google로 로그인</button>
-        <button class="btn-delete" style="width:100%;margin-top:8px" onclick="disconnectFirebase()">연결 해제</button>
       </div>`;
     return;
   }
