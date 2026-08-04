@@ -327,6 +327,7 @@ let currentMonth = new Date();
 let currentView = 'shelf';
 let selectedCover = null, selectedDepthMm = null, selectedSpineMm = null;
 let currentRating = 0, currentStatus = 'completed', editingId = null;
+let startDateManuallyEdited = false;
 let activeTags = [];
 
 const DEFAULT_TITLE = '독서기록';
@@ -491,6 +492,7 @@ function resetModalFields(){
 
 function openAddModal(defaultStatus){
   editingId=null; selectedCover=null; selectedDepthMm=null; selectedSpineMm=null; currentRating=0;
+  startDateManuallyEdited=false;
   document.getElementById('modalTitle').textContent='책 기록하기';
   document.getElementById('modalSubtitle').textContent='제목을 검색하면 페이지 수를 자동으로 채워드려요';
   document.getElementById('searchSection').classList.remove('hidden');
@@ -505,15 +507,15 @@ function openAddModal(defaultStatus){
   setTimeout(()=>document.getElementById('searchInput').focus(),50);
 }
 
-// 완독 날짜가 바뀌면, 시작 날짜가 비어있을 때만 자동으로 그 전날로 채워줌 (직접 입력한 값은 건드리지 않음)
+// 완독 날짜가 바뀌면 시작 날짜를 자동으로 그 전날로 채움 - 단, 사용자가 시작 날짜를 직접 수정한 뒤에는 더 이상 덮어쓰지 않음
 function autoFillStartDate(){
+  if(startDateManuallyEdited) return;
   const completedVal = document.getElementById('dateInput').value;
-  const startField = document.getElementById('startDateInput');
-  if(!completedVal || startField.value) return;
+  if(!completedVal) return;
   const d = new Date(completedVal + 'T00:00:00');
   if(isNaN(d)) return;
   d.setDate(d.getDate()-1);
-  startField.value = toLocalDateStr(d);
+  document.getElementById('startDateInput').value = toLocalDateStr(d);
 }
 
 function openEditModal(id){
@@ -521,6 +523,7 @@ function openEditModal(id){
   if(!book) return;
   editingId=id; selectedCover=book.cover||null; selectedDepthMm=book.depthMm||null; selectedSpineMm=book.spineMm||null;
   currentRating=book.rating||0;
+  startDateManuallyEdited=false;
   document.getElementById('modalTitle').textContent='책 수정하기';
   document.getElementById('modalSubtitle').textContent='내용을 고치거나 삭제할 수 있어요';
   document.getElementById('searchSection').classList.add('hidden');
@@ -897,8 +900,9 @@ function openShareStackCard(){
   const appTitle = document.getElementById('appTitle').textContent;
 
   const W = 800, padX=56;
-  const rowH = 34, gap=6;
-  const stackH = sorted.length * (rowH+gap);
+  const SCALE = W/420; // 폰 화면 대비 캔버스가 넓은 만큼 두께도 비례해서 키움 (화면과 동일한 비율 유지)
+  const gap=5;
+  const stackH = sorted.reduce((s,b)=> s + spineHeightPx(b)*SCALE + gap, 0);
   const H = 300 + stackH + 100;
 
   const canvas = document.getElementById('shareCanvas');
@@ -922,18 +926,21 @@ function openShareStackCard(){
   [...sorted].reverse().forEach(book=>{
     const wPct = widthFor(book)/100;
     const w = maxW * wPct;
+    const rowH = spineHeightPx(book) * SCALE;
     const x = padX + (maxW-w)/2;
     ctx.fillStyle = book.color;
     roundRect(ctx, x, y, w, rowH, 6); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.font = '700 15px Inter, sans-serif';
-    let title = book.title;
-    while(ctx.measureText(title).width > w-100 && title.length>3){ title = title.slice(0,-2); }
-    if(title !== book.title) title += '…';
-    ctx.fillText(title, x+18, y+22);
-    ctx.textAlign='right'; ctx.font='600 13px Inter, sans-serif';
-    ctx.fillText(`${book.pages}p`, x+w-14, y+22);
-    ctx.textAlign='left';
+    if(rowH >= 20){
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.font = '700 15px Inter, sans-serif';
+      let title = book.title;
+      while(ctx.measureText(title).width > w-100 && title.length>3){ title = title.slice(0,-2); }
+      if(title !== book.title) title += '…';
+      ctx.fillText(title, x+18, y+rowH/2+5);
+      ctx.textAlign='right'; ctx.font='600 13px Inter, sans-serif';
+      ctx.fillText(`${book.pages}p`, x+w-14, y+rowH/2+5);
+      ctx.textAlign='left';
+    }
     y += rowH+gap;
   });
 
@@ -1091,6 +1098,9 @@ async function shareImage(){
 
 /* ---------------- 초기화 ---------------- */
 document.getElementById('dateInput').addEventListener('input', autoFillStartDate);
+document.getElementById('dateInput').addEventListener('change', autoFillStartDate);
+document.getElementById('startDateInput').addEventListener('input', ()=>{ startDateManuallyEdited = true; });
+document.getElementById('startDateInput').addEventListener('change', ()=>{ startDateManuallyEdited = true; });
 
 applyTitleFromStorage();
 render();
