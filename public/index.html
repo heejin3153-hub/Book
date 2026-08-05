@@ -941,6 +941,11 @@ async function selectBook(index){
   selectedCover = book.cover||null; selectedDepthMm=null; selectedSpineMm=null;
   selectedAuthor = book.author || ''; selectedAladinItemId = book.itemId || null;
   selectedExtraInfo = null; // 책소개/줄거리/책속에서 등은 "자세히 보기" 누를 때 불러옴
+
+  // 책을 고르면 검색창은 접고, 필요하면 다시 열 수 있게 토글 버튼을 보여줌
+  document.getElementById('searchSection').classList.add('hidden');
+  document.getElementById('reSearchToggle').classList.remove('hidden');
+
   try{
     const res = await fetch(`/api/detail/${book.itemId}`);
     const data = await res.json();
