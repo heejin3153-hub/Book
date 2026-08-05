@@ -118,6 +118,10 @@
   /* 통계 */
   .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:22px; }
   .stat-box{ background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:14px; text-align:center; }
+  .stat-box-editable{ cursor:pointer; border:1.5px dashed var(--border-2); }
+  .stat-box-editable:active{ background:var(--accent-soft); }
+  .stat-box-editable .v{ max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .edit-pencil{ opacity:0.6; font-size:9px; }
   .stat-box .v{ font-size:22px; font-weight:800; letter-spacing:-0.01em; }
   .stat-box .l{ font-size:10.5px; color:var(--text-muted); font-weight:600; margin-top:4px; }
   .bar-chart{ display:flex; align-items:flex-end; gap:5px; height:110px; margin-bottom:6px; }
@@ -182,7 +186,7 @@
   .field input:focus, .field textarea:focus{ border-color:var(--accent); background:var(--surface); }
 
   .status-picker{ display:flex; gap:6px; }
-  .status-picker button{ flex:1; background:var(--bg); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:10px; padding:10px 4px; font-size:12px; font-weight:700; cursor:pointer; }
+  .status-picker button{ flex:1; background:var(--bg); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:10px; padding:11px 4px; font-size:13px; font-weight:700; cursor:pointer; }
   .status-picker button.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
 
   .search-row{ display:flex; gap:8px; align-items:flex-end; }
@@ -216,10 +220,10 @@
   .star-display .fg{ position:absolute; top:0; left:0; overflow:hidden; color:var(--star); white-space:nowrap; }
 
   .btn-row{ display:flex; gap:8px; margin-top:6px; }
-  .btn-add{ flex:1; background:var(--accent); color:#fff; border:none; border-radius:12px; padding:15px; font-size:14.5px; font-weight:700; cursor:pointer; }
+  .btn-add{ flex:1; background:var(--accent); color:#fff; border:none; border-radius:12px; padding:14px; font-size:14px; font-weight:700; cursor:pointer; }
   .btn-add:disabled{ opacity:0.4; }
-  .btn-delete{ background:#fdeeee; color:var(--danger); border:none; border-radius:12px; padding:15px 18px; font-size:14.5px; font-weight:700; cursor:pointer; }
-  .btn-secondary{ width:100%; background:var(--bg); border:1.5px solid var(--border-2); color:var(--text); border-radius:12px; padding:13px; font-size:13.5px; font-weight:700; cursor:pointer; margin-top:8px; }
+  .btn-delete{ flex:1; background:#fdeeee; color:var(--danger); border:none; border-radius:12px; padding:14px; font-size:14px; font-weight:700; cursor:pointer; text-align:center; }
+  .btn-secondary{ width:100%; background:var(--bg); border:1.5px solid var(--border-2); color:var(--text); border-radius:12px; padding:12px; font-size:13px; font-weight:700; cursor:pointer; margin-top:0; }
 
   .settings-row{ display:flex; gap:8px; margin-top:6px; }
   .sync-card{ background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:14px; }
@@ -228,12 +232,13 @@
   .sync-card .name{ font-size:13px; font-weight:700; }
   .sync-card .email{ font-size:11px; color:var(--text-muted); }
   .sync-card .status{ font-size:11px; color:var(--green); font-weight:600; margin-top:6px; }
-  .google-btn{ width:100%; background:#fff; border:1.5px solid var(--border-2); color:var(--text); border-radius:10px; padding:12px; font-size:13.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .google-btn{ width:100%; background:#fff; border:1.5px solid var(--border-2); color:var(--text); border-radius:12px; padding:12px; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
   .settings-row button{ flex:1; }
 
   .share-preview{ text-align:center; }
   .share-preview canvas{ max-width:100%; border-radius:12px; border:1px solid var(--border); margin-bottom:14px; }
   .share-actions{ display:flex; gap:8px; }
+  .share-actions button{ flex:1; margin-top:0; }
 
   .hidden{ display:none !important; }
   @media(max-width:360px){ .stats .num{ font-size:32px; } h1.title{ font-size:21px; } }
@@ -368,6 +373,26 @@
     <div class="card-divider"></div>
     <div class="field"><label>클라우드 동기화</label></div>
     <div id="syncArea"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 참여자 코드 입력 모달 -->
+<div id="inviteCodeModal" class="modal-back hidden">
+  <div class="card">
+    <div class="card-top">
+      <div><div class="ct">참여자 코드 입력</div><div class="cs">클라우드 동기화를 쓰려면 코드가 필요해요</div></div>
+      <button class="card-close" onclick="closeInviteCodeModal()">&times;</button>
+    </div>
+    <div class="card-body">
+      <div class="card-divider"></div>
+      <div class="field">
+        <label>참여자 코드</label>
+        <input id="inviteCodeInput" type="text" placeholder="전달받은 코드를 입력하세요" autocapitalize="off" autocorrect="off">
+      </div>
+      <div id="inviteCodeError" class="error-msg hidden" style="margin-bottom:14px"></div>
+      <button class="btn-add" onclick="redeemInviteCode()" id="inviteCodeBtn">입장하기</button>
+      <div style="font-size:11.5px;color:var(--text-muted);margin-top:12px;line-height:1.6">코드 없이도 이 기기에서 로컬로 계속 쓸 수 있어요. 다른 기기와 동기화하려면 코드가 필요해요.</div>
     </div>
   </div>
 </div>
@@ -762,6 +787,7 @@ function openAddModal(defaultStatus){
   document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
   document.getElementById('startDateInput').value = ''; // 완독일 입력 시 자동으로 전날로 채워짐
   autoFillStartDate();
+  syncDateBounds();
   renderStars();
   renderQuotesContainer();
   renderBookInfoButton();
@@ -802,6 +828,7 @@ function openEditModal(id){
   document.getElementById('dateInput').value=book.completedDate||'';
   document.getElementById('reviewInput').value=book.review||'';
   document.getElementById('wishCommentInput').value=book.wishComment||'';
+  syncDateBounds();
   renderStars();
   renderQuotesContainer();
   renderBookInfoButton();
@@ -978,6 +1005,10 @@ async function saveBook(){
   const quotes = currentStatus==='completed' ? currentQuotes.filter(q=>q.text && q.text.trim()).map(q=>({page:(q.page||'').trim(), text:q.text.trim()})) : [];
 
   if(currentStatus==='completed' && !completedDate){ alert('완독 날짜를 입력해주세요!'); return; }
+  if(currentStatus==='completed' && startDate && completedDate && new Date(startDate) > new Date(completedDate)){
+    alert('읽기 시작한 날짜가 완독 날짜보다 늦을 수 없어요. 날짜를 확인해주세요.');
+    return;
+  }
 
   let color = colorFor(title);
   if(selectedCover){ const extracted = await extractDominantColor(selectedCover); if(extracted) color = extracted; }
@@ -1106,7 +1137,7 @@ function renderShelf(){
   }
 
   const hObjLabel = heightObjectLabel(totalPages, filtered.length);
-  html += `<div class="stats"><div class="num">${filtered.length.toLocaleString()}</div><div class="label">읽은 책 · 총 ${totalPages.toLocaleString()}페이지</div>`;
+  html += `<div class="stats"><div class="num">${filtered.length.toLocaleString()}권</div><div class="label">읽은 책 · 총 ${totalPages.toLocaleString()}페이지</div>`;
   if(hLabel) html += `<div class="height">📏 다 쌓으면 약 ${hLabel}</div>`;
   if(hObjLabel) html += `<div style="font-size:12px;color:var(--text-muted);margin-top:8px;font-weight:500">${hObjLabel}</div>`;
   html += `</div>`;
@@ -1177,24 +1208,37 @@ function toggleTag(t){
 }
 
 /* ---------------- 캘린더 ---------------- */
+let calMode = 'completed'; // 'completed' | 'reading'
+function setCalMode(m){ calMode=m; renderCalendar(); }
+
 function renderCalendar(){
   const year=currentMonth.getFullYear(), month=currentMonth.getMonth();
   const firstDay=new Date(year,month,1), lastDay=new Date(year,month+1,0);
   const startDate=new Date(firstDay); startDate.setDate(startDate.getDate()-firstDay.getDay());
   const endDate=new Date(lastDay); endDate.setDate(endDate.getDate()+(6-lastDay.getDay()));
 
-  const monthBooks = books.filter(b=>{ if(b.status!=='completed'||!b.completedDate) return false; const d=new Date(b.completedDate); return d.getFullYear()===year&&d.getMonth()===month; });
-  const monthPages = monthBooks.reduce((s,b)=>s+b.pages,0);
-  const byDate={}; monthBooks.forEach(b=>{ (byDate[b.completedDate]=byDate[b.completedDate]||[]).push(b); });
+  const isCompletedMode = calMode==='completed';
+  const dateField = isCompletedMode ? 'completedDate' : 'startDate';
+  const monthBooks = books.filter(b=>{
+    if(isCompletedMode){ if(b.status!=='completed'||!b.completedDate) return false; }
+    else{ if(b.status!=='reading'||!b.startDate) return false; }
+    const d=new Date(b[dateField]); return d.getFullYear()===year&&d.getMonth()===month;
+  });
+  const monthPages = monthBooks.reduce((s,b)=>s+(b.pages||0),0);
+  const byDate={}; monthBooks.forEach(b=>{ (byDate[b[dateField]]=byDate[b[dateField]]||[]).push(b); });
 
   const days=[]; const cursor=new Date(startDate);
   while(cursor<=endDate){ days.push(new Date(cursor)); cursor.setDate(cursor.getDate()+1); }
   const dow=['일','월','화','수','목','금','토'];
 
   let html = `<div class="section-h"><div class="h">캘린더</div><button class="icon-btn" onclick="openShareCalendarCard()">📤 이미지</button></div>`;
+  html += `<div class="status-picker" style="margin-bottom:16px">
+    <button type="button" onclick="setCalMode('completed')" class="${isCompletedMode?'on':''}">완독만 보기</button>
+    <button type="button" onclick="setCalMode('reading')" class="${!isCompletedMode?'on':''}">읽는 중 보기</button>
+  </div>`;
   html += `<div class="cal-summary">
-    <div class="box"><div class="v">${monthBooks.length}권</div><div class="l">이번 달 완독</div></div>
-    <div class="box"><div class="v">${monthPages.toLocaleString()}p</div><div class="l">이번 달 읽은 페이지</div></div>
+    <div class="box"><div class="v">${monthBooks.length}권</div><div class="l">${isCompletedMode?'이번 달 완독':'이번 달 읽기 시작'}</div></div>
+    <div class="box"><div class="v">${monthPages.toLocaleString()}p</div><div class="l">${isCompletedMode?'이번 달 읽은 페이지':'페이지 합계'}</div></div>
   </div>`;
   html += `<div class="cal-head"><button class="cal-nav" onclick="changeMonth(-1)">←</button><div class="m">${year}년 ${month+1}월</div><button class="cal-nav" onclick="changeMonth(1)">→</button></div>`;
   html += `<div class="cal-grid">`;
@@ -1207,18 +1251,22 @@ function renderCalendar(){
         <span class="d">${day.getDate()}</span>${dayBooks.length>1?`<span class="cal-more">+${dayBooks.length-1}</span>`:''}
       </div>`;
     }else{
-      html += `<div class="cal-cell ${isOther?'other':''}"><span class="d">${day.getDate()}</span></div>`;
+      html += `<div class="cal-cell ${isOther?'other':''}" style="cursor:pointer" onclick="addBookForDate('${dateStr}')"><span class="d">${day.getDate()}</span></div>`;
     }
   });
   html += `</div>`;
 
-  html += `<div class="month-list"><div class="h" style="margin-bottom:10px;font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--text-muted);font-weight:700">이번 달의 완독</div>`;
-  if(monthBooks.length===0){ html += `<div class="month-empty">이 달에 완독한 책이 없어요</div>`; }
+  html += `<div class="month-list"><div class="h" style="margin-bottom:10px;font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--text-muted);font-weight:700">${isCompletedMode?'이번 달의 완독':'이번 달에 읽기 시작한 책'}</div>`;
+  if(monthBooks.length===0){ html += `<div class="month-empty">${isCompletedMode?'이 달에 완독한 책이 없어요':'이 달에 읽기 시작한 책이 없어요'}</div>`; }
   else{
-    [...monthBooks].sort((a,b)=>new Date(a.completedDate)-new Date(b.completedDate)).forEach(book=>{
+    [...monthBooks].sort((a,b)=>new Date(a[dateField])-new Date(b[dateField])).forEach(book=>{
       html += `<div class="month-row" onclick="openEditModal(${book.id})">
         ${book.cover?`<img class="cov" src="${book.cover}" loading="lazy"/>`:`<div class="chip" style="background:${book.color}"></div>`}
-        <div><div class="bt">${book.title}</div><div class="bd">${book.pages}p · ${book.completedDate}</div></div>
+        <div style="flex:1;min-width:0">
+          <div class="bt">${book.title}</div>
+          <div class="bd">${book[dateField]}${book.author?` · ${escapeHtml(book.author)}`:''}${book.pages?` · ${book.pages}p`:''}</div>
+          ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
+        </div>
       </div>`;
     });
   }
@@ -1227,9 +1275,87 @@ function renderCalendar(){
 }
 function changeMonth(delta){ currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth()+delta, 1); renderCalendar(); }
 
+function addBookForDate(dateStr){
+  if(calMode==='reading'){
+    openAddModal('reading');
+    document.getElementById('startDateInput').value = dateStr;
+    startDateManuallyEdited = true;
+    return;
+  }
+  openAddModal('completed');
+  document.getElementById('dateInput').value = dateStr;
+  startDateManuallyEdited = false;
+  autoFillStartDate();
+}
+
 /* ---------------- 통계 ---------------- */
-let statsYear = 'all';
+let statsYear = String(new Date().getFullYear());
 function onStatsYearChange(v){ statsYear=v; renderStats(); }
+
+function avgReadDays(list){
+  const withDates = list.filter(b=>b.startDate && b.completedDate);
+  if(withDates.length===0) return null;
+  const total = withDates.reduce((s,b)=>{
+    const d1=new Date(b.startDate), d2=new Date(b.completedDate);
+    const diff = Math.round((d2-d1)/86400000);
+    return s + Math.max(diff,0);
+  },0);
+  return (total/withDates.length).toFixed(1);
+}
+
+// 4번째 통계 칸에서 순환 선택 가능한 지표들
+const EXTRA_STAT_OPTIONS = [
+  {id:'avgDays', label:'평균 완독 소요일'},
+  {id:'perMonth', label:'월 평균 완독 권수'},
+  {id:'avgPages', label:'평균 페이지 수'},
+  {id:'thickest', label:'가장 두꺼운 책'},
+  {id:'topMonth', label:'가장 많이 읽은 달'},
+  {id:'fiveStar', label:'5점 준 책'},
+  {id:'topAuthor', label:'가장 많이 읽은 작가'}
+];
+let extraStatId = localStorage.getItem('stats-extra-metric') || 'avgDays';
+function cycleExtraStat(){
+  const ids = EXTRA_STAT_OPTIONS.map(o=>o.id);
+  const idx = ids.indexOf(extraStatId);
+  extraStatId = ids[(idx+1)%ids.length];
+  localStorage.setItem('stats-extra-metric', extraStatId);
+  renderStats();
+}
+function computeExtraStat(id, list){
+  switch(id){
+    case 'avgDays': { const d=avgReadDays(list); return d? d+'일' : '-'; }
+    case 'perMonth': {
+      if(list.length===0) return '-';
+      const months = new Set(list.map(b=>(b.completedDate||'').slice(0,7)).filter(Boolean));
+      return (list.length/(months.size||1)).toFixed(1)+'권';
+    }
+    case 'avgPages': {
+      if(list.length===0) return '-';
+      return Math.round(list.reduce((s,b)=>s+(b.pages||0),0)/list.length)+'p';
+    }
+    case 'thickest': {
+      const longest = list.reduce((a,b)=> (b.pages||0)>(a?a.pages:0)?b:a, null);
+      return longest? longest.pages+'p' : '-';
+    }
+    case 'topMonth': {
+      const counts = {};
+      list.forEach(b=>{ if(!b.completedDate) return; const m=new Date(b.completedDate).getMonth()+1; counts[m]=(counts[m]||0)+1; });
+      const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+      return entries.length? `${entries[0][0]}월 ${entries[0][1]}권` : '-';
+    }
+    case 'fiveStar': { return list.filter(b=>b.rating===5).length+'권'; }
+    case 'topAuthor': {
+      const counts = {};
+      list.forEach(b=>{ if(b.author) counts[b.author]=(counts[b.author]||0)+1; });
+      const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+      if(entries.length===0) return '-';
+      let name = entries[0][0];
+      if(name.length>7) name = name.slice(0,7)+'…';
+      return name;
+    }
+    default: return '-';
+  }
+}
 
 function renderStats(){
   const completed = books.filter(b=>b.status==='completed' && b.completedDate);
@@ -1238,12 +1364,16 @@ function renderStats(){
     return;
   }
   const availableYears = getAvailableYears(completed);
+  if(statsYear!=='all' && !availableYears.map(String).includes(statsYear)){
+    statsYear = availableYears.length ? String(availableYears[0]) : 'all';
+  }
   const scoped = statsYear==='all' ? completed : completed.filter(b=> new Date(b.completedDate).getFullYear()===Number(statsYear));
 
   const totalPages = scoped.reduce((s,b)=>s+b.pages,0);
   const rated = scoped.filter(b=>b.rating>0);
   const avgRating = rated.length ? (rated.reduce((s,b)=>s+b.rating,0)/rated.length).toFixed(1) : '-';
-  const longest = scoped.reduce((a,b)=> b.pages>(a?a.pages:0) ? b : a, null);
+  const extraOpt = EXTRA_STAT_OPTIONS.find(o=>o.id===extraStatId) || EXTRA_STAT_OPTIONS[0];
+  const extraValue = computeExtraStat(extraStatId, scoped);
 
   let html = `<div class="period-row">
     <select class="period-select" onchange="onStatsYearChange(this.value)">
@@ -1256,30 +1386,56 @@ function renderStats(){
     <div class="stat-box"><div class="v">${scoped.length}권</div><div class="l">${statsYear==='all'?'전체':statsYear+'년'} 완독</div></div>
     <div class="stat-box"><div class="v">${totalPages.toLocaleString()}p</div><div class="l">${statsYear==='all'?'전체':statsYear+'년'} 페이지</div></div>
     <div class="stat-box"><div class="v">${avgRating}${avgRating!=='-'?' ★':''}</div><div class="l">평균 별점</div></div>
-    <div class="stat-box"><div class="v">${longest?longest.pages:'-'}p</div><div class="l">가장 두꺼운 책</div></div>
+    <div class="stat-box stat-box-editable" onclick="cycleExtraStat()"><div class="v">${extraValue}</div><div class="l">${extraOpt.label} <span class="edit-pencil">✎</span></div></div>
   </div>`;
 
   if(statsYear==='all'){
-    // 연도별 막대
-    const yearCounts = {};
-    completed.forEach(b=>{ const y=new Date(b.completedDate).getFullYear(); yearCounts[y]=(yearCounts[y]||0)+1; });
+    // 연도별 막대 (권수)
+    const yearCounts = {}, yearRatings = {};
+    completed.forEach(b=>{
+      const y=new Date(b.completedDate).getFullYear();
+      yearCounts[y]=(yearCounts[y]||0)+1;
+      if(b.rating>0){ (yearRatings[y]=yearRatings[y]||[]).push(b.rating); }
+    });
     const years = Object.keys(yearCounts).map(Number).sort((a,b)=>a-b);
     const maxY = Math.max(...years.map(y=>yearCounts[y]), 1);
-    html += `<div class="section-h"><div class="h">연도별 완독</div></div><div class="bar-chart">`;
+    html += `<div class="section-h"><div class="h">연도별 완독 (권수)</div></div><div class="bar-chart">`;
     years.forEach(y=>{
       const pct = Math.max((yearCounts[y]/maxY)*100, 8);
-      html += `<div class="bar-wrap"><div class="bar" style="height:${pct}%" title="${y}년 ${yearCounts[y]}권"></div><div class="bn">${String(y).slice(2)}</div></div>`;
+      html += `<div class="bar-wrap"><div class="bn" style="margin:0 0 4px">${yearCounts[y]}</div><div class="bar" style="height:${pct}%" title="${y}년 ${yearCounts[y]}권"></div><div class="bn">${String(y).slice(2)}년</div></div>`;
+    });
+    html += `</div>`;
+
+    html += `<div class="section-h" style="margin-top:18px"><div class="h">연도별 평균 별점</div></div><div class="bar-chart" style="height:70px">`;
+    years.forEach(y=>{
+      const ratings = yearRatings[y]||[];
+      const avg = ratings.length ? ratings.reduce((a,b)=>a+b,0)/ratings.length : 0;
+      const pct = Math.max((avg/5)*100, avg>0?8:0);
+      html += `<div class="bar-wrap"><div class="bar" style="height:${pct}%;background:var(--star)" title="${y}년 평균 ${avg?avg.toFixed(1):'-'}점"></div><div class="bn">${String(y).slice(2)}년</div></div>`;
     });
     html += `</div>`;
   }else{
-    // 선택한 연도의 월별 막대
+    // 선택한 연도의 월별 막대 (권수)
     const monthCounts = Array(12).fill(0);
-    scoped.forEach(b=>{ monthCounts[new Date(b.completedDate).getMonth()]++; });
+    const monthRatings = Array.from({length:12}, ()=>[]);
+    scoped.forEach(b=>{
+      const m = new Date(b.completedDate).getMonth();
+      monthCounts[m]++;
+      if(b.rating>0) monthRatings[m].push(b.rating);
+    });
     const maxMonth = Math.max(...monthCounts, 1);
-    html += `<div class="section-h"><div class="h">${statsYear}년 월별 완독</div></div><div class="bar-chart">`;
+    html += `<div class="section-h"><div class="h">${statsYear}년 월별 완독 (권수)</div></div><div class="bar-chart">`;
     monthCounts.forEach((c,i)=>{
       const pct = Math.max((c/maxMonth)*100, c>0?8:0);
-      html += `<div class="bar-wrap"><div class="bar" style="height:${pct}%" title="${i+1}월 ${c}권"></div><div class="bn">${i+1}</div></div>`;
+      html += `<div class="bar-wrap"><div class="bn" style="margin:0 0 4px">${c||''}</div><div class="bar" style="height:${pct}%" title="${i+1}월 ${c}권"></div><div class="bn">${i+1}</div></div>`;
+    });
+    html += `</div>`;
+
+    html += `<div class="section-h" style="margin-top:18px"><div class="h">월별 평균 별점</div></div><div class="bar-chart" style="height:70px">`;
+    monthRatings.forEach((ratings,i)=>{
+      const avg = ratings.length ? ratings.reduce((a,b)=>a+b,0)/ratings.length : 0;
+      const pct = Math.max((avg/5)*100, avg>0?8:0);
+      html += `<div class="bar-wrap"><div class="bar" style="height:${pct}%;background:var(--star)" title="${i+1}월 평균 ${avg?avg.toFixed(1):'-'}점"></div><div class="bn">${i+1}</div></div>`;
     });
     html += `</div>`;
   }
@@ -1342,8 +1498,11 @@ function roundRect(ctx,x,y,w,h,r){
 let currentShareBlob = null;
 
 async function openShareStackCard(){
-  const completed = books.filter(b=>b.status==='completed');
-  if(completed.length===0){ alert('완독한 책이 있어야 이미지를 만들 수 있어요.'); return; }
+  const allCompleted = books.filter(b=>b.status==='completed');
+  if(allCompleted.length===0){ alert('완독한 책이 있어야 이미지를 만들 수 있어요.'); return; }
+  const completed = allCompleted.filter(inPeriod); // 책장 탭에서 선택한 기간을 그대로 반영
+  if(completed.length===0){ alert('선택한 기간에 완독한 책이 없어요.'); return; }
+  const periodText = periodYear==='all' ? '전체 기간' : (periodMonth==='all' ? `${periodYear}년` : `${periodYear}년 ${periodMonth}월`);
   const sorted = [...completed].sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
   const totalPages = completed.reduce((s,b)=>s+b.pages,0);
   const hLabel = heightLabel(totalPages, completed.length);
@@ -1368,7 +1527,7 @@ async function openShareStackCard(){
   const SCALE = W/420; // 폰 화면 대비 캔버스가 넓은 만큼 두께도 비례해서 키움 (화면과 동일한 비율 유지)
   const gap=5;
   const stackH = sorted.reduce((s,b)=> s + spineHeightPx(b)*SCALE + gap, 0);
-  const H = 340 + stackH + 100;
+  const H = 340 + stackH + 50;
 
   const canvas = document.getElementById('shareCanvas');
   canvas.width = W; canvas.height = H;
@@ -1376,21 +1535,23 @@ async function openShareStackCard(){
 
   // 배경
   ctx.fillStyle = '#fafafa'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#5b5bd6'; ctx.font='700 18px Inter, sans-serif';
+  ctx.fillText(periodText, padX, 44);
   ctx.fillStyle = '#18181b';
   ctx.font = '800 44px Inter, sans-serif';
-  ctx.fillText(`${completed.length}권`, padX, 90);
+  ctx.fillText(`${completed.length}권`, padX, 100);
   ctx.fillStyle = '#8a8a92'; ctx.font='500 20px Inter, sans-serif';
-  ctx.fillText(`읽은 책 · 총 ${totalPages.toLocaleString()}페이지`, padX, 126);
+  ctx.fillText(`읽은 책 · 총 ${totalPages.toLocaleString()}페이지`, padX, 136);
   if(hLabel){
     ctx.fillStyle = '#5b5bd6'; ctx.font='700 20px Inter, sans-serif';
-    ctx.fillText(`📏 다 쌓으면 약 ${hLabel}`, padX, 160);
+    ctx.fillText(`📏 다 쌓으면 약 ${hLabel}`, padX, 170);
   }
   if(hObjLabel){
     ctx.fillStyle = '#8a8a92'; ctx.font='500 17px Inter, sans-serif';
-    ctx.fillText(hObjLabel, padX, 190);
+    ctx.fillText(hObjLabel, padX, 200);
   }
 
-  let y = 240;
+  let y = 250;
   const maxW = W - padX*2;
   [...sorted].reverse().forEach(book=>{
     const wPct = widthFor(book)/100;
@@ -1429,9 +1590,6 @@ async function openShareStackCard(){
     }
     y += rowH+gap;
   });
-
-  ctx.fillStyle = '#c4c4cc'; ctx.font='500 13px Inter, sans-serif';
-  ctx.fillText(`${toLocalDateStr(new Date())} · Made with 독서기록`, padX, H-30);
 
   document.getElementById('shareModal').classList.remove('hidden');
   canvas.toBlob(blob=> currentShareBlob = blob, 'image/png');
@@ -1585,6 +1743,7 @@ async function shareImage(){
 
 /* ---------------- Firebase 클라우드 동기화 ---------------- */
 let fbApp=null, fbAuth=null, fbDb=null, currentUser=null, syncing=false;
+let hasAccess=false, checkingAccess=false;
 
 // 앱에 고정된 Firebase 설정값 - 어느 기기에서 접속해도 다시 입력할 필요 없음
 // (firebaseConfig 값 자체는 비밀키가 아니라 공개돼도 안전함, 실제 보안은 Firestore 규칙이 담당)
@@ -1621,8 +1780,9 @@ function initFirebase(){
     });
     fbAuth.onAuthStateChanged(user=>{
       currentUser = user;
+      hasAccess = false;
       renderSyncArea();
-      if(user) pullFromCloud();
+      if(user) checkAccess();
     });
   }catch(e){
     console.error('Firebase 초기화 실패', e);
@@ -1648,8 +1808,54 @@ function signInGoogle(){
 }
 function signOutGoogle(){ if(fbAuth) fbAuth.signOut(); }
 
+async function checkAccess(){
+  if(!currentUser || !fbDb) return;
+  checkingAccess = true;
+  renderSyncArea();
+  try{
+    const snap = await fbDb.collection('allowedUsers').doc(currentUser.uid).get();
+    hasAccess = snap.exists;
+  }catch(e){
+    hasAccess = false;
+  }
+  checkingAccess = false;
+  renderSyncArea();
+  if(hasAccess) pullFromCloud();
+}
+
+function openInviteCodeModal(){
+  document.getElementById('inviteCodeInput').value = '';
+  document.getElementById('inviteCodeError').classList.add('hidden');
+  document.getElementById('inviteCodeModal').classList.remove('hidden');
+  lockBodyScroll();
+}
+function closeInviteCodeModal(){ document.getElementById('inviteCodeModal').classList.add('hidden'); unlockBodyScroll(); }
+
+async function redeemInviteCode(){
+  const code = document.getElementById('inviteCodeInput').value.trim();
+  const errEl = document.getElementById('inviteCodeError');
+  errEl.classList.add('hidden');
+  if(!code){ errEl.textContent='코드를 입력해주세요.'; errEl.classList.remove('hidden'); return; }
+  const btn = document.getElementById('inviteCodeBtn');
+  btn.textContent = '확인 중...'; btn.disabled = true;
+  try{
+    await fbDb.collection('allowedUsers').doc(currentUser.uid).set({
+      code, email: currentUser.email||null, joinedAt: Date.now()
+    });
+    hasAccess = true;
+    closeInviteCodeModal();
+    renderSyncArea();
+    pullFromCloud();
+  }catch(e){
+    errEl.textContent = '코드가 올바르지 않거나 비활성화된 코드예요. 다시 확인해주세요.';
+    errEl.classList.remove('hidden');
+  }finally{
+    btn.textContent = '입장하기'; btn.disabled = false;
+  }
+}
+
 async function pushToCloud(){
-  if(!currentUser || !fbDb || syncing) return;
+  if(!currentUser || !fbDb || syncing || !hasAccess) return;
   syncing = true;
   try{
     await fbDb.collection('users').doc(currentUser.uid).set({
@@ -1669,7 +1875,7 @@ async function pushToCloud(){
 }
 
 async function pullFromCloud(){
-  if(!currentUser || !fbDb) return;
+  if(!currentUser || !fbDb || !hasAccess) return;
   try{
     const snap = await fbDb.collection('users').doc(currentUser.uid).get();
     if(snap.exists){
@@ -1719,6 +1925,30 @@ function renderSyncArea(){
       <div class="sync-card">
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">Google 계정으로 로그인하면 기기가 바뀌어도 독서 기록이 그대로 이어져요.</div>
         <button class="google-btn" onclick="signInGoogle()">Google로 로그인</button>
+      </div>`;
+    return;
+  }
+
+  if(checkingAccess){
+    el.innerHTML = `<div class="sync-card"><div style="font-size:12px;color:var(--text-muted)">권한 확인 중...</div></div>`;
+    return;
+  }
+
+  if(!hasAccess){
+    el.innerHTML = `
+      <div class="sync-card">
+        <div class="row">
+          ${currentUser.photoURL ? `<img class="avatar" src="${currentUser.photoURL}"/>` : `<div class="avatar"></div>`}
+          <div>
+            <div class="name">${currentUser.displayName||'사용자'}</div>
+            <div class="email">${currentUser.email||''}</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin:10px 0;line-height:1.6">참여자 코드가 필요해요. 코드를 받으셨다면 입력해주세요.</div>
+        <div class="settings-row">
+          <button class="btn-secondary" style="margin-top:0" onclick="openInviteCodeModal()">🔑 참여자 코드 입력</button>
+          <button class="btn-delete" style="margin-top:0" onclick="signOutGoogle()">로그아웃</button>
+        </div>
       </div>`;
     return;
   }
@@ -1780,12 +2010,22 @@ enableSwipeToClose('#addModal .card', closeAddModal);
 enableSwipeToClose('#titleModal .card', closeTitleModal);
 enableSwipeToClose('#bookInfoModal .card', closeBookInfoModal);
 enableSwipeToClose('#shareModal .card', closeShareModal);
+enableSwipeToClose('#inviteCodeModal .card', closeInviteCodeModal);
 
 /* ---------------- 초기화 ---------------- */
-document.getElementById('dateInput').addEventListener('input', autoFillStartDate);
-document.getElementById('dateInput').addEventListener('change', autoFillStartDate);
-document.getElementById('startDateInput').addEventListener('input', ()=>{ startDateManuallyEdited = true; });
-document.getElementById('startDateInput').addEventListener('change', ()=>{ startDateManuallyEdited = true; });
+function syncDateBounds(){
+  const startEl = document.getElementById('startDateInput');
+  const doneEl = document.getElementById('dateInput');
+  // 완독 날짜는 시작 날짜보다 빠를 수 없음
+  doneEl.min = startEl.value || '';
+  // 시작 날짜는 완독 날짜보다 늦을 수 없음
+  startEl.max = doneEl.value || '';
+}
+
+document.getElementById('dateInput').addEventListener('input', ()=>{ autoFillStartDate(); syncDateBounds(); });
+document.getElementById('dateInput').addEventListener('change', ()=>{ autoFillStartDate(); syncDateBounds(); });
+document.getElementById('startDateInput').addEventListener('input', ()=>{ startDateManuallyEdited = true; syncDateBounds(); });
+document.getElementById('startDateInput').addEventListener('change', ()=>{ startDateManuallyEdited = true; syncDateBounds(); });
 
 applyTitleFromStorage();
 render();
