@@ -65,7 +65,7 @@ app.get('/api/detail/:itemId', async (req, res) => {
   }
 
   try {
-    const url = `https://www.aladin.co.kr/ttb/api/ItemLookUp.aspx?ttbkey=${TTB_KEY}&itemId=${itemId}&itemIdType=ItemId&output=js&Version=20131101&OptResult=packing`;
+    const url = `https://www.aladin.co.kr/ttb/api/ItemLookUp.aspx?ttbkey=${TTB_KEY}&itemId=${itemId}&itemIdType=ItemId&output=js&Version=20131101&OptResult=packing,fullDescription,story,phraseList`;
 
     const response = await fetch(url);
     const data = await response.json();
@@ -75,10 +75,15 @@ app.get('/api/detail/:itemId', async (req, res) => {
     }
 
     const book = data.item[0];
+    const subInfo = book.subInfo || {};
     // subInfo.itemPage에 페이지 수가 들어있음
-    const pages = book.subInfo && book.subInfo.itemPage ? book.subInfo.itemPage : 0;
+    const pages = subInfo.itemPage ? subInfo.itemPage : 0;
     // subInfo.packing에 실제 책 크기(mm)가 들어있음 - 없는 책도 있음
-    const packing = book.subInfo && book.subInfo.packing ? book.subInfo.packing : null;
+    const packing = subInfo.packing || null;
+    // 책속에서(인용구) 코너 - 페이지 번호 + 문구
+    const phraseList = Array.isArray(subInfo.phraseList)
+      ? subInfo.phraseList.map(p => ({ pageNo: p.pageNo || '', phrase: (p.phrase || '').replace(/<[^>]*>/g, '').trim() })).filter(p => p.phrase)
+      : [];
 
     res.json({
       title: book.title,
@@ -89,7 +94,12 @@ app.get('/api/detail/:itemId', async (req, res) => {
       categoryName: book.categoryName || '',
       depthMm: packing && packing.sizeDepth ? Number(packing.sizeDepth) : null,   // 두께
       heightMm: packing && packing.sizeHeight ? Number(packing.sizeHeight) : null, // 세로(책등 길이)
-      widthMm: packing && packing.sizeWidth ? Number(packing.sizeWidth) : null     // 가로
+      widthMm: packing && packing.sizeWidth ? Number(packing.sizeWidth) : null,    // 가로
+      subTitle: subInfo.subTitle || '',
+      originalTitle: subInfo.originalTitle || '',
+      fullDescription: book.fullDescription || book.description || '',
+      story: subInfo.story || '',
+      phraseList
     });
   } catch (error) {
     console.error('상세 조회 오류:', error);
