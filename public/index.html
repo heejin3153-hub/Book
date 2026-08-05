@@ -405,26 +405,6 @@
   </div>
 </div>
 
-<!-- 참여자 코드 입력 모달 -->
-<div id="inviteCodeModal" class="modal-back hidden">
-  <div class="card">
-    <div class="card-top">
-      <div><div class="ct">참여자 코드 입력</div><div class="cs">클라우드 동기화를 쓰려면 코드가 필요해요</div></div>
-      <button class="card-close" onclick="closeInviteCodeModal()">&times;</button>
-    </div>
-    <div class="card-body">
-      <div class="card-divider"></div>
-      <div class="field">
-        <label>참여자 코드</label>
-        <input id="inviteCodeInput" type="text" placeholder="전달받은 코드를 입력하세요" autocapitalize="off" autocorrect="off">
-      </div>
-      <div id="inviteCodeError" class="error-msg hidden" style="margin-bottom:14px"></div>
-      <button class="btn-add" onclick="redeemInviteCode()" id="inviteCodeBtn">입장하기</button>
-      <div style="font-size:11.5px;color:var(--text-muted);margin-top:12px;line-height:1.6">코드 없이도 이 기기에서 로컬로 계속 쓸 수 있어요. 다른 기기와 동기화하려면 코드가 필요해요.</div>
-    </div>
-  </div>
-</div>
-
 <!-- 책 정보 자세히 보기 모달 -->
 <div id="bookInfoModal" class="modal-back hidden">
   <div class="card">
@@ -1797,7 +1777,6 @@ async function shareImage(){
 
 /* ---------------- Firebase 클라우드 동기화 ---------------- */
 let fbApp=null, fbAuth=null, fbDb=null, currentUser=null, syncing=false;
-let hasAccess=false, checkingAccess=false;
 
 // 앱에 고정된 Firebase 설정값 - 어느 기기에서 접속해도 다시 입력할 필요 없음
 // (firebaseConfig 값 자체는 비밀키가 아니라 공개돼도 안전함, 실제 보안은 Firestore 규칙이 담당)
@@ -1834,9 +1813,8 @@ function initFirebase(){
     });
     fbAuth.onAuthStateChanged(user=>{
       currentUser = user;
-      hasAccess = false;
       renderSyncArea();
-      if(user) checkAccess();
+      if(user) pullFromCloud();
     });
   }catch(e){
     console.error('Firebase 초기화 실패', e);
@@ -1862,54 +1840,8 @@ function signInGoogle(){
 }
 function signOutGoogle(){ if(fbAuth) fbAuth.signOut(); }
 
-async function checkAccess(){
-  if(!currentUser || !fbDb) return;
-  checkingAccess = true;
-  renderSyncArea();
-  try{
-    const snap = await fbDb.collection('allowedUsers').doc(currentUser.uid).get();
-    hasAccess = snap.exists;
-  }catch(e){
-    hasAccess = false;
-  }
-  checkingAccess = false;
-  renderSyncArea();
-  if(hasAccess) pullFromCloud();
-}
-
-function openInviteCodeModal(){
-  document.getElementById('inviteCodeInput').value = '';
-  document.getElementById('inviteCodeError').classList.add('hidden');
-  document.getElementById('inviteCodeModal').classList.remove('hidden');
-  lockBodyScroll();
-}
-function closeInviteCodeModal(){ document.getElementById('inviteCodeModal').classList.add('hidden'); unlockBodyScroll(); }
-
-async function redeemInviteCode(){
-  const code = document.getElementById('inviteCodeInput').value.trim();
-  const errEl = document.getElementById('inviteCodeError');
-  errEl.classList.add('hidden');
-  if(!code){ errEl.textContent='코드를 입력해주세요.'; errEl.classList.remove('hidden'); return; }
-  const btn = document.getElementById('inviteCodeBtn');
-  btn.textContent = '확인 중...'; btn.disabled = true;
-  try{
-    await fbDb.collection('allowedUsers').doc(currentUser.uid).set({
-      code, email: currentUser.email||null, joinedAt: Date.now()
-    });
-    hasAccess = true;
-    closeInviteCodeModal();
-    renderSyncArea();
-    pullFromCloud();
-  }catch(e){
-    errEl.textContent = '코드가 올바르지 않거나 비활성화된 코드예요. 다시 확인해주세요.';
-    errEl.classList.remove('hidden');
-  }finally{
-    btn.textContent = '입장하기'; btn.disabled = false;
-  }
-}
-
 async function pushToCloud(){
-  if(!currentUser || !fbDb || syncing || !hasAccess) return;
+  if(!currentUser || !fbDb || syncing) return;
   syncing = true;
   try{
     await fbDb.collection('users').doc(currentUser.uid).set({
@@ -1929,7 +1861,7 @@ async function pushToCloud(){
 }
 
 async function pullFromCloud(){
-  if(!currentUser || !fbDb || !hasAccess) return;
+  if(!currentUser || !fbDb) return;
   try{
     const snap = await fbDb.collection('users').doc(currentUser.uid).get();
     if(snap.exists){
@@ -1979,30 +1911,6 @@ function renderSyncArea(){
       <div class="sync-card">
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">Google 계정으로 로그인하면 기기가 바뀌어도 독서 기록이 그대로 이어져요.</div>
         <button class="google-btn" onclick="signInGoogle()">Google로 로그인</button>
-      </div>`;
-    return;
-  }
-
-  if(checkingAccess){
-    el.innerHTML = `<div class="sync-card"><div style="font-size:12px;color:var(--text-muted)">권한 확인 중...</div></div>`;
-    return;
-  }
-
-  if(!hasAccess){
-    el.innerHTML = `
-      <div class="sync-card">
-        <div class="row">
-          ${currentUser.photoURL ? `<img class="avatar" src="${currentUser.photoURL}"/>` : `<div class="avatar"></div>`}
-          <div>
-            <div class="name">${currentUser.displayName||'사용자'}</div>
-            <div class="email">${currentUser.email||''}</div>
-          </div>
-        </div>
-        <div style="font-size:12px;color:var(--text-muted);margin:10px 0;line-height:1.6">참여자 코드가 필요해요. 코드를 받으셨다면 입력해주세요.</div>
-        <div class="settings-row">
-          <button class="btn-secondary" style="margin-top:0" onclick="openInviteCodeModal()">🔑 참여자 코드 입력</button>
-          <button class="btn-delete" style="margin-top:0" onclick="signOutGoogle()">로그아웃</button>
-        </div>
       </div>`;
     return;
   }
@@ -2064,7 +1972,6 @@ enableSwipeToClose('#addModal .card', closeAddModal);
 enableSwipeToClose('#titleModal .card', closeTitleModal);
 enableSwipeToClose('#bookInfoModal .card', closeBookInfoModal);
 enableSwipeToClose('#shareModal .card', closeShareModal);
-enableSwipeToClose('#inviteCodeModal .card', closeInviteCodeModal);
 
 /* ---------------- 초기화 ---------------- */
 function syncDateBounds(){
