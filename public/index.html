@@ -3,7 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="light dark">
+<script>
+  (function(){
+    try{
+      var mode = localStorage.getItem('theme-mode') || 'light';
+      var actual = mode;
+      if(mode==='system'){
+        actual = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', actual);
+    }catch(e){}
+  })();
+</script>
 <title>독서기록</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,13 +25,20 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
-    color-scheme: light;
     --bg:#fafafa; --surface:#ffffff; --border:#ececec; --border-2:#e2e2e2;
     --text:#18181b; --text-muted:#8a8a92;
     --accent:#5b5bd6; --accent-soft:#eeeeff; --accent-dark:#4747b8;
     --danger:#e05252; --star:#f0ac1f; --green:#3fa88a;
     --radius:16px; --safe-b: env(safe-area-inset-bottom, 0px);
   }
+  html[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#111114; --surface:#1c1c21; --border:#2a2a30; --border-2:#35353d;
+    --text:#eeeef0; --text-muted:#9494a0;
+    --accent:#8080e8; --accent-soft:#26264a; --accent-dark:#a0a0f0;
+    --danger:#f27272; --star:#f5bb45; --green:#57c397;
+  }
+  html[data-theme="light"]{ color-scheme: light; }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
   body{ background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,'Malgun Gothic',sans-serif;
@@ -355,6 +374,15 @@
     </div>
 
     <div class="card-divider"></div>
+    <div class="field"><label>화면 테마</label>
+      <div class="status-picker" id="themePicker">
+        <button type="button" onclick="setThemeMode('light')" data-v="light">☀️ 기본</button>
+        <button type="button" onclick="setThemeMode('system')" data-v="system">⚙️ 시스템 설정</button>
+        <button type="button" onclick="setThemeMode('dark')" data-v="dark">🌙 야간모드</button>
+      </div>
+    </div>
+
+    <div class="card-divider"></div>
     <div class="field"><label>책 쌓기 모드</label>
       <div class="status-picker" id="stackStylePicker">
         <button type="button" onclick="setStackStyle('color')" data-v="color">🎨 단색보기</button>
@@ -649,6 +677,31 @@ function renderStackStylePicker(){
   document.querySelectorAll('#stackStylePicker button').forEach(btn=> btn.classList.toggle('on', btn.dataset.v===cur));
 }
 
+/* ---------------- 야간모드 ---------------- */
+function getThemeMode(){ return localStorage.getItem('theme-mode') || 'light'; }
+function applyTheme(){
+  const mode = getThemeMode();
+  let actual = mode;
+  if(mode==='system'){
+    actual = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  document.documentElement.setAttribute('data-theme', actual);
+}
+function setThemeMode(v){
+  localStorage.setItem('theme-mode', v);
+  applyTheme();
+  renderThemePicker();
+}
+function renderThemePicker(){
+  const cur = getThemeMode();
+  document.querySelectorAll('#themePicker button').forEach(btn=> btn.classList.toggle('on', btn.dataset.v===cur));
+}
+if(window.matchMedia){
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
+    if(getThemeMode()==='system') applyTheme();
+  });
+}
+
 function openTitleModal(){
   document.getElementById('titleEditInput').value = localStorage.getItem('app-title') || DEFAULT_TITLE;
   document.getElementById('subtitleEditInput').value = localStorage.getItem('app-subtitle') || DEFAULT_SUBTITLE;
@@ -656,6 +709,7 @@ function openTitleModal(){
   lockBodyScroll();
   renderSyncArea();
   renderStackStylePicker();
+  renderThemePicker();
 }
 function closeTitleModal(){ document.getElementById('titleModal').classList.add('hidden'); unlockBodyScroll(); }
 function saveTitle(){
@@ -2027,6 +2081,7 @@ document.getElementById('dateInput').addEventListener('change', ()=>{ autoFillSt
 document.getElementById('startDateInput').addEventListener('input', ()=>{ startDateManuallyEdited = true; syncDateBounds(); });
 document.getElementById('startDateInput').addEventListener('change', ()=>{ startDateManuallyEdited = true; syncDateBounds(); });
 
+applyTheme();
 applyTitleFromStorage();
 render();
 initFirebase();
