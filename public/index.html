@@ -785,11 +785,12 @@ function setStatus(s){
   const showStart = s!=='wishlist' ? '' : 'none';
   const showDate = s==='completed' ? '' : 'none';
   const showRatingReview = s==='completed' ? '' : 'none';
+  const showQuotes = (s==='completed' || s==='reading') ? '' : 'none';
   document.getElementById('startDateField').style.display = showStart;
   document.getElementById('dateField').style.display = showDate;
   document.getElementById('ratingField').style.display = showRatingReview;
   document.getElementById('reviewField').style.display = showRatingReview;
-  document.getElementById('quotesField').style.display = showRatingReview;
+  document.getElementById('quotesField').style.display = showQuotes;
   document.getElementById('pagesField').style.display = s==='wishlist' ? 'none' : '';
   document.getElementById('tagsField').style.display = '';
   const showWish = s==='wishlist' ? '' : 'none';
@@ -1042,7 +1043,7 @@ async function saveBook(){
   const wishComment = document.getElementById('wishCommentInput').value.trim();
   const folderSelect = document.getElementById('wishFolderSelectField');
   const folderId = (currentStatus==='wishlist' && folderSelect.value) ? Number(folderSelect.value) : null;
-  const quotes = currentStatus==='completed' ? currentQuotes.filter(q=>q.text && q.text.trim()).map(q=>({page:(q.page||'').trim(), text:q.text.trim()})) : [];
+  const quotes = (currentStatus==='completed' || currentStatus==='reading') ? currentQuotes.filter(q=>q.text && q.text.trim()).map(q=>({page:(q.page||'').trim(), text:q.text.trim()})) : [];
 
   if(currentStatus==='completed' && !completedDate){ alert('완독 날짜를 입력해주세요!'); return; }
   if(currentStatus==='completed' && startDate && completedDate && new Date(startDate) > new Date(completedDate)){
