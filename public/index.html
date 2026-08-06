@@ -702,8 +702,13 @@ function saveTitle(){
   localStorage.setItem('app-title', document.getElementById('titleEditInput').value.trim() || DEFAULT_TITLE);
   localStorage.setItem('app-subtitle', document.getElementById('subtitleEditInput').value.trim() || DEFAULT_SUBTITLE);
   applyTitleFromStorage(); closeTitleModal();
+  pushToCloud();
 }
-function resetTitle(){ localStorage.removeItem('app-title'); localStorage.removeItem('app-subtitle'); applyTitleFromStorage(); closeTitleModal(); }
+function resetTitle(){
+  localStorage.removeItem('app-title'); localStorage.removeItem('app-subtitle');
+  applyTitleFromStorage(); closeTitleModal();
+  pushToCloud();
+}
 
 /* ---------------- 데이터 백업 ---------------- */
 function exportData(){
