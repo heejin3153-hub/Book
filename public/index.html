@@ -611,7 +611,7 @@ function starHtml(rating){
 function toLocalDateStr(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
 
 function saveBooksRaw(){ localStorage.setItem('reading-books', JSON.stringify(books)); }
-function saveBooks(){ saveBooksRaw(); pushToCloud(); }
+async function saveBooks(){ saveBooksRaw(); await pushToCloud(); }
 
 function extractDominantColor(url){
   return new Promise((resolve)=>{
@@ -900,11 +900,11 @@ function finishReading(){
   setStatus('completed');
 }
 
-function deleteFromModal(){
+async function deleteFromModal(){
   if(editingId===null) return;
   if(!confirm('이 책을 삭제할까요?')) return;
   books = books.filter(b=>b.id!==editingId);
-  saveBooks(); closeAddModal(); render();
+  await saveBooks(); closeAddModal(); render();
 }
 
 /* ---------------- 검색 ---------------- */
@@ -1086,14 +1086,14 @@ async function saveBook(){
   }else{
     books.push({ id: Date.now(), ...payload });
   }
-  saveBooks(); closeAddModal(); render();
+  await saveBooks(); closeAddModal(); render();
 }
 
-function markWishStart(id){
+async function markWishStart(id){
   const book = books.find(b=>b.id===id);
   if(!book) return;
   book.status='reading'; book.startDate = new Date().toISOString().split('T')[0];
-  saveBooks(); render();
+  await saveBooks(); render();
 }
 
 /* ---------------- 렌더 공통 ---------------- */
