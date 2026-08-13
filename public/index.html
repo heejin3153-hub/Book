@@ -494,7 +494,7 @@ let activeTags = [];
 /* ---------------- 위시리스트 폴더 ---------------- */
 let wishFolders = JSON.parse(localStorage.getItem('wish-folders') || '[]');
 let activeWishFolder = 'all';
-function saveFolders(){ localStorage.setItem('wish-folders', JSON.stringify(wishFolders)); pushToCloud(); }
+function saveFolders(){ localStorage.setItem('wish-folders', JSON.stringify(wishFolders)); pushMetaToCloud(); }
 
 function addWishFolder(){
   const name = prompt('새 폴더 이름을 입력해주세요');
@@ -515,9 +515,13 @@ function editWishFolder(id, event){
   if(!trimmed){
     if(!confirm(`"${folder.name}" 폴더를 삭제할까요? 안에 있던 책은 삭제되지 않고 미분류로 이동해요.`)) return;
     wishFolders = wishFolders.filter(f=>f.id!==id);
-    books.forEach(b=>{ if(b.folderId===id) b.folderId=null; });
+    const affected = books.filter(b=> b.folderId===id);
+    affected.forEach(b=>{ b.folderId=null; });
     if(activeWishFolder===id) activeWishFolder='all';
-    saveFolders(); saveBooks(); renderWishlist();
+    saveBooksRaw();
+    saveFolders();
+    affected.forEach(b=> saveBookToCloud(b));
+    renderWishlist();
     return;
   }
   folder.name = trimmed;
@@ -611,7 +615,6 @@ function starHtml(rating){
 function toLocalDateStr(d){ const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
 
 function saveBooksRaw(){ localStorage.setItem('reading-books', JSON.stringify(books)); }
-async function saveBooks(){ saveBooksRaw(); await pushToCloud(); }
 
 function extractDominantColor(url){
   return new Promise((resolve)=>{
@@ -702,12 +705,12 @@ function saveTitle(){
   localStorage.setItem('app-title', document.getElementById('titleEditInput').value.trim() || DEFAULT_TITLE);
   localStorage.setItem('app-subtitle', document.getElementById('subtitleEditInput').value.trim() || DEFAULT_SUBTITLE);
   applyTitleFromStorage(); closeTitleModal();
-  pushToCloud();
+  pushMetaToCloud();
 }
 function resetTitle(){
   localStorage.removeItem('app-title'); localStorage.removeItem('app-subtitle');
   applyTitleFromStorage(); closeTitleModal();
-  pushToCloud();
+  pushMetaToCloud();
 }
 
 /* ---------------- 데이터 백업 ---------------- */
@@ -725,21 +728,28 @@ function importData(event){
   const file = event.target.files[0];
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = (e)=>{
+  reader.onload = async (e)=>{
     try{
       const imported = JSON.parse(e.target.result);
       if(!Array.isArray(imported)) throw new Error('형식 오류');
       const existingIds = new Set(books.map(b=>b.id));
-      let added = 0;
+      const newBooks = [];
       imported.forEach(b=>{
         if(b && b.title && !existingIds.has(b.id)){
-          books.push({ status:'completed', tags:[], startDate:null, ...b });
+          const nb = { status:'completed', tags:[], startDate:null, ...b };
+          books.push(nb);
+          newBooks.push(nb);
           existingIds.add(b.id);
-          added++;
         }
       });
-      saveBooks(); render();
-      alert(`${added}권을 가져왔어요! (중복은 자동으로 건너뜀)`);
+      saveBooksRaw();
+      if(newBooks.length>0 && currentUser && fbDb){
+        const batch = fbDb.batch();
+        newBooks.forEach(b=> batch.set(booksCollection().doc(String(b.id)), b));
+        await batch.commit();
+      }
+      render();
+      alert(`${newBooks.length}권을 가져왔어요! (중복은 자동으로 건너뜀)`);
     }catch(err){
       alert('파일을 읽을 수 없어요. 이 앱에서 내보낸 JSON 파일인지 확인해주세요.');
     }
@@ -903,8 +913,11 @@ function finishReading(){
 async function deleteFromModal(){
   if(editingId===null) return;
   if(!confirm('이 책을 삭제할까요?')) return;
-  books = books.filter(b=>b.id!==editingId);
-  await saveBooks(); closeAddModal(); render();
+  const idToDelete = editingId;
+  books = books.filter(b=>b.id!==idToDelete);
+  saveBooksRaw();
+  await deleteBookFromCloud(idToDelete);
+  closeAddModal(); render();
 }
 
 /* ---------------- 검색 ---------------- */
@@ -1074,6 +1087,7 @@ async function saveBook(){
     depthMm: selectedDepthMm, spineMm: selectedSpineMm
   };
 
+  let savedBook;
   if(editingId!==null){
     const idx = books.findIndex(b=>b.id===editingId);
     if(idx>-1){
@@ -1082,18 +1096,24 @@ async function saveBook(){
         color: selectedCover ? color : books[idx].color,
         depthMm: selectedDepthMm || books[idx].depthMm,
         spineMm: selectedSpineMm || books[idx].spineMm };
+      savedBook = books[idx];
     }
   }else{
-    books.push({ id: Date.now(), ...payload });
+    savedBook = { id: Date.now(), ...payload };
+    books.push(savedBook);
   }
-  await saveBooks(); closeAddModal(); render();
+  saveBooksRaw();
+  await saveBookToCloud(savedBook);
+  closeAddModal(); render();
 }
 
 async function markWishStart(id){
   const book = books.find(b=>b.id===id);
   if(!book) return;
   book.status='reading'; book.startDate = new Date().toISOString().split('T')[0];
-  await saveBooks(); render();
+  saveBooksRaw();
+  await saveBookToCloud(book);
+  render();
 }
 
 /* ---------------- 렌더 공통 ---------------- */
@@ -1818,6 +1838,7 @@ async function shareImage(){
 
 /* ---------------- Firebase 클라우드 동기화 ---------------- */
 let fbApp=null, fbAuth=null, fbDb=null, currentUser=null, syncing=false;
+let booksListenerUnsub = null;
 
 // 앱에 고정된 Firebase 설정값 - 어느 기기에서 접속해도 다시 입력할 필요 없음
 // (firebaseConfig 값 자체는 비밀키가 아니라 공개돼도 안전함, 실제 보안은 Firestore 규칙이 담당)
@@ -1852,10 +1873,15 @@ function initFirebase(){
       console.error('redirect result error', err);
       if(err && err.code) alert('로그인 처리 중 오류: ' + err.code);
     });
-    fbAuth.onAuthStateChanged(user=>{
+    fbAuth.onAuthStateChanged(async user=>{
       currentUser = user;
       renderSyncArea();
-      if(user) pullFromCloud();
+      if(booksListenerUnsub){ booksListenerUnsub(); booksListenerUnsub=null; }
+      if(user){
+        await migrateBooksIfNeeded();
+        await pullMetaFromCloud();
+        attachBooksListener();
+      }
     });
   }catch(e){
     console.error('Firebase 초기화 실패', e);
@@ -1879,68 +1905,91 @@ function signInGoogle(){
     console.error(err);
   });
 }
-function signOutGoogle(){ if(fbAuth) fbAuth.signOut(); }
+function signOutGoogle(){
+  if(booksListenerUnsub){ booksListenerUnsub(); booksListenerUnsub=null; }
+  if(fbAuth) fbAuth.signOut();
+}
 
-async function pushToCloud(){
-  if(!currentUser || !fbDb || syncing) return;
-  syncing = true;
+function booksCollection(){ return fbDb.collection('users').doc(currentUser.uid).collection('books'); }
+function normalizeBook(b){ return { status:'completed', tags:[], startDate:null, ...b, tags:b.tags||[] }; }
+
+// 예전(책 전체를 통짜 배열로 저장하던) 방식 데이터가 있으면, 책 하나당 문서 하나씩으로 1회 옮겨줌
+async function migrateBooksIfNeeded(){
+  if(!currentUser || !fbDb) return;
+  try{
+    const oldDoc = await fbDb.collection('users').doc(currentUser.uid).get();
+    if(!oldDoc.exists) return;
+    const data = oldDoc.data();
+    if(!Array.isArray(data.books) || data.books.length===0) return;
+    const already = await booksCollection().limit(1).get();
+    if(!already.empty) return; // 이미 새 방식으로 옮겨져 있으면 재실행 안 함
+    const batch = fbDb.batch();
+    data.books.forEach(b=>{ batch.set(booksCollection().doc(String(b.id)), b); });
+    await batch.commit();
+    await fbDb.collection('users').doc(currentUser.uid).set({ books: firebase.firestore.FieldValue.delete() }, {merge:true});
+  }catch(e){
+    console.error('책 데이터 이전 실패', e);
+  }
+}
+
+// 책 목록은 실시간 구독 - 다른 기기에서 바뀌면 새로고침 없이도 바로 반영되고,
+// 책 한 권 수정이 다른 책들에 절대 영향을 못 주는 구조라 유령 중복이 생길 수가 없음
+function attachBooksListener(){
+  if(!currentUser || !fbDb) return;
+  booksListenerUnsub = booksCollection().onSnapshot(snap=>{
+    const cloudBooks = [];
+    snap.forEach(doc=> cloudBooks.push(normalizeBook(doc.data())));
+    books = cloudBooks;
+    saveBooksRaw();
+    render();
+    localStorage.setItem('last-sync', new Date().toISOString());
+    renderSyncArea();
+  }, err=>{
+    console.error('책 목록 실시간 동기화 실패', err);
+  });
+}
+
+async function saveBookToCloud(book){
+  if(!currentUser || !fbDb || !book) return;
+  syncing = true; renderSyncArea();
+  try{ await booksCollection().doc(String(book.id)).set(book); }
+  catch(e){ console.error('책 저장(클라우드) 실패', e); }
+  finally{ syncing = false; renderSyncArea(); }
+}
+async function deleteBookFromCloud(id){
+  if(!currentUser || !fbDb) return;
+  try{ await booksCollection().doc(String(id)).delete(); }
+  catch(e){ console.error('책 삭제(클라우드) 실패', e); }
+}
+
+// 제목/부제목/위시폴더 등 자잘한 설정값은 그대로 문서 하나에 저장 (변경이 드물어서 안전함)
+async function pushMetaToCloud(){
+  if(!currentUser || !fbDb) return;
   try{
     await fbDb.collection('users').doc(currentUser.uid).set({
-      books,
       wishFolders,
       appTitle: localStorage.getItem('app-title') || null,
       appSubtitle: localStorage.getItem('app-subtitle') || null,
       updatedAt: Date.now()
-    });
-    localStorage.setItem('last-sync', new Date().toISOString());
-  }catch(e){
-    console.error('클라우드 저장 실패', e);
-  }finally{
-    syncing = false;
-    renderSyncArea();
-  }
+    }, {merge:true});
+  }catch(e){ console.error('설정 저장 실패', e); }
 }
-
-async function pullFromCloud(){
+async function pullMetaFromCloud(){
   if(!currentUser || !fbDb) return;
   try{
     const snap = await fbDb.collection('users').doc(currentUser.uid).get();
-    if(snap.exists){
-      const data = snap.data();
-      if(Array.isArray(data.books)){
-        const cloudBooks = data.books.map(b => ({ status:'completed', tags:[], startDate:null, ...b, tags: b.tags||[] }));
-        // 로그인 직전 로컬에만 있던(아직 클라우드에 안 올라간) 책은 잃어버리지 않도록 병합
-        // 단, 제목+완독날짜가 이미 클라우드에 있는 책과 같으면 "같은 책"으로 보고 중복 추가하지 않음
-        const cloudIds = new Set(cloudBooks.map(b=>b.id));
-        const cloudSignatures = new Set(cloudBooks.map(b=> `${(b.title||'').trim().toLowerCase()}|${b.completedDate||''}`));
-        const localOnly = books.filter(b=>{
-          if(cloudIds.has(b.id)) return false;
-          const sig = `${(b.title||'').trim().toLowerCase()}|${b.completedDate||''}`;
-          return !cloudSignatures.has(sig);
-        });
-        books = [...cloudBooks, ...localOnly];
-        saveBooksRaw();
-        if(localOnly.length>0) pushToCloud(); // 병합 결과를 다시 클라우드에 반영
-      }
-      if(Array.isArray(data.wishFolders)){
-        const cloudFolderIds = new Set(data.wishFolders.map(f=>f.id));
-        const localOnlyFolders = wishFolders.filter(f=>!cloudFolderIds.has(f.id));
-        wishFolders = [...data.wishFolders, ...localOnlyFolders];
-        localStorage.setItem('wish-folders', JSON.stringify(wishFolders));
-      }
-      if(data.appTitle) localStorage.setItem('app-title', data.appTitle);
-      if(data.appSubtitle) localStorage.setItem('app-subtitle', data.appSubtitle);
-      applyTitleFromStorage();
-      render();
-    }else{
-      // 클라우드에 데이터가 없으면 지금 기기의 데이터를 최초 업로드
-      pushToCloud();
+    if(!snap.exists) return;
+    const data = snap.data();
+    if(Array.isArray(data.wishFolders)){
+      const cloudFolderIds = new Set(data.wishFolders.map(f=>f.id));
+      const localOnlyFolders = wishFolders.filter(f=>!cloudFolderIds.has(f.id));
+      wishFolders = [...data.wishFolders, ...localOnlyFolders];
+      localStorage.setItem('wish-folders', JSON.stringify(wishFolders));
     }
-    localStorage.setItem('last-sync', new Date().toISOString());
-    renderSyncArea();
-  }catch(e){
-    console.error('클라우드 불러오기 실패', e);
-  }
+    if(data.appTitle) localStorage.setItem('app-title', data.appTitle);
+    if(data.appSubtitle) localStorage.setItem('app-subtitle', data.appSubtitle);
+    applyTitleFromStorage();
+  }catch(e){ console.error('설정 불러오기 실패', e); }
 }
 
 function renderSyncArea(){
@@ -1967,9 +2016,8 @@ function renderSyncArea(){
           <div class="email">${currentUser.email||''}</div>
         </div>
       </div>
-      <div class="status">${syncing ? '동기화 중...' : `✓ 동기화됨 · 마지막: ${lastSyncLabel}`}</div>
+      <div class="status">${syncing ? '동기화 중...' : `✓ 실시간 동기화 중 · 마지막: ${lastSyncLabel}`}</div>
       <div class="settings-row">
-        <button class="btn-secondary" style="margin-top:0" onclick="pullFromCloud()">⬇ 클라우드에서 불러오기</button>
         <button class="btn-delete" style="margin-top:0" onclick="signOutGoogle()">로그아웃</button>
       </div>
     </div>`;
