@@ -122,12 +122,12 @@
   .cal-cell .d{ color:var(--text-muted); position:relative; z-index:1; }
   .cal-cell.has{ border-color:transparent; cursor:pointer; }
   .cal-cell.has .d{ color:rgba(255,255,255,0.97); text-shadow:0 1px 3px rgba(0,0,0,0.4); }
-  .cal-cell .cover-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .cal-cell .cover-img{ position:absolute; top:0; left:0; right:0; bottom:0; width:100%; height:100%; margin:0; padding:0; display:block; object-fit:cover; }
   .cal-cell .cover-shade{ position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.45) 100%); }
   .cal-more{ position:absolute; bottom:2px; right:3px; font-size:7.5px; color:#fff; font-weight:800; z-index:1; text-shadow:0 1px 2px rgba(0,0,0,0.5); }
   .cal-cell.multi{ display:flex; flex-direction:row; align-items:stretch; justify-content:flex-start; padding:0; gap:1px; background:var(--border); }
   .cal-cell.multi .mini-cover{ flex:1; min-width:0; position:relative; overflow:hidden; cursor:pointer; }
-  .cal-cell.multi .mini-cover img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .cal-cell.multi .mini-cover img{ position:absolute; top:0; left:0; right:0; bottom:0; width:100%; height:100%; margin:0; padding:0; display:block; object-fit:cover; }
   .cal-cell.multi .d{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2; font-size:10px; color:#fff; font-weight:800; text-shadow:0 1px 3px rgba(0,0,0,0.7); background:rgba(0,0,0,0.4); width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
   .cal-cell.multi .cal-more{ top:2px; right:2px; bottom:auto; background:rgba(0,0,0,0.55); border-radius:6px; padding:0 4px; line-height:1.4; }
   .month-list{ margin-top:4px; }
@@ -434,6 +434,22 @@
     </div>
     <div class="card-body">
     <div class="card-divider"></div>
+    <div id="calShareOptions" class="hidden">
+      <div class="field">
+        <label>범위</label>
+        <div class="status-picker" id="calShareScopePicker">
+          <button type="button" onclick="setCalShareScope('completed')" data-v="completed">완독만</button>
+          <button type="button" onclick="setCalShareScope('all')" data-v="all">읽은 기록 전체</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>포함 내용</label>
+        <div class="status-picker" id="calShareFullPicker">
+          <button type="button" onclick="setCalShareFull(false)" data-v="false">달력만</button>
+          <button type="button" onclick="setCalShareFull(true)" data-v="true">달력 + 목록 전체</button>
+        </div>
+      </div>
+    </div>
     <div class="share-preview">
       <canvas id="shareCanvas"></canvas>
       <div class="share-actions">
@@ -1593,6 +1609,7 @@ function roundRect(ctx,x,y,w,h,r){
 let currentShareBlob = null;
 
 async function openShareStackCard(){
+  document.getElementById('calShareOptions').classList.add('hidden');
   const allCompleted = books.filter(b=>b.status==='completed');
   if(allCompleted.length===0){ alert('완독한 책이 있어야 이미지를 만들 수 있어요.'); return; }
   const completed = allCompleted.filter(inPeriod); // 책장 탭에서 선택한 기간을 그대로 반영
@@ -1701,13 +1718,51 @@ function loadImage(url){
   });
 }
 
-async function openShareCalendarCard(){
-  const year=currentMonth.getFullYear(), month=currentMonth.getMonth();
-  const monthBooks = books.filter(b=>{ if(b.status!=='completed'||!b.completedDate) return false; const d=new Date(b.completedDate); return d.getFullYear()===year&&d.getMonth()===month; });
-  const monthPages = monthBooks.reduce((s,b)=>s+b.pages,0);
-  const byDate={}; monthBooks.forEach(b=>{ (byDate[b.completedDate]=byDate[b.completedDate]||[]).push(b); });
+let calShareScope = 'completed'; // 'completed' | 'all'
+let calShareFull = false; // false: 달력만, true: 달력+목록 전체
 
+function setCalShareScope(v){ calShareScope=v; renderCalShareOptionButtons(); generateCalShareImage(); }
+function setCalShareFull(v){ calShareFull=v; renderCalShareOptionButtons(); generateCalShareImage(); }
+function renderCalShareOptionButtons(){
+  document.querySelectorAll('#calShareScopePicker button').forEach(b=> b.classList.toggle('on', b.dataset.v===calShareScope));
+  document.querySelectorAll('#calShareFullPicker button').forEach(b=> b.classList.toggle('on', b.dataset.v===String(calShareFull)));
+}
+
+async function openShareCalendarCard(){
+  document.getElementById('shareModal').classList.remove('hidden');
+  document.getElementById('calShareOptions').classList.remove('hidden');
+  lockBodyScroll();
+  renderCalShareOptionButtons();
+  await generateCalShareImage();
+}
+
+async function generateCalShareImage(){
+  const year=currentMonth.getFullYear(), month=currentMonth.getMonth();
   const firstDay=new Date(year,month,1), lastDay=new Date(year,month+1,0);
+  const monthStartStr = toLocalDateStr(firstDay), monthEndStr = toLocalDateStr(lastDay);
+
+  const completedThisMonth = books.filter(b=>{ if(b.status!=='completed'||!b.completedDate) return false; const d=new Date(b.completedDate); return d.getFullYear()===year&&d.getMonth()===month; });
+  const monthPages = completedThisMonth.reduce((s,b)=>s+(b.pages||0),0);
+
+  // 범위에 따라 달력 그리드에 표시할 날짜별 책 계산
+  const byDate = {};
+  if(calShareScope==='completed'){
+    completedThisMonth.forEach(b=> (byDate[b.completedDate]=byDate[b.completedDate]||[]).push(b));
+  }else{
+    books.filter(b=> b.status==='completed' || b.status==='reading').forEach(b=>{
+      const range = getBookRange(b);
+      if(!range) return;
+      if(range.end < monthStartStr || range.start > monthEndStr) return;
+      let cursor = parseLocalDate(range.start < monthStartStr ? monthStartStr : range.start);
+      const rangeEnd = parseLocalDate(range.end > monthEndStr ? monthEndStr : range.end);
+      while(cursor <= rangeEnd){
+        const ds = toLocalDateStr(cursor);
+        (byDate[ds] = byDate[ds]||[]).push(b);
+        cursor.setDate(cursor.getDate()+1);
+      }
+    });
+  }
+
   const startDate=new Date(firstDay); startDate.setDate(startDate.getDate()-firstDay.getDay());
   const endDate=new Date(lastDay); endDate.setDate(endDate.getDate()+(6-lastDay.getDay()));
   const days=[]; const cursor=new Date(startDate);
@@ -1715,9 +1770,9 @@ async function openShareCalendarCard(){
   const weeks = Math.ceil(days.length/7);
 
   // 표지 이미지를 서버 프록시를 통해 미리 로드 (CORS 문제 없이 캔버스에 그리기 위함)
-  const uniqueCovers = [...new Set(monthBooks.map(b=>b.cover).filter(Boolean))];
-  document.getElementById('shareModal').classList.remove('hidden');
-  lockBodyScroll();
+  const gridCovers = Object.values(byDate).flat().map(b=>b.cover).filter(Boolean);
+  const listCovers = calShareFull ? completedThisMonth.map(b=>b.cover).filter(Boolean) : [];
+  const uniqueCovers = [...new Set([...gridCovers, ...listCovers])];
   const canvasLoading = document.getElementById('shareCanvas');
   canvasLoading.width=800; canvasLoading.height=200;
   const lctx = canvasLoading.getContext('2d');
@@ -1742,7 +1797,12 @@ async function openShareCalendarCard(){
     rows.push({ days: rowDays, height: hasBook ? bookRowH : emptyRowH });
   }
   const gridH = rows.reduce((s,r)=>s+r.height, 0);
-  const H = gridTop + gridH + 36;
+
+  // "전체" 옵션이면 목록 영역 높이도 미리 계산
+  const listRowH = 78;
+  const listTitleH = calShareFull ? 56 : 0;
+  const listH = calShareFull ? completedThisMonth.length * listRowH + listTitleH + 20 : 0;
+  const H = gridTop + gridH + 36 + listH;
 
   const canvas = document.getElementById('shareCanvas');
   canvas.width = W; canvas.height = H;
@@ -1753,7 +1813,7 @@ async function openShareCalendarCard(){
   ctx.fillStyle = '#18181b'; ctx.font = '800 52px Inter, sans-serif';
   ctx.fillText(`${year}.${String(month+1).padStart(2,'0')}.`, padX, 88);
   ctx.fillStyle = '#8a8a92'; ctx.font = '600 17px Inter, sans-serif';
-  ctx.fillText(`이번 달 완독 ${monthBooks.length}권 · ${monthPages.toLocaleString()}페이지`, padX, 122);
+  ctx.fillText(`이번 달 완독 ${completedThisMonth.length}권 · ${monthPages.toLocaleString()}페이지${calShareScope==='all'?' · 읽은 기록 전체 표시':''}`, padX, 122);
 
   const dow = ['일','월','화','수','목','금','토'];
   ctx.font = '700 18px Inter, sans-serif'; ctx.fillStyle = '#a8a8b0'; ctx.textAlign = 'center';
@@ -1808,6 +1868,50 @@ async function openShareCalendarCard(){
     y += row.height;
   });
   ctx.textAlign = 'left';
+
+  // "달력 + 목록 전체" 옵션이면 아래에 이번 달 완독 목록을 이어서 그림
+  if(calShareFull){
+    y += 16;
+    ctx.strokeStyle = '#ececec'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padX, y); ctx.lineTo(W-padX, y); ctx.stroke();
+    y += 34;
+    ctx.fillStyle = '#8a8a92'; ctx.font = '700 13px Inter, sans-serif';
+    ctx.fillText('이번 달의 완독', padX, y);
+    y += 22;
+
+    const sortedList = [...completedThisMonth].sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
+    sortedList.forEach(book=>{
+      const coverW = 40, coverH = 57;
+      const img = book.cover ? imageMap.get(book.cover) : null;
+      roundRect(ctx, padX, y, coverW, coverH, 5);
+      ctx.save(); ctx.clip();
+      if(img){
+        const scale = Math.max(coverW/img.width, coverH/img.height);
+        const iw=img.width*scale, ih=img.height*scale;
+        ctx.drawImage(img, padX+(coverW-iw)/2, y+(coverH-ih)/2, iw, ih);
+      }else{
+        ctx.fillStyle = book.color; ctx.fillRect(padX,y,coverW,coverH);
+      }
+      ctx.restore();
+
+      const textX = padX + coverW + 16;
+      ctx.fillStyle = '#18181b'; ctx.font = '700 16px Inter, sans-serif';
+      let title = book.title;
+      while(ctx.measureText(title).width > W-padX-textX-16 && title.length>3){ title = title.slice(0,-2); }
+      if(title!==book.title) title += '…';
+      ctx.fillText(title, textX, y+22);
+
+      ctx.fillStyle = '#9a9aa4'; ctx.font = '500 13px Inter, sans-serif';
+      const meta = [book.completedDate, cleanAuthor(book.author), book.pages?`${book.pages}p`:null].filter(Boolean).join(' · ');
+      ctx.fillText(meta, textX, y+42);
+
+      if(book.rating){
+        ctx.fillStyle = '#f0ac1f'; ctx.font = '700 13px Inter, sans-serif';
+        ctx.fillText(`★ ${book.rating}`, textX, y+60);
+      }
+      y += listRowH;
+    });
+  }
 
   document.getElementById('shareModal').classList.remove('hidden');
   canvas.toBlob(blob=> currentShareBlob = blob, 'image/png');
