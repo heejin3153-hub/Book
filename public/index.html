@@ -570,7 +570,8 @@ function widthFor(book){
 }
 function offsetFor(book){
   // 책마다 좌우로 살짝 어긋나게 배치해서 지그재그로 쌓인 느낌을 줌 (-9% ~ +9%)
-  let h=0; const seed='zz'+book.title;
+  // id를 섞어서 제목이 같은 책(같은 책을 여러 권 추가한 경우)도 서로 다르게 어긋나게 함
+  let h=0; const seed='zz'+book.id+book.title;
   for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; }
   return (h%19) - 9;
 }
