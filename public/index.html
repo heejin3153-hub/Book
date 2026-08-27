@@ -91,7 +91,11 @@
   .shelf-row{ display:flex; align-items:center; gap:2px; height:100%; }
   .shelf-spine{ position:relative; flex-shrink:0; height:94%; cursor:pointer; padding:0 4px; box-sizing:content-box; border-radius:4px; overflow:hidden; }
   .shelf-spine img{ position:relative; z-index:1; height:100%; width:auto; display:block; margin:0 auto; }
-  .shelf-spine-blur{ position:absolute; inset:-8px; background-size:cover; background-position:center; filter:blur(6px) saturate(1.1); z-index:0; }
+  /* cover는 이미지 가운데 부분만 확대해서 잘라 쓰다 보니, 크롭된 부분의 색이 바로 옆
+     선명한 이미지의 실제 가장자리 색과 안 맞아 이음매가 어긋나 보였음. 100% 100%로
+     이미지를 그대로(자르지 않고) 좌우로 늘려서 채우면 이미지의 실제 가장자리 색이
+     블러 테두리 가장자리에도 그대로 오게 되어 자연스럽게 이어짐 */
+  .shelf-spine-blur{ position:absolute; inset:-8px; background-size:100% 100%; background-position:center; filter:blur(6px) saturate(1.1); z-index:0; }
   /* 표지 대체 박스는 폭이 표지 원본 비율과 무관하게(페이지수 기준으로) 정해지다 보니,
      cover로 채우면 표지의 좁은 가로 슬라이스만 잘라내 옆으로 늘인 것처럼 뭉개져 보였음.
      contain으로 바꿔서 표지 비율을 그대로 유지한 채 축소해서 보여주고(남는 자리는
