@@ -82,13 +82,20 @@
   .tag-chip{ background:var(--bg); border:1px solid var(--border); color:var(--text-muted); border-radius:20px; padding:6px 12px; font-size:11.5px; font-weight:600; cursor:pointer; }
   .tag-chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
 
-  /* 책 쌓기 - 책을 세워서 옆으로 나란히 놓는 실제 책장 모습 */
+  /* 책 쌓기 */
   .shelf-area{ min-height:70px; overflow-x:hidden; }
-  .shelf-row{ display:flex; align-items:flex-end; gap:2px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:4px 2px 14px; }
-  .shelf-spine{ flex-shrink:0; height:100%; cursor:pointer; }
-  .shelf-spine img{ height:100%; width:auto; display:block; }
-  .shelf-fallback{ display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:2px; }
-  .shelf-title{ writing-mode:vertical-rl; text-orientation:mixed; color:#fff; font-size:12px; font-weight:700; white-space:nowrap; max-height:100%; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,0.25); }
+  .stack{ display:flex; flex-direction:column-reverse; gap:4px; align-items:center; }
+  .spine{ position:relative; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; overflow:hidden; clip-path:inset(0 0 0 0 round 6px); box-shadow:0 2px 3px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.22); }
+  .spine-cover{ position:absolute; inset:-4px; background-size:cover; background-position:center; filter:blur(4px) brightness(0.7) saturate(1.05); z-index:0; }
+  .spine-real{ position:absolute; inset:0; overflow:hidden; clip-path:inset(0); z-index:0; }
+  .spine-real img{ position:absolute; top:50%; left:50%; object-fit:contain; pointer-events:none; }
+  .spine::after{ content:''; position:absolute; right:0; top:2px; bottom:2px; width:5px; background:repeating-linear-gradient(180deg,#efe8d8 0px,#efe8d8 1px,#e0d7c1 1px,#e0d7c1 2px); border-radius:0 4px 4px 0; z-index:1; }
+  /* 실제 책등 사진이 있을 땐 사진 자체가 진짜 디테일이라, 가짜 그림자/모서리/페이지단면 장식을 다 뺌 */
+  .spine.spine-noframe{ border-radius:0; box-shadow:none; }
+  .spine.spine-noframe::after{ content:none; }
+  .spine-label{ position:relative; z-index:2; display:flex; align-items:center; gap:8px; padding:0 14px 0 16px; width:100%; margin-right:5px; color:#fff; font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-shadow:0 1px 3px rgba(0,0,0,0.4); }
+  .spine-label .t{ overflow:hidden; text-overflow:ellipsis; }
+  .spine-label .p{ margin-left:auto; font-size:11px; opacity:0.9; font-variant-numeric:tabular-nums; flex-shrink:0; }
 
   .empty-shelf{ text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7; padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500; }
 
@@ -1277,21 +1284,18 @@ function renderShelf(){
   if(filtered.length===0){
     html += `<div class="empty-shelf">${completed.length===0 ? '아직 쌓은 책이 없어요.<br/>오른쪽 아래 + 버튼으로 첫 책을 올려보세요.' : '이 조건에 해당하는 책이 없어요.'}</div>`;
   }else{
-    // 책을 세워서 옆으로 나란히 놓는 진짜 책장 모습. 실제 책등 사진은 원본 비율 그대로,
-    // 사진이 없는 책은 두께만큼 폭을 잡은 색상 막대에 제목을 세로로 써서 보여줌
+    html += `<div class="stack">`;
     const panelScale = currentPanelScale();
-    const rowHeight = Math.max(120, Math.min(220*panelScale, 260));
-    html += `<div class="shelf-row" style="height:${rowHeight}px">`;
     sorted.forEach(book=>{
-      const useRealSpine = getStackStyle()==='cover' && !!book.spineImage;
-      if(useRealSpine){
-        html += `<div class="shelf-spine" onclick="openEditModal(${book.id})"><img src="${book.spineImage}" alt="" loading="lazy"/></div>`;
-      }else{
-        const w = Math.max(20, Math.min(thicknessMm(book.pages)*PX_PER_MM*2.2, 90));
-        html += `<div class="shelf-spine shelf-fallback" style="width:${w}px;background:${book.color}" onclick="openEditModal(${book.id})">
-          <span class="shelf-title">${escapeHtml(book.title)}</span>
-        </div>`;
-      }
+      const w = widthFor(book), h = spineHeightPx(book)*panelScale, off = offsetFor(book);
+      const style = getStackStyle();
+      const hasRealSpine = style==='cover' && !!book.spineImage;
+      const useCoverBg = book.cover && style==='cover' && !hasRealSpine;
+      html += `<div class="spine ${hasRealSpine?'spine-noframe':''}" style="height:${h}px;width:${w}%;transform:translateX(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
+        ${hasRealSpine ? `<div class="spine-real"><img src="${book.spineImage}" alt="" style="opacity:0"/></div>` : ''}
+        ${useCoverBg ? `<div class="spine-cover" style="background-image:url('${book.cover}')"></div>` : ''}
+        ${hasRealSpine ? '' : `<div class="spine-label"><span class="t">${book.title}</span><span class="p">${book.pages}p</span></div>`}
+      </div>`;
     });
     html += `</div>`;
   }
@@ -1336,7 +1340,51 @@ function renderShelf(){
     html += `</div>`;
   }
   document.getElementById('shelfView').innerHTML = html;
+  layoutRealSpines();
 }
+
+// 실제 책등 이미지는 세로로 긴 사진이라, 눕혀 쌓는 가로 막대 안에 맞게
+// 반시계 방향으로 90도 돌려서 채워넣음. 두께(높이, h)는 페이지수/실제 사이즈 기준으로 그대로 두고,
+// 박스의 "폭"은 그 이미지의 실제 가로세로 비율에 맞춰 계산함 - 두꺼운/얇은 책마다 폭이 다르게
+// 나오는 게 실제 책장처럼 자연스러운 모습이고, 잘리지도 여백이 남지도 않게 정확히 맞아떨어짐.
+// (화면 폭을 넘어서는 극단적인 경우에만 어쩔 수 없이 살짝 여백이 남을 수 있음)
+function layoutRealSpines(){
+  document.querySelectorAll('.spine-real').forEach(wrap=>{
+    const img = wrap.querySelector('img');
+    if(!img) return;
+    const spineEl = wrap.closest('.spine');
+
+    const fitWidthToImage = ()=>{
+      if(!spineEl || !img.naturalWidth || !img.naturalHeight) return;
+      const rowH = spineEl.offsetHeight;
+      const stackEl = spineEl.closest('.stack');
+      // 지그재그 오프셋(offsetFor, 자기 폭의 ±9%만큼 좌우로 밀림)이 화면 밖으로 안 넘어가게 안전 여유를 둠
+      const maxW = stackEl ? stackEl.clientWidth * 0.84 : Infinity;
+      const idealW = rowH * (img.naturalHeight / img.naturalWidth);
+      spineEl.style.width = Math.min(idealW, maxW) + 'px';
+      applyRotatedFit();
+      img.style.opacity = '1'; // 크기를 다 맞춘 다음에만 보이게 해서 로딩 중 회색 박스가 안 비치게 함
+    };
+    const applyRotatedFit = ()=>{
+      const w = wrap.offsetWidth, h = wrap.offsetHeight;
+      if(w<=0 || h<=0) return;
+      img.style.width = h+'px';
+      img.style.height = w+'px';
+      img.style.transform = 'translate(-50%,-50%) rotate(-90deg)';
+    };
+
+    if(img.complete && img.naturalWidth>0){
+      fitWidthToImage();
+    }else{
+      img.addEventListener('load', fitWidthToImage, {once:true});
+    }
+  });
+}
+let spineResizeTimer = null;
+window.addEventListener('resize', ()=>{
+  clearTimeout(spineResizeTimer);
+  spineResizeTimer = setTimeout(layoutRealSpines, 150);
+});
 
 function toggleTag(t){
   const i = activeTags.indexOf(t);
