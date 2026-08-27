@@ -87,7 +87,8 @@
   .stack{ display:flex; flex-direction:column-reverse; gap:4px; align-items:center; }
   .spine{ position:relative; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; overflow:hidden; box-shadow:0 2px 3px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.22); }
   .spine-cover{ position:absolute; inset:-4px; background-size:cover; background-position:center; filter:blur(4px) brightness(0.7) saturate(1.05); z-index:0; }
-  .spine-real{ position:absolute; inset:0; background-size:cover; background-position:center; z-index:0; }
+  .spine-real{ position:absolute; inset:0; overflow:hidden; z-index:0; }
+  .spine-real img{ position:absolute; top:50%; left:50%; object-fit:cover; pointer-events:none; }
   .spine::after{ content:''; position:absolute; right:0; top:2px; bottom:2px; width:5px; background:repeating-linear-gradient(180deg,#efe8d8 0px,#efe8d8 1px,#e0d7c1 1px,#e0d7c1 2px); border-radius:0 4px 4px 0; z-index:1; }
   .spine-label{ position:relative; z-index:2; display:flex; align-items:center; gap:8px; padding:0 14px 0 16px; width:100%; margin-right:5px; color:#fff; font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-shadow:0 1px 3px rgba(0,0,0,0.4); }
   .spine-label .t{ overflow:hidden; text-overflow:ellipsis; }
@@ -1286,7 +1287,7 @@ function renderShelf(){
       const hasRealSpine = style==='cover' && !!book.spineImage;
       const useCoverBg = book.cover && style==='cover' && !hasRealSpine;
       html += `<div class="spine" style="height:${h}px;width:${w}%;transform:translateX(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
-        ${hasRealSpine ? `<div class="spine-real" style="background-image:url('${book.spineImage}')"></div>` : ''}
+        ${hasRealSpine ? `<div class="spine-real"><img src="${book.spineImage}" alt=""/></div>` : ''}
         ${useCoverBg ? `<div class="spine-cover" style="background-image:url('${book.cover}')"></div>` : ''}
         ${hasRealSpine ? '' : `<div class="spine-label"><span class="t">${book.title}</span><span class="p">${book.pages}p</span></div>`}
       </div>`;
@@ -1334,7 +1335,27 @@ function renderShelf(){
     html += `</div>`;
   }
   document.getElementById('shelfView').innerHTML = html;
+  layoutRealSpines();
 }
+
+// 실제 책등 이미지는 세로로 긴 사진이라, 눕혀 쌓는 가로 막대 안에 맞게
+// 반시계 방향으로 90도 돌려서 채워넣음 (박스의 실제 렌더 크기를 재서 정확히 채움)
+function layoutRealSpines(){
+  document.querySelectorAll('.spine-real').forEach(wrap=>{
+    const img = wrap.querySelector('img');
+    if(!img) return;
+    const w = wrap.offsetWidth, h = wrap.offsetHeight;
+    if(w<=0 || h<=0) return;
+    img.style.width = h+'px';
+    img.style.height = w+'px';
+    img.style.transform = 'translate(-50%,-50%) rotate(-90deg)';
+  });
+}
+let spineResizeTimer = null;
+window.addEventListener('resize', ()=>{
+  clearTimeout(spineResizeTimer);
+  spineResizeTimer = setTimeout(layoutRealSpines, 150);
+});
 
 function toggleTag(t){
   const i = activeTags.indexOf(t);
@@ -1731,10 +1752,13 @@ async function openShareStackCard(){
     roundRect(ctx, x, y, w, rowH, 6);
     if(spineImg){
       ctx.save(); ctx.clip();
-      // 실제 책등 이미지는 이미 제목이 인쇄돼 있으니 텍스트/그라데이션 없이 그대로 채움
-      const scale = Math.max(w/spineImg.width, rowH/spineImg.height);
+      // 실제 책등 이미지는 세로로 긴 사진이라 반시계 방향으로 90도 돌려서 가로 막대에 맞춤
+      // (텍스트/그라데이션 없이 그대로 채움 - 이미 제목이 인쇄돼 있음)
+      ctx.translate(x + w/2, y + rowH/2);
+      ctx.rotate(-Math.PI/2);
+      const scale = Math.max(rowH/spineImg.width, w/spineImg.height);
       const iw=spineImg.width*scale, ih=spineImg.height*scale;
-      ctx.drawImage(spineImg, x+(w-iw)/2, y+(rowH-ih)/2, iw, ih);
+      ctx.drawImage(spineImg, -iw/2, -ih/2, iw, ih);
       ctx.restore();
     }else if(img){
       ctx.save(); ctx.clip();
