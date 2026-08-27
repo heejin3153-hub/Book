@@ -109,18 +109,47 @@ app.get('/api/detail/:itemId', async (req, res) => {
   }
 });
 
-// 예스24 책등(SIDE) 이미지 조회 - ISBN으로 상품을 검색해서 일치하는 책의 책등 이미지 URL을 반환
+// 예스24 검색 결과 중 "도서" 항목만 대상으로, 제목(+저자)이 그럴듯하게 일치하는 걸 고름
+// (ISBN이 정확히 안 맞는 경우 - 판본이 다르거나 절판 등 - 를 위한 느슨한 폴백 매칭)
+function pickBestYes24Match(items, title, author) {
+  const books = (items || []).filter(it => it.goodsType === '도서');
+  if (books.length === 0) return null;
+  const normalize = s => (s || '').replace(/[\s():,.'"『』「」\-]/g, '').toLowerCase();
+  const nTitle = normalize(title);
+  if (!nTitle) return null;
+  const titleMatches = books.filter(it => {
+    const nItemTitle = normalize(it.title);
+    return nItemTitle && (nItemTitle.includes(nTitle) || nTitle.includes(nItemTitle));
+  });
+  if (titleMatches.length === 0) return null;
+  const firstAuthorName = (author || '').split(/[,\/]/)[0].replace(/\(.*?\)/g, '').trim();
+  if (firstAuthorName) {
+    const withAuthor = titleMatches.find(it => (it.author || '').includes(firstAuthorName));
+    if (withAuthor) return withAuthor;
+  }
+  return titleMatches[0];
+}
+
+// 예스24 책등(SIDE) 이미지 조회 - ISBN으로 먼저 찾고, 안 되면 제목+저자로 재검색해서 비슷한 책을 찾음
 app.get('/api/yes24-spine', async (req, res) => {
-  const { isbn } = req.query;
+  const { isbn, title, author } = req.query;
   if (!isbn) return res.status(400).json({ error: 'isbn이 필요합니다.' });
   if (!YES24_API_KEY) return res.json({ spineUrl: null }); // 키 미설정 시 조용히 폴백(기존 표지 흐림 방식)
 
   try {
-    const url = `https://apis.yes24.com/v1/goods/itemList?query=${encodeURIComponent(isbn)}`;
-    const response = await fetch(url, { headers: { 'X-Api-Key': YES24_API_KEY } });
-    const data = await response.json();
-    const items = (data.data && data.data.items) || [];
-    const match = items.find(it => it.isbn13 === isbn) || null;
+    const isbnUrl = `https://apis.yes24.com/v1/goods/itemList?query=${encodeURIComponent(isbn)}`;
+    const isbnResponse = await fetch(isbnUrl, { headers: { 'X-Api-Key': YES24_API_KEY } });
+    const isbnData = await isbnResponse.json();
+    const isbnItems = (isbnData.data && isbnData.data.items) || [];
+    let match = isbnItems.find(it => it.isbn13 === isbn) || null;
+
+    if (!match && title) {
+      const titleUrl = `https://apis.yes24.com/v1/goods/itemList?query=${encodeURIComponent(title)}`;
+      const titleResponse = await fetch(titleUrl, { headers: { 'X-Api-Key': YES24_API_KEY } });
+      const titleData = await titleResponse.json();
+      const titleItems = (titleData.data && titleData.data.items) || [];
+      match = pickBestYes24Match(titleItems, title, author);
+    }
 
     if (!match) return res.json({ spineUrl: null });
     res.json({ spineUrl: `https://image.yes24.com/goods/${match.itemId}/SIDE/XL`, itemId: match.itemId });

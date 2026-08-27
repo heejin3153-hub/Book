@@ -699,7 +699,8 @@ async function backfillSpineImages(force=false){
       const detail = await detailRes.json();
       let spineUrl = null;
       if(detail.isbn){
-        const spineRes = await fetch(`/api/yes24-spine?isbn=${encodeURIComponent(detail.isbn)}`);
+        const q = `isbn=${encodeURIComponent(detail.isbn)}&title=${encodeURIComponent(detail.title||book.title||'')}&author=${encodeURIComponent(detail.author||book.author||'')}`;
+        const spineRes = await fetch(`/api/yes24-spine?${q}`);
         const spineData = await spineRes.json();
         spineUrl = spineData.spineUrl || null;
       }
@@ -1095,7 +1096,7 @@ async function selectBook(index){
   try{
     const [res, spineRes] = await Promise.all([
       fetch(`/api/detail/${book.itemId}`),
-      book.isbn ? fetch(`/api/yes24-spine?isbn=${encodeURIComponent(book.isbn)}`) : Promise.resolve(null)
+      book.isbn ? fetch(`/api/yes24-spine?isbn=${encodeURIComponent(book.isbn)}&title=${encodeURIComponent(book.title||'')}&author=${encodeURIComponent(book.author||'')}`) : Promise.resolve(null)
     ]);
     const data = await res.json();
     if(data.cover) selectedCover = data.cover;
