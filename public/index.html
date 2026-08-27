@@ -92,6 +92,11 @@
   .shelf-spine{ position:relative; flex-shrink:0; height:94%; cursor:pointer; padding:0 1px; box-sizing:content-box; border-radius:4px; overflow:hidden; }
   .shelf-spine img{ position:relative; z-index:1; height:100%; width:auto; display:block; margin:0 auto; }
   .shelf-spine-blur{ position:absolute; inset:-8px; background-size:cover; background-position:center; filter:blur(6px) saturate(1.1); z-index:0; }
+  /* 표지 대체 박스는 폭이 표지 원본 비율과 무관하게(페이지수 기준으로) 정해지다 보니,
+     cover로 채우면 표지의 좁은 가로 슬라이스만 잘라내 옆으로 늘인 것처럼 뭉개져 보였음.
+     contain으로 바꿔서 표지 비율을 그대로 유지한 채 축소해서 보여주고(남는 자리는
+     책 색으로 채움), 원본과 다르게 늘어나 보이지 않게 함 */
+  .shelf-cover-fixed .shelf-spine-blur{ background-size:contain; background-repeat:no-repeat; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; }
   /* text-orientation:mixed는 숫자/영문만 따로 90도 돌리는데, 전체를 한 번 더 돌리는 우리 구조에서는
      그게 이중으로 돌아가 뒤집혀 보임 - upright로 통일해서 전체가 딱 한 번만 돌아가게 함 */
