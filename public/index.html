@@ -86,8 +86,8 @@
   .shelf-area{ min-height:70px; overflow-x:hidden; }
   .lay-wrap{ width:100%; overflow:hidden; position:relative; }
   .lay-rotate{ position:relative; transform-origin:top left; }
-  .shelf-row{ display:flex; align-items:flex-end; gap:2px; height:100%; }
-  .shelf-spine{ flex-shrink:0; height:100%; cursor:pointer; padding:0 3px; box-sizing:content-box; }
+  .shelf-row{ display:flex; align-items:center; gap:2px; height:100%; }
+  .shelf-spine{ flex-shrink:0; height:94%; cursor:pointer; padding:0 3px; box-sizing:content-box; }
   .shelf-spine img{ height:100%; width:auto; display:block; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:2px; }
   .shelf-title{ writing-mode:vertical-rl; text-orientation:mixed; color:#fff; font-size:12px; font-weight:700; white-space:nowrap; max-height:100%; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,0.25); }
@@ -574,12 +574,6 @@ function offsetFor(book){
   for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; }
   return (h%19) - 9;
 }
-function standHeightPct(book){
-  // "세워서 나란히" 놓을 때 책마다 높이를 살짝 다르게 줘서(88~100%), 눕혔을 때 지그재그로 쌓인 느낌을 줌
-  let h=0; const seed='hh'+book.id+book.title;
-  for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; }
-  return 88 + (h%13);
-}
 const MM_PER_PAGE=0.07, COVER_MM=3;
 function thicknessMm(pages){ return pages*MM_PER_PAGE+COVER_MM; }
 const PX_PER_MM=1.8;
@@ -664,6 +658,44 @@ function extractDominantColor(url){
       img.src = url ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url; // 프록시를 거쳐야 CORS 문제 없이 픽셀을 읽을 수 있음
     }catch(e){ resolve(null); }
   });
+}
+
+// 책등 이미지의 좌우 가장자리 색만 뽑아서, 두께 보강용 여백(padding)이 표지 색이 아니라
+// 그 사진 자체의 테두리 색과 자연스럽게 이어지는 것처럼 보이게 함
+function extractEdgeColor(url){
+  return new Promise((resolve)=>{
+    try{
+      const img=new Image(); img.crossOrigin='anonymous';
+      img.onload=()=>{
+        try{
+          const w=16,h=16;
+          const c=document.createElement('canvas'); c.width=w; c.height=h;
+          const ctx=c.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+          const data=ctx.getImageData(0,0,w,h).data;
+          let r=0,g=0,b=0,n=0;
+          for(let y=0;y<h;y++){
+            for(const x of [0,1,w-2,w-1]){
+              const i=(y*w+x)*4;
+              if(data[i+3]<100) continue;
+              r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++;
+            }
+          }
+          if(n===0){ resolve(null); return; }
+          r=Math.round(r/n); g=Math.round(g/n); b=Math.round(b/n);
+          resolve('#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join(''));
+        }catch(e){ resolve(null); }
+      };
+      img.onerror=()=>resolve(null);
+      img.src = url ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url;
+    }catch(e){ resolve(null); }
+  });
+}
+const spineEdgeColorCache = new Map();
+async function getSpineEdgeColor(url){
+  if(spineEdgeColorCache.has(url)) return spineEdgeColorCache.get(url);
+  const color = await extractEdgeColor(url);
+  spineEdgeColorCache.set(url, color);
+  return color;
 }
 
 /* ---------------- 탭 전환 ---------------- */
@@ -1306,12 +1338,14 @@ function renderShelf(){
     html += `<div class="lay-wrap" id="layWrap"><div class="lay-rotate" id="layRotate"><div class="shelf-row" id="shelfRow">`;
     sorted.forEach(book=>{
       const useRealSpine = style==='cover' && !!book.spineImage;
-      const hPct = standHeightPct(book);
+      // 세워진 상태에서 위아래로 살짝(양쪽 방향 다) 밀어서 지그재그 느낌을 줌. 높이는 94%로 통일해서
+      // 밀려도 화면 밖으로 잘리지 않을 여유(±3%)만 확보 - 책마다 높이 자체는 똑같이 유지됨
+      const off = (offsetFor(book)/3).toFixed(2);
       if(useRealSpine){
-        html += `<div class="shelf-spine" style="height:${hPct}%;background:${book.color}" onclick="openEditModal(${book.id})"><img src="${book.spineImage}" alt=""/></div>`;
+        html += `<div class="shelf-spine" style="transform:translateY(${off}%);background:${book.color}" onclick="openEditModal(${book.id})"><img src="${book.spineImage}" alt=""/></div>`;
       }else{
         const w = spineHeightPx(book) * panelScale;
-        html += `<div class="shelf-spine shelf-fallback" style="width:${w}px;height:${hPct}%;background:${book.color}" onclick="openEditModal(${book.id})">
+        html += `<div class="shelf-spine shelf-fallback" style="width:${w}px;transform:translateY(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
           <span class="shelf-title">${escapeHtml(book.title)}</span>
         </div>`;
       }
@@ -1385,13 +1419,29 @@ function layoutLyingShelf(){
 
   const imgs = Array.from(row.querySelectorAll('img'));
   const pending = imgs.filter(img=>!img.complete);
-  if(pending.length===0){ apply(); return; }
-  let remaining = pending.length;
-  const onSettle = ()=>{ remaining--; if(remaining<=0) apply(); };
-  pending.forEach(img=>{
-    img.addEventListener('load', onSettle, {once:true});
-    img.addEventListener('error', onSettle, {once:true});
-  });
+  if(pending.length===0){ apply(); }
+  else{
+    let remaining = pending.length;
+    const onSettle = ()=>{ remaining--; if(remaining<=0) apply(); };
+    pending.forEach(img=>{
+      img.addEventListener('load', onSettle, {once:true});
+      img.addEventListener('error', onSettle, {once:true});
+    });
+  }
+
+  applyEdgeColors(row);
+}
+
+// 실제 책등 이미지가 있는 칸은, 두께 보강용 여백(padding) 색을 그 책의 대표색 대신
+// 사진 가장자리 색으로 바꿔서 사진과 이어지는 것처럼 보이게 함 (크기 계산과는 무관해서 별도로 진행)
+async function applyEdgeColors(row){
+  const spines = Array.from(row.querySelectorAll('.shelf-spine:not(.shelf-fallback)'));
+  for(const el of spines){
+    const img = el.querySelector('img');
+    if(!img || !img.src) continue;
+    const color = await getSpineEdgeColor(img.src);
+    if(color) el.style.background = color;
+  }
 }
 let shelfResizeTimer = null;
 window.addEventListener('resize', ()=>{
