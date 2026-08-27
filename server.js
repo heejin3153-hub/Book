@@ -135,10 +135,12 @@ function pickBestYes24Match(items, title, author) {
 const PLACEHOLDER_MAX_BYTES = 6000;
 async function isLikelyRealSpineImage(url) {
   try {
-    const headRes = await fetch(url, { method: 'HEAD' });
-    if (!headRes.ok) return false;
-    const len = Number(headRes.headers.get('content-length') || 0);
-    if (len > 0 && len < PLACEHOLDER_MAX_BYTES) return false;
+    // HEAD는 CDN에 따라 content-length를 안 주거나 자체를 막는 경우가 있어, 직접 받아서 크기를 확인함
+    const res = await fetch(url);
+    if (!res.ok) return false;
+    const buf = await res.buffer();
+    console.log(`[yes24-spine] ${url} -> ${buf.length} bytes`);
+    if (buf.length > 0 && buf.length < PLACEHOLDER_MAX_BYTES) return false;
     return true;
   } catch (e) {
     return true; // 확인 자체가 실패하면 과도하게 걸러내지 않고 일단 있는 걸로 취급
