@@ -130,6 +130,21 @@ function pickBestYes24Match(items, title, author) {
   return titleMatches[0];
 }
 
+// 예스24는 책등 사진이 없는 상품도 404 대신 "이미지 준비중" 같은 안내용 대체 이미지를 200으로 내려줌.
+// 그런 대체 이미지는 실제 촬영 사진보다 파일 용량이 훨씬 작은 경우가 많아서, 용량으로 걸러냄.
+const PLACEHOLDER_MAX_BYTES = 6000;
+async function isLikelyRealSpineImage(url) {
+  try {
+    const headRes = await fetch(url, { method: 'HEAD' });
+    if (!headRes.ok) return false;
+    const len = Number(headRes.headers.get('content-length') || 0);
+    if (len > 0 && len < PLACEHOLDER_MAX_BYTES) return false;
+    return true;
+  } catch (e) {
+    return true; // 확인 자체가 실패하면 과도하게 걸러내지 않고 일단 있는 걸로 취급
+  }
+}
+
 // 예스24 책등(SIDE) 이미지 조회 - ISBN으로 먼저 찾고, 안 되면 제목+저자로 재검색해서 비슷한 책을 찾음
 app.get('/api/yes24-spine', async (req, res) => {
   const { isbn, title, author } = req.query;
@@ -152,7 +167,9 @@ app.get('/api/yes24-spine', async (req, res) => {
     }
 
     if (!match) return res.json({ spineUrl: null });
-    res.json({ spineUrl: `https://image.yes24.com/goods/${match.itemId}/SIDE/XL`, itemId: match.itemId });
+    const spineUrl = `https://image.yes24.com/goods/${match.itemId}/SIDE/XL`;
+    if (!(await isLikelyRealSpineImage(spineUrl))) return res.json({ spineUrl: null });
+    res.json({ spineUrl, itemId: match.itemId });
   } catch (error) {
     console.error('예스24 책등 조회 오류:', error);
     res.json({ spineUrl: null }); // 실패해도 기존 표지 흐림 방식으로 자연스럽게 폴백
