@@ -84,7 +84,9 @@
 
   /* 책 쌓기 - "세워서 나란히" 놓은 걸 그대로 만든 다음 통째로 90도 돌려서 눕힘 */
   .shelf-area{ min-height:70px; overflow-x:hidden; }
-  .lay-wrap{ width:100%; overflow:hidden; position:relative; }
+  /* 세운 상태(회전 전) 프레임이 잠깐 노출되는 걸 막기 위해 기본은 숨김 - layoutLyingShelf()가
+     회전 계산을 마친 뒤에만 보이게 함 */
+  .lay-wrap{ width:100%; overflow:hidden; position:relative; opacity:0; }
   .lay-rotate{ position:relative; transform-origin:top left; }
   .shelf-row{ display:flex; align-items:center; gap:2px; height:100%; }
   .shelf-spine{ position:relative; flex-shrink:0; height:94%; cursor:pointer; padding:0 3px; box-sizing:content-box; border-radius:4px; overflow:hidden; }
@@ -94,6 +96,8 @@
   /* text-orientation:mixed는 숫자/영문만 따로 90도 돌리는데, 전체를 한 번 더 돌리는 우리 구조에서는
      그게 이중으로 돌아가 뒤집혀 보임 - upright로 통일해서 전체가 딱 한 번만 돌아가게 함 */
   .shelf-title{ writing-mode:vertical-rl; text-orientation:upright; color:#fff; font-size:12px; font-weight:700; white-space:nowrap; max-height:100%; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,0.25); }
+  /* 책등 사진이 없어 표지 사진을 흐리게 깔아 대신 쓸 때, 표지엔 세로 제목이 없으니 위에 겹쳐서 써줌 */
+  .shelf-title-overlay{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2; }
 
   .empty-shelf{ text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7; padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500; }
 
@@ -1333,6 +1337,7 @@ function renderShelf(){
         html += `<div class="shelf-spine" style="transform:translateY(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
           <div class="shelf-spine-blur" style="background-image:url('${imgUrl}')"></div>
           <img src="${imgUrl}" alt="" onerror="spineImgFailed(this, ${book.id})"/>
+          ${useCoverImg ? `<span class="shelf-title shelf-title-overlay">${escapeHtml(book.title)}</span>` : ''}
         </div>`;
       }else{
         const w = spineHeightPx(book) * panelScale;
@@ -1396,9 +1401,14 @@ function layoutLyingShelf(){
   const row = document.getElementById('shelfRow');
   if(!wrap || !rotate || !row) return;
 
+  // 이미지 로딩을 기다리는 동안(특히 새로고침 직후) 회전 전 "세워진" 모습이 그대로 보이는 걸
+  // 막기 위해 계산이 끝날 때까지 숨겨둠 - 이미 로드된 이미지뿐이라 apply()가 바로 실행되는
+  // 경우엔 화면에 그려지기 전에 숨겼다 바로 다시 보이므로 깜빡임 없음
+  wrap.style.opacity = '0';
+
   const apply = ()=>{
     const panelWidth = wrap.clientWidth;
-    if(panelWidth<=0) return;
+    if(panelWidth<=0){ wrap.style.opacity = '1'; return; }
     row.style.height = panelWidth+'px';
     const rowWidth = row.scrollWidth;
     rotate.style.width = rowWidth+'px';
@@ -1406,6 +1416,7 @@ function layoutLyingShelf(){
     // 왼쪽(반시계) 방향으로 돌리고, 맨 마지막(최신) 책이 맨 위로 오게 함
     rotate.style.transform = `translateY(${rowWidth}px) rotate(-90deg)`;
     wrap.style.height = rowWidth+'px';
+    wrap.style.opacity = '1';
   };
 
   const imgs = Array.from(row.querySelectorAll('img'));
