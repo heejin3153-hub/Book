@@ -130,17 +130,41 @@ function pickBestYes24Match(items, title, author) {
   return titleMatches[0];
 }
 
+// PNG/JPEG 파일 헤더만 읽어서 가로/세로 픽셀 크기를 구함 (외부 라이브러리 없이)
+function getImageDimensions(buf) {
+  if (buf.length >= 24 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    // PNG: IHDR 청크가 항상 8바이트 시그니처 다음 고정 위치에 옴
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  }
+  if (buf.length >= 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+    // JPEG: SOFn 마커를 찾을 때까지 세그먼트를 순서대로 건너뜀
+    let i = 2;
+    while (i + 9 < buf.length) {
+      if (buf[i] !== 0xff) { i++; continue; }
+      const marker = buf[i + 1];
+      const isSOF = (marker >= 0xc0 && marker <= 0xcf) && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+      if (isSOF) return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { i += 2; continue; }
+      const segmentLength = buf.readUInt16BE(i + 2);
+      i += 2 + segmentLength;
+    }
+  }
+  return null;
+}
+
 // 예스24는 책등 사진이 없는 상품도 404 대신 "이미지 준비중" 같은 안내용 대체 이미지를 200으로 내려줌.
-// 그런 대체 이미지는 실제 촬영 사진보다 파일 용량이 훨씬 작은 경우가 많아서, 용량으로 걸러냄.
-const PLACEHOLDER_MAX_BYTES = 6000;
+// 진짜 책등 사진은 세로가 가로보다 훨씬 긴 형태(책을 세워서 옆에서 찍은 사진)라서,
+// 그렇게 길쭉하지 않으면(정사각형/가로형이면) 안내용 대체 이미지로 보고 걸러냄.
+const MIN_SPINE_ASPECT_RATIO = 2.2; // 세로/가로 최소 비율
 async function isLikelyRealSpineImage(url) {
   try {
-    // HEAD는 CDN에 따라 content-length를 안 주거나 자체를 막는 경우가 있어, 직접 받아서 크기를 확인함
     const res = await fetch(url);
     if (!res.ok) return false;
     const buf = await res.buffer();
-    console.log(`[yes24-spine] ${url} -> ${buf.length} bytes`);
-    if (buf.length > 0 && buf.length < PLACEHOLDER_MAX_BYTES) return false;
+    const dims = getImageDimensions(buf);
+    const ratio = dims && dims.width > 0 ? dims.height / dims.width : null;
+    console.log(`[yes24-spine] ${url} -> ${buf.length} bytes, ${dims ? `${dims.width}x${dims.height} (ratio ${ratio.toFixed(2)})` : '크기 파싱 실패'}`);
+    if (ratio !== null && ratio < MIN_SPINE_ASPECT_RATIO) return false;
     return true;
   } catch (e) {
     return true; // 확인 자체가 실패하면 과도하게 걸러내지 않고 일단 있는 걸로 취급
