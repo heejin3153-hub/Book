@@ -1292,7 +1292,7 @@ function renderShelf(){
       const hasRealSpine = style==='cover' && !!book.spineImage;
       const useCoverBg = book.cover && style==='cover' && !hasRealSpine;
       html += `<div class="spine ${hasRealSpine?'spine-noframe':''}" style="height:${h}px;width:${w}%;transform:translateX(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
-        ${hasRealSpine ? `<div class="spine-real"><img src="${book.spineImage}" alt=""/></div>` : ''}
+        ${hasRealSpine ? `<div class="spine-real"><img src="${book.spineImage}" alt="" style="opacity:0"/></div>` : ''}
         ${useCoverBg ? `<div class="spine-cover" style="background-image:url('${book.cover}')"></div>` : ''}
         ${hasRealSpine ? '' : `<div class="spine-label"><span class="t">${book.title}</span><span class="p">${book.pages}p</span></div>`}
       </div>`;
@@ -1363,6 +1363,7 @@ function layoutRealSpines(){
       const idealW = rowH * (img.naturalHeight / img.naturalWidth);
       spineEl.style.width = Math.min(idealW, maxW) + 'px';
       applyRotatedFit();
+      img.style.opacity = '1'; // 크기를 다 맞춘 다음에만 보이게 해서 로딩 중 회색 박스가 안 비치게 함
     };
     const applyRotatedFit = ()=>{
       const w = wrap.offsetWidth, h = wrap.offsetHeight;
@@ -1375,7 +1376,6 @@ function layoutRealSpines(){
     if(img.complete && img.naturalWidth>0){
       fitWidthToImage();
     }else{
-      applyRotatedFit(); // 로드 전엔 일단 기존 박스 크기로 회전만 맞춰두고, 로드되면 폭을 다시 계산
       img.addEventListener('load', fitWidthToImage, {once:true});
     }
   });
