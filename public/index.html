@@ -87,7 +87,7 @@
   .lay-wrap{ width:100%; overflow:hidden; position:relative; }
   .lay-rotate{ position:relative; transform-origin:top left; }
   .shelf-row{ display:flex; align-items:flex-end; gap:2px; height:100%; }
-  .shelf-spine{ flex-shrink:0; height:100%; cursor:pointer; }
+  .shelf-spine{ flex-shrink:0; height:100%; cursor:pointer; padding:0 3px; box-sizing:content-box; }
   .shelf-spine img{ height:100%; width:auto; display:block; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:2px; }
   .shelf-title{ writing-mode:vertical-rl; text-orientation:mixed; color:#fff; font-size:12px; font-weight:700; white-space:nowrap; max-height:100%; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,0.25); }
@@ -573,6 +573,12 @@ function offsetFor(book){
   let h=0; const seed='zz'+book.id+book.title;
   for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; }
   return (h%19) - 9;
+}
+function standHeightPct(book){
+  // "세워서 나란히" 놓을 때 책마다 높이를 살짝 다르게 줘서(88~100%), 눕혔을 때 지그재그로 쌓인 느낌을 줌
+  let h=0; const seed='hh'+book.id+book.title;
+  for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; }
+  return 88 + (h%13);
 }
 const MM_PER_PAGE=0.07, COVER_MM=3;
 function thicknessMm(pages){ return pages*MM_PER_PAGE+COVER_MM; }
@@ -1300,11 +1306,12 @@ function renderShelf(){
     html += `<div class="lay-wrap" id="layWrap"><div class="lay-rotate" id="layRotate"><div class="shelf-row" id="shelfRow">`;
     sorted.forEach(book=>{
       const useRealSpine = style==='cover' && !!book.spineImage;
+      const hPct = standHeightPct(book);
       if(useRealSpine){
-        html += `<div class="shelf-spine" onclick="openEditModal(${book.id})"><img src="${book.spineImage}" alt=""/></div>`;
+        html += `<div class="shelf-spine" style="height:${hPct}%;background:${book.color}" onclick="openEditModal(${book.id})"><img src="${book.spineImage}" alt=""/></div>`;
       }else{
         const w = spineHeightPx(book) * panelScale;
-        html += `<div class="shelf-spine shelf-fallback" style="width:${w}px;background:${book.color}" onclick="openEditModal(${book.id})">
+        html += `<div class="shelf-spine shelf-fallback" style="width:${w}px;height:${hPct}%;background:${book.color}" onclick="openEditModal(${book.id})">
           <span class="shelf-title">${escapeHtml(book.title)}</span>
         </div>`;
       }
@@ -1371,7 +1378,8 @@ function layoutLyingShelf(){
     const rowWidth = row.scrollWidth;
     rotate.style.width = rowWidth+'px';
     rotate.style.height = panelWidth+'px';
-    rotate.style.transform = 'rotate(90deg) translateY(-100%)';
+    // 왼쪽(반시계) 방향으로 돌리고, 맨 마지막(최신) 책이 맨 위로 오게 함
+    rotate.style.transform = `translateY(${rowWidth}px) rotate(-90deg)`;
     wrap.style.height = rowWidth+'px';
   };
 
