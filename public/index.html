@@ -979,6 +979,18 @@ function clearSpineImage(){
   saveBookToCloud(book);
   render();
 }
+// 책등/표지 이미지 로드가 실패하면 브로큰 이미지 아이콘 크기로 쪼그라들어 "사라진 것처럼"
+// 보이던 문제 방지 - 실패하면 그 책만 색+제목 막대로 즉시 대체함
+function spineImgFailed(img, id){
+  const book = books.find(b=>b.id===id);
+  const el = img.closest('.shelf-spine');
+  if(!book || !el) return;
+  const w = spineHeightPx(book) * currentPanelScale();
+  el.classList.add('shelf-fallback');
+  el.style.width = w+'px';
+  el.innerHTML = `<span class="shelf-title">${escapeHtml(book.title)}</span>`;
+  layoutLyingShelf();
+}
 function finishReading(){
   if(editingId===null) return;
   document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
@@ -1312,7 +1324,7 @@ function renderShelf(){
         const imgUrl = useRealSpine ? book.spineImage : book.cover;
         html += `<div class="shelf-spine" style="transform:translateY(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
           <div class="shelf-spine-blur" style="background-image:url('${imgUrl}')"></div>
-          <img src="${imgUrl}" alt=""/>
+          <img src="${imgUrl}" alt="" onerror="spineImgFailed(this, ${book.id})"/>
         </div>`;
       }else{
         const w = spineHeightPx(book) * panelScale;
