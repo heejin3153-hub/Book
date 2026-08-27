@@ -580,7 +580,15 @@ function offsetFor(book){
 const MM_PER_PAGE=0.07, COVER_MM=3;
 function thicknessMm(pages){ return pages*MM_PER_PAGE+COVER_MM; }
 const PX_PER_MM=1.8;
-function spineHeightPx(book){ const mm=book.depthMm||thicknessMm(book.pages); return Math.max(26, Math.min(mm*PX_PER_MM,150)); }
+function spineHeightPx(book){
+  // depthMm/pages가 비어있거나 이상한 값이어도(예: 수정 중 페이지수가 잠깐 비워짐) NaN이 나오지 않게 보정.
+  // NaN이 style에 들어가면 무효 CSS로 무시돼서 책이 "매우 얇아진" 것처럼 쪼그라들었음.
+  const depth = Number(book.depthMm);
+  const pages = Number(book.pages);
+  const mm = depth > 0 ? depth : thicknessMm(pages > 0 ? pages : 0);
+  const safeMm = Number.isFinite(mm) && mm > 0 ? mm : COVER_MM;
+  return Math.max(26, Math.min(safeMm*PX_PER_MM,150));
+}
 // 화면(패널) 실제 폭에 맞춰 두께를 비례 확대/축소 - 아이패드처럼 폭이 넓어져도 비율이 그대로 유지되게 함
 function currentPanelScale(){
   const panel = document.querySelector('.panel');
