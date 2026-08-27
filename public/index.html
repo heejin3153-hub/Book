@@ -679,6 +679,35 @@ function setStackStyle(v){
   localStorage.setItem('stack-style', v);
   renderStackStylePicker();
   if(currentView==='shelf') renderShelf();
+  if(v==='spine') backfillSpineImages().then(changed=>{ if(changed && currentView==='shelf') renderShelf(); });
+}
+
+// 기존에 등록된 책들(알라딘으로 추가했지만 spineImage가 없는 책)의 예스24 책등 이미지를 한 번씩 조회해서 채워넣음
+let spineBackfillRunning = false;
+async function backfillSpineImages(){
+  if(spineBackfillRunning) return false;
+  const targets = books.filter(b => b.aladinItemId && b.spineImage === undefined);
+  if(targets.length===0) return false;
+  spineBackfillRunning = true;
+  let changed = false;
+  for(const book of targets){
+    try{
+      const detailRes = await fetch(`/api/detail/${book.aladinItemId}`);
+      const detail = await detailRes.json();
+      let spineUrl = null;
+      if(detail.isbn){
+        const spineRes = await fetch(`/api/yes24-spine?isbn=${encodeURIComponent(detail.isbn)}`);
+        const spineData = await spineRes.json();
+        spineUrl = spineData.spineUrl || null;
+      }
+      book.spineImage = spineUrl; // 못 찾아도 null로 표시해 다음부턴 다시 조회하지 않음
+      changed = true;
+      saveBookToCloud(book);
+    }catch(e){ book.spineImage = null; changed = true; }
+  }
+  if(changed) saveBooksRaw();
+  spineBackfillRunning = false;
+  return changed;
 }
 function renderStackStylePicker(){
   const cur = getStackStyle();
@@ -2210,6 +2239,7 @@ applyTheme();
 applyTitleFromStorage();
 render();
 initFirebase();
+if(getStackStyle()==='spine') backfillSpineImages().then(changed=>{ if(changed && currentView==='shelf') renderShelf(); });
 </script>
 </body>
 </html>

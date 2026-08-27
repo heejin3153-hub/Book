@@ -91,6 +91,7 @@ app.get('/api/detail/:itemId', async (req, res) => {
       author: book.author,
       pages: pages,
       cover: book.cover,
+      isbn: book.isbn13 || book.isbn || '',
       publisher: book.publisher,
       categoryName: book.categoryName || '',
       depthMm: packing && packing.sizeDepth ? Number(packing.sizeDepth) : null,   // 두께
