@@ -88,7 +88,7 @@
   .spine{ position:relative; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; overflow:hidden; box-shadow:0 2px 3px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.22); }
   .spine-cover{ position:absolute; inset:-4px; background-size:cover; background-position:center; filter:blur(4px) brightness(0.7) saturate(1.05); z-index:0; }
   .spine-real{ position:absolute; inset:0; overflow:hidden; z-index:0; }
-  .spine-real img{ position:absolute; top:50%; left:50%; object-fit:cover; pointer-events:none; }
+  .spine-real img{ position:absolute; top:50%; left:50%; object-fit:contain; pointer-events:none; }
   .spine::after{ content:''; position:absolute; right:0; top:2px; bottom:2px; width:5px; background:repeating-linear-gradient(180deg,#efe8d8 0px,#efe8d8 1px,#e0d7c1 1px,#e0d7c1 2px); border-radius:0 4px 4px 0; z-index:1; }
   .spine-label{ position:relative; z-index:2; display:flex; align-items:center; gap:8px; padding:0 14px 0 16px; width:100%; margin-right:5px; color:#fff; font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-shadow:0 1px 3px rgba(0,0,0,0.4); }
   .spine-label .t{ overflow:hidden; text-overflow:ellipsis; }
@@ -1752,11 +1752,12 @@ async function openShareStackCard(){
     roundRect(ctx, x, y, w, rowH, 6);
     if(spineImg){
       ctx.save(); ctx.clip();
+      ctx.fillStyle = book.color; ctx.fill(); // 이미지 비율이 안 맞아 여백이 생겨도 책 색으로 채워짐
       // 실제 책등 이미지는 세로로 긴 사진이라 반시계 방향으로 90도 돌려서 가로 막대에 맞춤
-      // (텍스트/그라데이션 없이 그대로 채움 - 이미 제목이 인쇄돼 있음)
+      // 잘리지 않도록 꽉 채우지 않고(cover) 비율 그대로 다 보이게(contain) 그림
       ctx.translate(x + w/2, y + rowH/2);
       ctx.rotate(-Math.PI/2);
-      const scale = Math.max(rowH/spineImg.width, w/spineImg.height);
+      const scale = Math.min(rowH/spineImg.width, w/spineImg.height);
       const iw=spineImg.width*scale, ih=spineImg.height*scale;
       ctx.drawImage(spineImg, -iw/2, -ih/2, iw, ih);
       ctx.restore();
