@@ -1344,13 +1344,13 @@ function renderShelf(){
         // 그래서 표지로 대신할 때는 폭을 페이지수 기반으로 직접 정하고, 표지 원본은 흐린 배경으로만
         // 채움(선명한 사진을 따로 안 겹쳐서 "배경이 두 겹"으로 보이던 문제 방지) + 세로 제목을 겹쳐 씀
         const coverW = useCoverImg ? spineHeightPx(book) * panelScale : null;
-        // 실제 책등 사진은 원본 비율(width:auto)로 그리되, 혹시 그 사진 자체가 이상한
-        // 비율(예: 못 걸러낸 "이미지 준비중" 안내 이미지 등)이라도 책이 실선처럼
-        // 쪼그라들지 않게 페이지수 기반 최소 폭을 항상 보장함
-        const minW = spineHeightPx(book) * panelScale;
+        // 실제 책등 사진은 원본 비율(width:auto) 그대로 그림 - 최소 폭을 강제로 걸면
+        // height는 고정인 채 width만 늘어나서 사진 비율 자체가 찌그러지는 부작용이 있었음.
+        // 서버의 "이미지 준비중" 감지가 확인됐으니(디버그로 검증) 최소 폭 강제는 빼고
+        // 원본 비율을 그대로 존중함 - 잘못된 이미지는 onerror/재조회로 걸러냄
         html += `<div class="shelf-spine${useCoverImg?' shelf-cover-fixed':''}" style="${useCoverImg?`width:${coverW}px;`:''}transform:translateY(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
           <div class="shelf-spine-blur" style="background-image:url('${imgUrl}')"></div>
-          <img src="${imgUrl}" alt="" style="${useCoverImg?'display:none':`min-width:${minW}px`}" onerror="spineImgFailed(this, ${book.id})"/>
+          <img src="${imgUrl}" alt="" ${useCoverImg?'style="display:none"':''} onerror="spineImgFailed(this, ${book.id})"/>
           ${useCoverImg ? `<span class="shelf-title shelf-title-overlay">${escapeHtml(book.title)}</span>` : ''}
         </div>`;
       }else{
