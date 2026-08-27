@@ -92,15 +92,12 @@
   .shelf-spine{ position:relative; flex-shrink:0; height:94%; cursor:pointer; padding:0 3px; box-sizing:content-box; border-radius:4px; overflow:hidden; }
   .shelf-spine img{ position:relative; z-index:1; height:100%; width:auto; display:block; margin:0 auto; }
   .shelf-spine-blur{ position:absolute; inset:-8px; background-size:cover; background-position:center; filter:blur(6px) saturate(1.1); z-index:0; }
-  /* 표지 사진 대체용 박스는 폭이 페이지수로 이미 정해져 있으니, 이미지는 그 박스 안에
-     크롭 없이 맞추기만 함(남는 여백은 위 shelf-spine-blur가 채워줌) */
-  .shelf-spine.shelf-cover-fixed img{ width:100%; height:100%; object-fit:contain; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; }
   /* text-orientation:mixed는 숫자/영문만 따로 90도 돌리는데, 전체를 한 번 더 돌리는 우리 구조에서는
      그게 이중으로 돌아가 뒤집혀 보임 - upright로 통일해서 전체가 딱 한 번만 돌아가게 함 */
   .shelf-title{ writing-mode:vertical-rl; text-orientation:upright; color:#fff; font-size:12px; font-weight:700; white-space:nowrap; max-height:100%; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,0.25); }
   /* 책등 사진이 없어 표지 사진을 흐리게 깔아 대신 쓸 때, 표지엔 세로 제목이 없으니 위에 겹쳐서 써줌 */
-  .shelf-title-overlay{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2; }
+  .shelf-title-overlay{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2; font-size:15px; }
 
   .empty-shelf{ text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7; padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500; }
 
@@ -1339,12 +1336,12 @@ function renderShelf(){
         const imgUrl = useRealSpine ? book.spineImage : book.cover;
         // 표지 사진은 책등 사진과 달리 두께와 무관하게 다 비슷한 비율이라, 표지의 실제 가로세로
         // 비율을 그대로 쓰면(=사진 원본 비율로 폭이 정해지면) 두께감이 실제 책과 안 맞음.
-        // 그래서 표지로 대신할 때는 폭을 페이지수 기반으로 직접 정하고, 이미지는 그 안에
-        // 크롭 없이(object-fit:contain) 넣은 뒤 남는 여백은 블러 배경으로 채움.
+        // 그래서 표지로 대신할 때는 폭을 페이지수 기반으로 직접 정하고, 표지 원본은 흐린 배경으로만
+        // 채움(선명한 사진을 따로 안 겹쳐서 "배경이 두 겹"으로 보이던 문제 방지) + 세로 제목을 겹쳐 씀
         const coverW = useCoverImg ? spineHeightPx(book) * panelScale : null;
         html += `<div class="shelf-spine${useCoverImg?' shelf-cover-fixed':''}" style="${useCoverImg?`width:${coverW}px;`:''}transform:translateY(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
           <div class="shelf-spine-blur" style="background-image:url('${imgUrl}')"></div>
-          <img src="${imgUrl}" alt="" onerror="spineImgFailed(this, ${book.id})"/>
+          <img src="${imgUrl}" alt="" ${useCoverImg?'style="display:none"':''} onerror="spineImgFailed(this, ${book.id})"/>
           ${useCoverImg ? `<span class="shelf-title shelf-title-overlay">${escapeHtml(book.title)}</span>` : ''}
         </div>`;
       }else{

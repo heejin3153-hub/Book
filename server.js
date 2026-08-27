@@ -3,6 +3,7 @@ const express = require('express');
 const fetch = require('node-fetch');
 const path = require('path');
 const crypto = require('crypto');
+const { Jimp } = require('jimp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -155,6 +156,27 @@ async function getPlaceholderHash() {
   }
   return placeholderHashPromise;
 }
+// 안내 이미지가 하나만 있는 게 아니었음 - 없는 상품번호로 받은 것과, 실제 있는 상품인데
+// 책등 사진만 없는 경우 받는 안내 이미지가 서로 달라서(또는 CDN이 매번 살짝 다르게
+// 재인코딩해서) 해시가 정확히 일치하지 않는 경우가 있었음. 그래서 해시 일치 여부와
+// 별개로, 이미지 대부분이 거의 흰 배경인지(안내 이미지 특유의 "거의 빈 캔버스에 작은
+// 안내 문구"인지)도 함께 확인해서 이중으로 걸러냄.
+async function isMostlyBlank(buf) {
+  try {
+    const img = await Jimp.read(buf);
+    const SAMPLE = 24;
+    const small = img.clone().resize({ w: SAMPLE, h: SAMPLE });
+    let white = 0, total = 0;
+    small.scan(0, 0, small.bitmap.width, small.bitmap.height, function (x, y, idx) {
+      const r = this.bitmap.data[idx], g = this.bitmap.data[idx + 1], b = this.bitmap.data[idx + 2];
+      total++;
+      if (r > 245 && g > 245 && b > 245) white++;
+    });
+    return total > 0 && (white / total) > 0.9;
+  } catch (e) {
+    return false; // 디코딩 실패 시엔 안내 이미지인지 판단할 수 없으니 걸러내지 않음
+  }
+}
 async function isLikelyRealSpineImage(url) {
   try {
     const res = await fetch(url);
@@ -163,8 +185,9 @@ async function isLikelyRealSpineImage(url) {
     const hash = sha256(buf);
     const placeholderHash = await getPlaceholderHash();
     const isPlaceholder = placeholderHash && hash === placeholderHash;
-    console.log(`[yes24-spine] ${url} -> ${buf.length} bytes, hash ${hash.slice(0, 12)}${isPlaceholder ? ' (PLACEHOLDER)' : ''}`);
-    return !isPlaceholder;
+    const isBlank = !isPlaceholder && await isMostlyBlank(buf);
+    console.log(`[yes24-spine] ${url} -> ${buf.length} bytes, hash ${hash.slice(0, 12)}${isPlaceholder ? ' (PLACEHOLDER-HASH)' : ''}${isBlank ? ' (BLANK-LIKE)' : ''}`);
+    return !isPlaceholder && !isBlank;
   } catch (e) {
     return true; // 확인 자체가 실패하면 과도하게 걸러내지 않고 일단 있는 걸로 취급
   }
