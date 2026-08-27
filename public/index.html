@@ -91,7 +91,9 @@
   .shelf-spine img{ position:relative; z-index:1; height:100%; width:auto; display:block; margin:0 auto; }
   .shelf-spine-blur{ position:absolute; inset:-8px; background-size:cover; background-position:center; filter:blur(6px) saturate(1.1); z-index:0; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; }
-  .shelf-title{ writing-mode:vertical-rl; text-orientation:mixed; color:#fff; font-size:12px; font-weight:700; white-space:nowrap; max-height:100%; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,0.25); }
+  /* text-orientation:mixed는 숫자/영문만 따로 90도 돌리는데, 전체를 한 번 더 돌리는 우리 구조에서는
+     그게 이중으로 돌아가 뒤집혀 보임 - upright로 통일해서 전체가 딱 한 번만 돌아가게 함 */
+  .shelf-title{ writing-mode:vertical-rl; text-orientation:upright; color:#fff; font-size:12px; font-weight:700; white-space:nowrap; max-height:100%; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,0.25); }
 
   .empty-shelf{ text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7; padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500; }
 
@@ -1301,13 +1303,16 @@ function renderShelf(){
     html += `<div class="lay-wrap" id="layWrap"><div class="lay-rotate" id="layRotate"><div class="shelf-row" id="shelfRow">`;
     sorted.forEach(book=>{
       const useRealSpine = style==='cover' && !!book.spineImage;
+      // 실제 책등 이미지가 없어도 "이미지로 보기" 모드면 표지 이미지로 대신 채움 - 단색보기일 때만 색+제목 막대
+      const useCoverImg = !useRealSpine && style==='cover' && !!book.cover;
       // 세워진 상태에서 위아래로 살짝(양쪽 방향 다) 밀어서 지그재그 느낌을 줌. 높이는 94%로 통일해서
       // 밀려도 화면 밖으로 잘리지 않을 여유(±3%)만 확보 - 책마다 높이 자체는 똑같이 유지됨
       const off = (offsetFor(book)/3).toFixed(2);
-      if(useRealSpine){
+      if(useRealSpine || useCoverImg){
+        const imgUrl = useRealSpine ? book.spineImage : book.cover;
         html += `<div class="shelf-spine" style="transform:translateY(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
-          <div class="shelf-spine-blur" style="background-image:url('${book.spineImage}')"></div>
-          <img src="${book.spineImage}" alt=""/>
+          <div class="shelf-spine-blur" style="background-image:url('${imgUrl}')"></div>
+          <img src="${imgUrl}" alt=""/>
         </div>`;
       }else{
         const w = spineHeightPx(book) * panelScale;
