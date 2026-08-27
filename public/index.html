@@ -87,6 +87,7 @@
   .stack{ display:flex; flex-direction:column-reverse; gap:4px; align-items:center; }
   .spine{ position:relative; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; overflow:hidden; box-shadow:0 2px 3px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.22); }
   .spine-cover{ position:absolute; inset:-4px; background-size:cover; background-position:center; filter:blur(4px) brightness(0.7) saturate(1.05); z-index:0; }
+  .spine-real{ position:absolute; inset:0; background-size:cover; background-position:center; z-index:0; }
   .spine::after{ content:''; position:absolute; right:0; top:2px; bottom:2px; width:5px; background:repeating-linear-gradient(180deg,#efe8d8 0px,#efe8d8 1px,#e0d7c1 1px,#e0d7c1 2px); border-radius:0 4px 4px 0; z-index:1; }
   .spine-label{ position:relative; z-index:2; display:flex; align-items:center; gap:8px; padding:0 14px 0 16px; width:100%; margin-right:5px; color:#fff; font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-shadow:0 1px 3px rgba(0,0,0,0.4); }
   .spine-label .t{ overflow:hidden; text-overflow:ellipsis; }
@@ -393,6 +394,7 @@
       <div class="status-picker" id="stackStylePicker">
         <button type="button" onclick="setStackStyle('color')" data-v="color">🎨 단색보기</button>
         <button type="button" onclick="setStackStyle('cover')" data-v="cover">🖼️ 표지이미지보기</button>
+        <button type="button" onclick="setStackStyle('spine')" data-v="spine">📚 실제책등보기</button>
       </div>
     </div>
 
@@ -476,6 +478,7 @@ let currentMonth = new Date();
 let currentView = 'shelf';
 let selectedCover = null, selectedDepthMm = null, selectedSpineMm = null;
 let selectedAuthor = '', selectedAladinItemId = null, selectedExtraInfo = null;
+let selectedSpineImage = null;
 let currentRating = 0, currentStatus = 'completed', editingId = null;
 
 // 팝업이 열려있는 동안 배경(body) 스크롤을 막고, 팝업 안에서만 스크롤되게 함
@@ -884,6 +887,7 @@ function openEditModal(id){
   const book = books.find(b=>b.id===id);
   if(!book) return;
   editingId=id; selectedCover=book.cover||null; selectedDepthMm=book.depthMm||null; selectedSpineMm=book.spineMm||null;
+  selectedSpineImage=book.spineImage||null;
   currentRating=book.rating||0;
   selectedAuthor=book.author||''; selectedAladinItemId=book.aladinItemId||null; selectedExtraInfo=null;
   currentQuotes=(book.quotes||[]).map(q=>({...q}));
@@ -915,7 +919,7 @@ function closeAddModal(){
   document.getElementById('addModal').classList.add('hidden');
   resetModalFields();
   selectedCover=null; selectedDepthMm=null; selectedSpineMm=null; currentRating=0; editingId=null;
-  selectedAuthor=''; selectedAladinItemId=null; selectedExtraInfo=null;
+  selectedAuthor=''; selectedAladinItemId=null; selectedExtraInfo=null; selectedSpineImage=null;
   currentQuotes=[];
   unlockBodyScroll();
 }
@@ -1043,13 +1047,17 @@ async function selectBook(index){
   selectedCover = book.cover||null; selectedDepthMm=null; selectedSpineMm=null;
   selectedAuthor = book.author || ''; selectedAladinItemId = book.itemId || null;
   selectedExtraInfo = null; // 책소개/줄거리/책속에서 등은 "자세히 보기" 누를 때 불러옴
+  selectedSpineImage = null;
 
   // 책을 고르면 검색창은 접고, 필요하면 다시 열 수 있게 토글 버튼을 보여줌
   document.getElementById('searchSection').classList.add('hidden');
   document.getElementById('reSearchToggle').classList.remove('hidden');
 
   try{
-    const res = await fetch(`/api/detail/${book.itemId}`);
+    const [res, spineRes] = await Promise.all([
+      fetch(`/api/detail/${book.itemId}`),
+      book.isbn ? fetch(`/api/yes24-spine?isbn=${encodeURIComponent(book.isbn)}`) : Promise.resolve(null)
+    ]);
     const data = await res.json();
     if(data.cover) selectedCover = data.cover;
     if(data.depthMm) selectedDepthMm = data.depthMm;
@@ -1058,6 +1066,7 @@ async function selectBook(index){
     if(data.categoryName){ document.getElementById('tagsInput').value = categoryToTags(data.categoryName).join(', '); }
     if(data.pages && data.pages>0){ document.getElementById('pagesInput').value = data.pages; }
     else{ document.getElementById('pagesInput').placeholder='예: 472'; alert('페이지 수를 찾을 수 없어요. 직접 입력해주세요.'); }
+    if(spineRes){ const spineData = await spineRes.json(); selectedSpineImage = spineData.spineUrl || null; }
     renderBookInfoButton();
   }catch(e){ document.getElementById('pagesInput').placeholder='예: 472'; alert('페이지 수 조회 실패. 직접 입력해주세요.'); }
 }
@@ -1100,7 +1109,8 @@ async function saveBook(){
     cover: selectedCover, color,
     author: selectedAuthor || (books.find(b=>b.id===editingId)?.author || ''),
     aladinItemId: selectedAladinItemId || (books.find(b=>b.id===editingId)?.aladinItemId || null),
-    depthMm: selectedDepthMm, spineMm: selectedSpineMm
+    depthMm: selectedDepthMm, spineMm: selectedSpineMm,
+    spineImage: selectedSpineImage
   };
 
   let savedBook;
@@ -1111,7 +1121,8 @@ async function saveBook(){
         cover: selectedCover || books[idx].cover,
         color: selectedCover ? color : books[idx].color,
         depthMm: selectedDepthMm || books[idx].depthMm,
-        spineMm: selectedSpineMm || books[idx].spineMm };
+        spineMm: selectedSpineMm || books[idx].spineMm,
+        spineImage: selectedSpineImage || books[idx].spineImage };
       savedBook = books[idx];
     }
   }else{
@@ -1232,10 +1243,13 @@ function renderShelf(){
     const panelScale = currentPanelScale();
     sorted.forEach(book=>{
       const w = widthFor(book), h = spineHeightPx(book)*panelScale, off = offsetFor(book);
-      const useCoverBg = book.cover && getStackStyle()==='cover';
+      const style = getStackStyle();
+      const hasRealSpine = style==='spine' && book.spineImage;
+      const useCoverBg = book.cover && (style==='cover' || (style==='spine' && !hasRealSpine));
       html += `<div class="spine" style="height:${h}px;width:${w}%;transform:translateX(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
+        ${hasRealSpine ? `<div class="spine-real" style="background-image:url('${book.spineImage}')"></div>` : ''}
         ${useCoverBg ? `<div class="spine-cover" style="background-image:url('${book.cover}')"></div>` : ''}
-        <div class="spine-label"><span class="t">${book.title}</span><span class="p">${book.pages}p</span></div>
+        ${hasRealSpine ? '' : `<div class="spine-label"><span class="t">${book.title}</span><span class="p">${book.pages}p</span></div>`}
       </div>`;
     });
     html += `</div>`;
@@ -1630,9 +1644,12 @@ async function openShareStackCard(){
   lctx.fillStyle='#8a8a92'; lctx.font='500 16px Inter, sans-serif'; lctx.textAlign='center';
   lctx.fillText('이미지를 준비하는 중...', 400, 100); lctx.textAlign='left';
 
-  const useCover = getStackStyle()==='cover';
-  const uniqueCovers = useCover ? [...new Set(sorted.map(b=>b.cover).filter(Boolean))] : [];
-  const loadedPairs = await Promise.all(uniqueCovers.map(async url => [url, await loadImage(proxied(url))]));
+  const stackStyle = getStackStyle();
+  const useCover = stackStyle==='cover';
+  const useSpine = stackStyle==='spine';
+  const uniqueCovers = (useCover || useSpine) ? [...new Set(sorted.map(b=>b.cover).filter(Boolean))] : [];
+  const uniqueSpineImgs = useSpine ? [...new Set(sorted.map(b=>b.spineImage).filter(Boolean))] : [];
+  const loadedPairs = await Promise.all([...uniqueCovers, ...uniqueSpineImgs].map(async url => [url, await loadImage(proxied(url))]));
   const imageMap = new Map(loadedPairs);
 
   const W = 800, padX=56;
@@ -1671,10 +1688,18 @@ async function openShareStackCard(){
     const rowH = spineHeightPx(book) * SCALE;
     const off = offsetFor(book)/100;
     const x = padX + (maxW-w)/2 + maxW*off*0.5;
-    const img = (useCover && book.cover) ? imageMap.get(book.cover) : null;
+    const spineImg = (useSpine && book.spineImage) ? imageMap.get(book.spineImage) : null;
+    const img = spineImg ? null : (((useCover || useSpine) && book.cover) ? imageMap.get(book.cover) : null);
 
     roundRect(ctx, x, y, w, rowH, 6);
-    if(img){
+    if(spineImg){
+      ctx.save(); ctx.clip();
+      // 실제 책등 이미지는 이미 제목이 인쇄돼 있으니 텍스트/그라데이션 없이 그대로 채움
+      const scale = Math.max(w/spineImg.width, rowH/spineImg.height);
+      const iw=spineImg.width*scale, ih=spineImg.height*scale;
+      ctx.drawImage(spineImg, x+(w-iw)/2, y+(rowH-ih)/2, iw, ih);
+      ctx.restore();
+    }else if(img){
       ctx.save(); ctx.clip();
       // 표지 이미지에서 가운데 부분을 크롭해서 채움 (object-fit: cover)
       const scale = Math.max(w/img.width, rowH/img.height);
@@ -1689,7 +1714,7 @@ async function openShareStackCard(){
       ctx.fillStyle = book.color; ctx.fill();
     }
 
-    if(rowH >= 24){
+    if(!spineImg && rowH >= 24){
       ctx.fillStyle = 'rgba(255,255,255,0.97)';
       ctx.font = '700 19px Inter, sans-serif';
       let title = book.title;

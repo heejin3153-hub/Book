@@ -6,6 +6,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const TTB_KEY = process.env.ALADIN_TTB_KEY;
+const YES24_API_KEY = process.env.YES24_API_KEY;
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -107,6 +108,27 @@ app.get('/api/detail/:itemId', async (req, res) => {
   }
 });
 
+// 예스24 책등(SIDE) 이미지 조회 - ISBN으로 상품을 검색해서 일치하는 책의 책등 이미지 URL을 반환
+app.get('/api/yes24-spine', async (req, res) => {
+  const { isbn } = req.query;
+  if (!isbn) return res.status(400).json({ error: 'isbn이 필요합니다.' });
+  if (!YES24_API_KEY) return res.json({ spineUrl: null }); // 키 미설정 시 조용히 폴백(기존 표지 흐림 방식)
+
+  try {
+    const url = `https://apis.yes24.com/v1/goods/itemList?query=${encodeURIComponent(isbn)}`;
+    const response = await fetch(url, { headers: { 'X-Api-Key': YES24_API_KEY } });
+    const data = await response.json();
+    const items = (data.data && data.data.items) || [];
+    const match = items.find(it => it.isbn13 === isbn) || null;
+
+    if (!match) return res.json({ spineUrl: null });
+    res.json({ spineUrl: `https://image.yes24.com/goods/${match.itemId}/SIDE/XL`, itemId: match.itemId });
+  } catch (error) {
+    console.error('예스24 책등 조회 오류:', error);
+    res.json({ spineUrl: null }); // 실패해도 기존 표지 흐림 방식으로 자연스럽게 폴백
+  }
+});
+
 // 표지 이미지 프록시 - 캔버스(이미지 카드 생성)에서 CORS 제약 없이 그릴 수 있도록 서버가 대신 가져옴
 app.get('/api/image-proxy', async (req, res) => {
   const { url } = req.query;
@@ -114,8 +136,8 @@ app.get('/api/image-proxy', async (req, res) => {
 
   try {
     const parsed = new URL(url);
-    const allowedHosts = ['image.aladin.co.kr', 'www.aladin.co.kr', 'image1.aladin.co.kr', 'image2.aladin.co.kr', 'image3.aladin.co.kr', 'image4.aladin.co.kr'];
-    const isAllowed = allowedHosts.some(h => parsed.hostname === h || parsed.hostname.endsWith('.aladin.co.kr'));
+    const allowedHosts = ['image.aladin.co.kr', 'www.aladin.co.kr', 'image1.aladin.co.kr', 'image2.aladin.co.kr', 'image3.aladin.co.kr', 'image4.aladin.co.kr', 'image.yes24.com'];
+    const isAllowed = allowedHosts.some(h => parsed.hostname === h) || parsed.hostname.endsWith('.aladin.co.kr') || parsed.hostname.endsWith('.yes24.com');
     if (!isAllowed) return res.status(400).send('허용되지 않은 도메인입니다.');
 
     const imgRes = await fetch(url);
