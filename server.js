@@ -161,7 +161,7 @@ async function getPlaceholderHash() {
 // 재인코딩해서) 해시가 정확히 일치하지 않는 경우가 있었음. 그래서 해시 일치 여부와
 // 별개로, 이미지 대부분이 거의 흰 배경인지(안내 이미지 특유의 "거의 빈 캔버스에 작은
 // 안내 문구"인지)도 함께 확인해서 이중으로 걸러냄.
-async function isMostlyBlank(buf) {
+async function analyzeBlankness(buf) {
   try {
     const img = await Jimp.read(buf);
     const SAMPLE = 24;
@@ -172,30 +172,40 @@ async function isMostlyBlank(buf) {
       total++;
       if (r > 245 && g > 245 && b > 245) white++;
     });
-    return total > 0 && (white / total) > 0.9;
+    return { decoded: true, ratio: total > 0 ? white / total : null, width: img.bitmap.width, height: img.bitmap.height };
   } catch (e) {
-    return false; // 디코딩 실패 시엔 안내 이미지인지 판단할 수 없으니 걸러내지 않음
+    return { decoded: false, error: e.message };
   }
 }
-async function isLikelyRealSpineImage(url) {
+function isMostlyBlank(info) {
+  return !!(info && info.decoded && info.ratio !== null && info.ratio > 0.9);
+}
+// debugInfo를 넘기면(디버깅용) 판정 근거(바이트 수/해시/흰색 비율 등)를 그 객체에 채워 넣음
+async function isLikelyRealSpineImage(url, debugInfo) {
   try {
     const res = await fetch(url);
-    if (!res.ok) return false;
+    if (!res.ok) { if (debugInfo) debugInfo.httpStatus = res.status; return false; }
     const buf = await res.buffer();
     const hash = sha256(buf);
     const placeholderHash = await getPlaceholderHash();
     const isPlaceholder = placeholderHash && hash === placeholderHash;
-    const isBlank = !isPlaceholder && await isMostlyBlank(buf);
-    console.log(`[yes24-spine] ${url} -> ${buf.length} bytes, hash ${hash.slice(0, 12)}${isPlaceholder ? ' (PLACEHOLDER-HASH)' : ''}${isBlank ? ' (BLANK-LIKE)' : ''}`);
+    const blank = isPlaceholder ? null : await analyzeBlankness(buf);
+    const isBlank = !isPlaceholder && isMostlyBlank(blank);
+    if (debugInfo) {
+      debugInfo.bytes = buf.length; debugInfo.hash = hash;
+      debugInfo.isPlaceholderHash = isPlaceholder; debugInfo.blank = blank; debugInfo.rejected = isPlaceholder || isBlank;
+    }
+    console.log(`[yes24-spine] ${url} -> ${buf.length} bytes, hash ${hash.slice(0, 12)}${isPlaceholder ? ' (PLACEHOLDER-HASH)' : ''}${blank && blank.decoded ? ` whiteRatio=${blank.ratio.toFixed(3)}` : ''}${blank && !blank.decoded ? ` (디코딩 실패: ${blank.error})` : ''}${isBlank ? ' (BLANK-LIKE)' : ''}`);
     return !isPlaceholder && !isBlank;
   } catch (e) {
+    if (debugInfo) debugInfo.error = e.message;
     return true; // 확인 자체가 실패하면 과도하게 걸러내지 않고 일단 있는 걸로 취급
   }
 }
 
 // 예스24 책등(SIDE) 이미지 조회 - ISBN으로 먼저 찾고, 안 되면 제목+저자로 재검색해서 비슷한 책을 찾음
 app.get('/api/yes24-spine', async (req, res) => {
-  const { isbn, title, author } = req.query;
+  const { isbn, title, author, debug } = req.query;
   if (!isbn) return res.status(400).json({ error: 'isbn이 필요합니다.' });
   if (!YES24_API_KEY) return res.json({ spineUrl: null }); // 키 미설정 시 조용히 폴백(기존 표지 흐림 방식)
 
@@ -216,7 +226,12 @@ app.get('/api/yes24-spine', async (req, res) => {
 
     if (!match) return res.json({ spineUrl: null });
     const spineUrl = `https://image.yes24.com/goods/${match.itemId}/SIDE/XL`;
-    if (!(await isLikelyRealSpineImage(spineUrl))) return res.json({ spineUrl: null });
+    // ?debug=1이면 "이미지 준비중" 판정 근거(바이트 수/해시/흰색 비율 등)를 그대로 내려줌 -
+    // 실제 안내 이미지가 왜 안 걸러지는지 값을 직접 보고 임계값을 맞추기 위한 임시 진단용
+    const debugInfo = debug ? {} : null;
+    const ok = await isLikelyRealSpineImage(spineUrl, debugInfo);
+    if (debug) return res.json({ spineUrl: ok ? spineUrl : null, itemId: match.itemId, rawUrl: spineUrl, debug: debugInfo });
+    if (!ok) return res.json({ spineUrl: null });
     res.json({ spineUrl, itemId: match.itemId });
   } catch (error) {
     console.error('예스24 책등 조회 오류:', error);
