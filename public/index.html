@@ -1339,9 +1339,13 @@ function renderShelf(){
         // 그래서 표지로 대신할 때는 폭을 페이지수 기반으로 직접 정하고, 표지 원본은 흐린 배경으로만
         // 채움(선명한 사진을 따로 안 겹쳐서 "배경이 두 겹"으로 보이던 문제 방지) + 세로 제목을 겹쳐 씀
         const coverW = useCoverImg ? spineHeightPx(book) * panelScale : null;
+        // 실제 책등 사진은 원본 비율(width:auto)로 그리되, 혹시 그 사진 자체가 이상한
+        // 비율(예: 못 걸러낸 "이미지 준비중" 안내 이미지 등)이라도 책이 실선처럼
+        // 쪼그라들지 않게 페이지수 기반 최소 폭을 항상 보장함
+        const minW = spineHeightPx(book) * panelScale;
         html += `<div class="shelf-spine${useCoverImg?' shelf-cover-fixed':''}" style="${useCoverImg?`width:${coverW}px;`:''}transform:translateY(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
           <div class="shelf-spine-blur" style="background-image:url('${imgUrl}')"></div>
-          <img src="${imgUrl}" alt="" ${useCoverImg?'style="display:none"':''} onerror="spineImgFailed(this, ${book.id})"/>
+          <img src="${imgUrl}" alt="" style="${useCoverImg?'display:none':`min-width:${minW}px`}" onerror="spineImgFailed(this, ${book.id})"/>
           ${useCoverImg ? `<span class="shelf-title shelf-title-overlay">${escapeHtml(book.title)}</span>` : ''}
         </div>`;
       }else{
