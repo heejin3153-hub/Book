@@ -393,8 +393,7 @@
     <div class="field"><label>책 쌓기 모드</label>
       <div class="status-picker" id="stackStylePicker">
         <button type="button" onclick="setStackStyle('color')" data-v="color">🎨 단색보기</button>
-        <button type="button" onclick="setStackStyle('cover')" data-v="cover">🖼️ 표지이미지보기</button>
-        <button type="button" onclick="setStackStyle('spine')" data-v="spine">📚 실제책등보기</button>
+        <button type="button" onclick="setStackStyle('cover')" data-v="cover">🖼️ 이미지로 보기</button>
       </div>
     </div>
 
@@ -679,7 +678,7 @@ function setStackStyle(v){
   localStorage.setItem('stack-style', v);
   renderStackStylePicker();
   if(currentView==='shelf') renderShelf();
-  if(v==='spine') backfillSpineImages().then(changed=>{ if(changed && currentView==='shelf') renderShelf(); });
+  if(v==='cover') backfillSpineImages().then(changed=>{ if(changed && currentView==='shelf') renderShelf(); });
 }
 
 // 기존에 등록된 책들(알라딘으로 추가했지만 spineImage가 없는 책)의 예스24 책등 이미지를 한 번씩 조회해서 채워넣음
@@ -1273,8 +1272,8 @@ function renderShelf(){
     sorted.forEach(book=>{
       const w = widthFor(book), h = spineHeightPx(book)*panelScale, off = offsetFor(book);
       const style = getStackStyle();
-      const hasRealSpine = style==='spine' && book.spineImage;
-      const useCoverBg = book.cover && (style==='cover' || (style==='spine' && !hasRealSpine));
+      const hasRealSpine = style==='cover' && !!book.spineImage;
+      const useCoverBg = book.cover && style==='cover' && !hasRealSpine;
       html += `<div class="spine" style="height:${h}px;width:${w}%;transform:translateX(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
         ${hasRealSpine ? `<div class="spine-real" style="background-image:url('${book.spineImage}')"></div>` : ''}
         ${useCoverBg ? `<div class="spine-cover" style="background-image:url('${book.cover}')"></div>` : ''}
@@ -1673,11 +1672,9 @@ async function openShareStackCard(){
   lctx.fillStyle='#8a8a92'; lctx.font='500 16px Inter, sans-serif'; lctx.textAlign='center';
   lctx.fillText('이미지를 준비하는 중...', 400, 100); lctx.textAlign='left';
 
-  const stackStyle = getStackStyle();
-  const useCover = stackStyle==='cover';
-  const useSpine = stackStyle==='spine';
-  const uniqueCovers = (useCover || useSpine) ? [...new Set(sorted.map(b=>b.cover).filter(Boolean))] : [];
-  const uniqueSpineImgs = useSpine ? [...new Set(sorted.map(b=>b.spineImage).filter(Boolean))] : [];
+  const useCover = getStackStyle()==='cover';
+  const uniqueCovers = useCover ? [...new Set(sorted.map(b=>b.cover).filter(Boolean))] : [];
+  const uniqueSpineImgs = useCover ? [...new Set(sorted.map(b=>b.spineImage).filter(Boolean))] : [];
   const loadedPairs = await Promise.all([...uniqueCovers, ...uniqueSpineImgs].map(async url => [url, await loadImage(proxied(url))]));
   const imageMap = new Map(loadedPairs);
 
@@ -1717,8 +1714,8 @@ async function openShareStackCard(){
     const rowH = spineHeightPx(book) * SCALE;
     const off = offsetFor(book)/100;
     const x = padX + (maxW-w)/2 + maxW*off*0.5;
-    const spineImg = (useSpine && book.spineImage) ? imageMap.get(book.spineImage) : null;
-    const img = spineImg ? null : (((useCover || useSpine) && book.cover) ? imageMap.get(book.cover) : null);
+    const spineImg = (useCover && book.spineImage) ? imageMap.get(book.spineImage) : null;
+    const img = spineImg ? null : ((useCover && book.cover) ? imageMap.get(book.cover) : null);
 
     roundRect(ctx, x, y, w, rowH, 6);
     if(spineImg){
@@ -2239,7 +2236,7 @@ applyTheme();
 applyTitleFromStorage();
 render();
 initFirebase();
-if(getStackStyle()==='spine') backfillSpineImages().then(changed=>{ if(changed && currentView==='shelf') renderShelf(); });
+if(getStackStyle()==='cover') backfillSpineImages().then(changed=>{ if(changed && currentView==='shelf') renderShelf(); });
 </script>
 </body>
 </html>
