@@ -358,6 +358,7 @@
     </div>
 
     <button class="btn-secondary hidden" id="finishBtn" onclick="finishReading()">📖 지금 완독으로 표시하기</button>
+    <button class="btn-secondary hidden" id="clearSpineBtn" onclick="clearSpineImage()">🚫 책등 이미지 잘못됐어요 (표지로 대체)</button>
     </div>
     <div class="card-footer">
       <div class="btn-row" style="margin-top:0">
@@ -901,6 +902,7 @@ function openAddModal(defaultStatus){
   document.getElementById('searchSection').classList.remove('hidden');
   document.getElementById('reSearchToggle').classList.add('hidden');
   document.getElementById('deleteBtn').classList.add('hidden');
+  document.getElementById('clearSpineBtn').classList.add('hidden');
   resetModalFields();
   document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
   document.getElementById('startDateInput').value = ''; // 완독일 입력 시 자동으로 전날로 채워짐
@@ -940,6 +942,7 @@ function openEditModal(id){
   document.getElementById('searchSection').classList.add('hidden');
   document.getElementById('reSearchToggle').classList.remove('hidden');
   document.getElementById('deleteBtn').classList.remove('hidden');
+  document.getElementById('clearSpineBtn').classList.toggle('hidden', !book.spineImage);
   document.getElementById('titleInput').value=book.title;
   document.getElementById('pagesInput').value=book.pages||'';
   document.getElementById('tagsInput').value=(book.tags||[]).join(', ');
@@ -967,6 +970,17 @@ function closeAddModal(){
   unlockBodyScroll();
 }
 
+function clearSpineImage(){
+  if(editingId===null) return;
+  const book = books.find(b=>b.id===editingId);
+  if(!book) return;
+  book.spineImage = null; // 다음 "다시 조회하기"에서 재시도하지 않도록 undefined가 아닌 null로 확정
+  selectedSpineImage = null; spineImageLoaded = true;
+  document.getElementById('clearSpineBtn').classList.add('hidden');
+  saveBooksRaw();
+  saveBookToCloud(book);
+  render();
+}
 function finishReading(){
   if(editingId===null) return;
   document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
