@@ -395,6 +395,7 @@
         <button type="button" onclick="setStackStyle('color')" data-v="color">🎨 단색보기</button>
         <button type="button" onclick="setStackStyle('cover')" data-v="cover">🖼️ 이미지로 보기</button>
       </div>
+      <button class="btn-secondary" style="margin-top:8px" onclick="manualRefreshSpineImages(this)">📚 책등 이미지 다시 조회하기</button>
     </div>
 
     <div class="card-divider"></div>
@@ -477,7 +478,7 @@ let currentMonth = new Date();
 let currentView = 'shelf';
 let selectedCover = null, selectedDepthMm = null, selectedSpineMm = null;
 let selectedAuthor = '', selectedAladinItemId = null, selectedExtraInfo = null;
-let selectedSpineImage = null;
+let selectedSpineImage = null, spineImageLoaded = false;
 let currentRating = 0, currentStatus = 'completed', editingId = null;
 
 // 팝업이 열려있는 동안 배경(body) 스크롤을 막고, 팝업 안에서만 스크롤되게 함
@@ -682,10 +683,11 @@ function setStackStyle(v){
 }
 
 // 기존에 등록된 책들(알라딘으로 추가했지만 spineImage가 없는 책)의 예스24 책등 이미지를 한 번씩 조회해서 채워넣음
+// force=true면 이미 "못 찾음(null)"으로 표시된 책도 다시 조회함 (수동 새로고침 버튼용)
 let spineBackfillRunning = false;
-async function backfillSpineImages(){
+async function backfillSpineImages(force=false){
   if(spineBackfillRunning) return false;
-  const targets = books.filter(b => b.aladinItemId && b.spineImage === undefined);
+  const targets = books.filter(b => b.aladinItemId && (force || b.spineImage === undefined));
   if(targets.length===0) return false;
   spineBackfillRunning = true;
   let changed = false;
@@ -702,11 +704,18 @@ async function backfillSpineImages(){
       book.spineImage = spineUrl; // 못 찾아도 null로 표시해 다음부턴 다시 조회하지 않음
       changed = true;
       saveBookToCloud(book);
-    }catch(e){ book.spineImage = null; changed = true; }
+    }catch(e){ /* 네트워크 오류 등으로 실패한 건 값을 건드리지 않아 다음에 다시 시도되게 함 */ }
   }
   if(changed) saveBooksRaw();
   spineBackfillRunning = false;
   return changed;
+}
+async function manualRefreshSpineImages(btn){
+  if(btn){ btn.disabled = true; btn.textContent = '조회 중...'; }
+  const changed = await backfillSpineImages(true);
+  if(currentView==='shelf') renderShelf();
+  if(btn){ btn.disabled = false; btn.textContent = '📚 책등 이미지 다시 조회하기'; }
+  alert(changed ? '책등 이미지를 다시 조회했어요!' : '알라딘 검색으로 추가한 책이 없어요.');
 }
 function renderStackStylePicker(){
   const cur = getStackStyle();
@@ -915,7 +924,7 @@ function openEditModal(id){
   const book = books.find(b=>b.id===id);
   if(!book) return;
   editingId=id; selectedCover=book.cover||null; selectedDepthMm=book.depthMm||null; selectedSpineMm=book.spineMm||null;
-  selectedSpineImage=book.spineImage||null;
+  selectedSpineImage=book.spineImage||null; spineImageLoaded=book.spineImage!==undefined;
   currentRating=book.rating||0;
   selectedAuthor=book.author||''; selectedAladinItemId=book.aladinItemId||null; selectedExtraInfo=null;
   currentQuotes=(book.quotes||[]).map(q=>({...q}));
@@ -947,7 +956,7 @@ function closeAddModal(){
   document.getElementById('addModal').classList.add('hidden');
   resetModalFields();
   selectedCover=null; selectedDepthMm=null; selectedSpineMm=null; currentRating=0; editingId=null;
-  selectedAuthor=''; selectedAladinItemId=null; selectedExtraInfo=null; selectedSpineImage=null;
+  selectedAuthor=''; selectedAladinItemId=null; selectedExtraInfo=null; selectedSpineImage=null; spineImageLoaded=false;
   currentQuotes=[];
   unlockBodyScroll();
 }
@@ -1075,7 +1084,7 @@ async function selectBook(index){
   selectedCover = book.cover||null; selectedDepthMm=null; selectedSpineMm=null;
   selectedAuthor = book.author || ''; selectedAladinItemId = book.itemId || null;
   selectedExtraInfo = null; // 책소개/줄거리/책속에서 등은 "자세히 보기" 누를 때 불러옴
-  selectedSpineImage = null;
+  selectedSpineImage = null; spineImageLoaded = false;
 
   // 책을 고르면 검색창은 접고, 필요하면 다시 열 수 있게 토글 버튼을 보여줌
   document.getElementById('searchSection').classList.add('hidden');
@@ -1094,7 +1103,7 @@ async function selectBook(index){
     if(data.categoryName){ document.getElementById('tagsInput').value = categoryToTags(data.categoryName).join(', '); }
     if(data.pages && data.pages>0){ document.getElementById('pagesInput').value = data.pages; }
     else{ document.getElementById('pagesInput').placeholder='예: 472'; alert('페이지 수를 찾을 수 없어요. 직접 입력해주세요.'); }
-    if(spineRes){ const spineData = await spineRes.json(); selectedSpineImage = spineData.spineUrl || null; }
+    if(spineRes){ const spineData = await spineRes.json(); selectedSpineImage = spineData.spineUrl || null; spineImageLoaded = true; }
     renderBookInfoButton();
   }catch(e){ document.getElementById('pagesInput').placeholder='예: 472'; alert('페이지 수 조회 실패. 직접 입력해주세요.'); }
 }
@@ -1138,7 +1147,9 @@ async function saveBook(){
     author: selectedAuthor || (books.find(b=>b.id===editingId)?.author || ''),
     aladinItemId: selectedAladinItemId || (books.find(b=>b.id===editingId)?.aladinItemId || null),
     depthMm: selectedDepthMm, spineMm: selectedSpineMm,
-    spineImage: selectedSpineImage
+    // 예스24 책등 조회가 아직 안 끝났으면 spineImage를 아예 안 남겨서(undefined),
+    // 나중에 새로고침할 때 다시 조회하도록 함 (조회 중 저장하면 못 찾은 걸로 영구 고정되는 버그 방지)
+    ...(spineImageLoaded ? { spineImage: selectedSpineImage } : {})
   };
 
   let savedBook;
@@ -1150,7 +1161,7 @@ async function saveBook(){
         color: selectedCover ? color : books[idx].color,
         depthMm: selectedDepthMm || books[idx].depthMm,
         spineMm: selectedSpineMm || books[idx].spineMm,
-        spineImage: selectedSpineImage || books[idx].spineImage };
+        spineImage: spineImageLoaded ? selectedSpineImage : books[idx].spineImage };
       savedBook = books[idx];
     }
   }else{
