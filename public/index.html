@@ -1340,14 +1340,16 @@ function renderShelf(){
 
 // 실제 책등 이미지는 세로로 긴 사진이라, 눕혀 쌓는 가로 막대 안에 맞게
 // 반시계 방향으로 90도 돌려서 채워넣음 (박스의 실제 렌더 크기를 재서 정확히 채움)
+// SPINE_ZOOM만큼 살짝 더 키워서 꽉 채우고(약간의 크롭 감수), overflow:hidden으로 넘치는 부분만 잘라냄
+const SPINE_ZOOM = 1.18;
 function layoutRealSpines(){
   document.querySelectorAll('.spine-real').forEach(wrap=>{
     const img = wrap.querySelector('img');
     if(!img) return;
     const w = wrap.offsetWidth, h = wrap.offsetHeight;
     if(w<=0 || h<=0) return;
-    img.style.width = h+'px';
-    img.style.height = w+'px';
+    img.style.width = (h*SPINE_ZOOM)+'px';
+    img.style.height = (w*SPINE_ZOOM)+'px';
     img.style.transform = 'translate(-50%,-50%) rotate(-90deg)';
   });
 }
@@ -1757,7 +1759,7 @@ async function openShareStackCard(){
       // 잘리지 않도록 꽉 채우지 않고(cover) 비율 그대로 다 보이게(contain) 그림
       ctx.translate(x + w/2, y + rowH/2);
       ctx.rotate(-Math.PI/2);
-      const scale = Math.min(rowH/spineImg.width, w/spineImg.height);
+      const scale = Math.min(rowH/spineImg.width, w/spineImg.height) * SPINE_ZOOM;
       const iw=spineImg.width*scale, ih=spineImg.height*scale;
       ctx.drawImage(spineImg, -iw/2, -ih/2, iw, ih);
       ctx.restore();
