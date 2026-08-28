@@ -597,12 +597,6 @@ const DEFAULT_SUBTITLE = '책을 검색하면 페이지 수를 자동으로 가�
 const PALETTE = ['#5b5bd6','#e0748c','#3fa88a','#e8a23f','#4a90d9','#9b6fd6','#e0645a','#3fb5b5'];
 
 function colorFor(seed){ let h=0; for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; } return PALETTE[h%PALETTE.length]; }
-function widthFor(book){
-  // 폭은 대충 고정 (78~86% 사이 살짝만 변주) - 지그재그는 offsetFor가 담당
-  let h=0; const seed=book.title;
-  for(let i=0;i<seed.length;i++){ h=(h*17+seed.charCodeAt(i))>>>0; }
-  return 78 + (h%9);
-}
 // 책장에 꽂기 - 책마다 키를 다르게 보이도록. 알라딘 실측 세로 길이(spineMm)가 있으면
 // 그 비율을 그대로 쓰고(진짜 그 책 키만큼), 없으면 흔한 단행본처럼 보이게 대충 흩어지는
 // 값을 씀(0.82~1.00) - 항상 1(단 높이 꽉 채움)을 넘지 않게 해서 선반을 넘지 않게 함
@@ -2021,11 +2015,12 @@ function drawStackShareCanvas(canvas, theme, {periodText, sorted, totalPages, hL
     const rowH = spineHeightPx(book) * SCALE;
     const spineImg = (useCover && book.spineImage) ? imageMap.get(book.spineImage) : null;
     const img = spineImg ? null : ((useCover && book.cover) ? imageMap.get(book.cover) : null);
-    // 실제 책등 이미지가 있으면 페이지수 기반 임의 폭 대신 이미지의 실제 비율에 맞춘 폭을 씀
-    // (두꺼운/얇은 책마다 폭이 다르게 나오는 게 실제 책장처럼 자연스러움 - 잘리지도 여백도 안 남음)
+    // 실제 책등 이미지가 있으면 임의 폭 대신 이미지의 실제 비율에 맞춘 폭을 씀(사진 자체
+    // 비율에 이미 그 책의 실제 세로 길이감이 녹아있음) - 없으면 bookHeightFactor로
+    // 책마다 실제 세로 길이(또는 그럴듯한 값) 비율만큼 길이가 다르게 보이게 함
     const w = spineImg
       ? Math.min(rowH * (spineImg.height/spineImg.width), maxW*0.95)
-      : maxW * (widthFor(book)/100);
+      : maxW * 0.9 * bookHeightFactor(book);
     const off = offsetFor(book)/100;
     const x = padX + (maxW-w)/2 + maxW*off*0.5;
 
@@ -2079,15 +2074,19 @@ function drawBookcaseShareCanvas(canvas, theme, {periodText, sorted, totalPages,
   const tierH = 168*SCALE, boardH = 10*SCALE, bookGap = 4;
   const maxW = W - padX*2 - framePad*2;
 
-  // 실제 렌더 폭 기준으로 단을 미리 나눔(폭 계산은 spineWidthPx로 라이브 화면과 동일하게 맞춤)
+  // 실제 렌더 폭 기준으로 단을 미리 나눔(폭 계산은 spineWidthPx로 라이브 화면과 동일하게 맞춤).
+  // bookHeightFactor로 책마다 키를 다르게 하고(실측 세로 길이 또는 그럴듯한 값), 책등
+  // 사진이 있는 책은 키가 줄어드는 만큼 폭도 같은 비율로 줄여서 사진 비율이 안 찌그러지게 함
   const rows = [];
   let cur = [], curW = 0;
   sorted.forEach(book=>{
     const spineImg = (useCover && book.spineImage) ? imageMap.get(book.spineImage) : null;
     const img = spineImg ? null : ((useCover && book.cover) ? imageMap.get(book.cover) : null);
-    const w = spineImg ? Math.min(tierH*(spineImg.width/spineImg.height), maxW*0.9) : spineWidthPx(book, tierH);
+    const bookH = tierH * bookHeightFactor(book);
+    let w = spineImg ? Math.min(tierH*(spineImg.width/spineImg.height), maxW*0.9) : spineWidthPx(book, tierH);
+    if(spineImg) w = w * (bookH/tierH);
     if(cur.length>0 && curW + bookGap + w > maxW){ rows.push(cur); cur=[]; curW=0; }
-    cur.push({book, w, spineImg, img});
+    cur.push({book, w, bookH, spineImg, img});
     curW += w + bookGap;
   });
   if(cur.length>0) rows.push(cur);
@@ -2123,26 +2122,27 @@ function drawBookcaseShareCanvas(canvas, theme, {periodText, sorted, totalPages,
   rows.forEach((row,ri)=>{
     const y = headerH + framePad + ri*(tierH+boardH);
     let x = padX + framePad;
-    row.forEach(({book,w,spineImg,img})=>{
+    row.forEach(({book,w,bookH,spineImg,img})=>{
+      const by = y + (tierH - bookH); // 단 바닥에 붙여서(책 키가 짧아도 아래쪽 기준) 그림
       if(spineImg){
         // 실제 책등 사진은 이미 세워진 방향(세로로 긴 사진)이라 회전 없이 그대로 채움
-        ctx.drawImage(spineImg, x, y, w, tierH);
+        ctx.drawImage(spineImg, x, by, w, bookH);
       }else{
-        ctx.fillStyle = book.color; ctx.fillRect(x, y, w, tierH);
+        ctx.fillStyle = book.color; ctx.fillRect(x, by, w, bookH);
         if(img){
-          const scale = Math.min(w/img.width, tierH/img.height);
+          const scale = Math.min(w/img.width, bookH/img.height);
           const iw=img.width*scale, ih=img.height*scale;
-          ctx.drawImage(img, x+(w-iw)/2, y+(tierH-ih)/2, iw, ih);
+          ctx.drawImage(img, x+(w-iw)/2, by+(bookH-ih)/2, iw, ih);
         }
         // 책등 사진이 없는 책은 제목을 옆으로 눕혀서 표시(실제 책등 인쇄 방식과 비슷함)
         ctx.save();
-        ctx.translate(x+w/2, y+tierH/2);
+        ctx.translate(x+w/2, by+bookH/2);
         ctx.rotate(Math.PI/2);
         ctx.fillStyle = 'rgba(255,255,255,0.97)';
         ctx.font = '700 16px Inter, sans-serif';
         ctx.textAlign='center'; ctx.textBaseline='middle';
         let title = book.title;
-        while(ctx.measureText(title).width > tierH-24 && title.length>3){ title = title.slice(0,-2); }
+        while(ctx.measureText(title).width > bookH-24 && title.length>3){ title = title.slice(0,-2); }
         if(title !== book.title) title += '…';
         ctx.fillText(title, 0, 0);
         ctx.restore();
