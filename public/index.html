@@ -119,6 +119,8 @@
      여러 단으로 안 나눠도 됨) 책이 늘어나면 flex-wrap이 알아서 다음 단으로 넘김 */
   .bookcase{ background:var(--case-frame); border-radius:14px; padding:10px; box-sizing:border-box; }
   .bookcase-books{ display:flex; flex-wrap:wrap; align-items:flex-end; align-content:flex-start; border-radius:6px; }
+  /* 책마다 키가 달라도 줄(단) 높이 자체는 항상 고정되도록 감싸는 칸 - 책은 바닥에 붙임 */
+  .case-slot{ display:inline-flex; align-items:flex-end; flex-shrink:0; }
   /* 책장에 꽂기는 한 단에 책이 훨씬 여러 권 붙어있어서, 책 쌓기와 같은 두께의 블러
      테두리를 쓰면 여백이 누적되어 훨씬 두꺼워 보임 - 좌우 여백을 더 줄임 */
   .bookcase-books .shelf-spine{ padding:0 1px; }
@@ -600,6 +602,18 @@ function widthFor(book){
   let h=0; const seed=book.title;
   for(let i=0;i<seed.length;i++){ h=(h*17+seed.charCodeAt(i))>>>0; }
   return 78 + (h%9);
+}
+// 책장에 꽂기 - 책마다 키를 다르게 보이도록. 알라딘 실측 세로 길이(spineMm)가 있으면
+// 그 비율을 그대로 쓰고(진짜 그 책 키만큼), 없으면 흔한 단행본처럼 보이게 대충 흩어지는
+// 값을 씀(0.82~1.00) - 항상 1(단 높이 꽉 채움)을 넘지 않게 해서 선반을 넘지 않게 함
+function bookHeightFactor(book){
+  if(book.spineMm && book.spineMm>0){
+    const MAX_SPINE_MM = 225; // 일반 단행본 중 큰 편에 속하는 세로 길이를 기준(100%)으로 삼음
+    return Math.max(0.7, Math.min(1, book.spineMm / MAX_SPINE_MM));
+  }
+  let h=0; const seed='hh'+book.id+book.title;
+  for(let i=0;i<seed.length;i++){ h=(h*13+seed.charCodeAt(i))>>>0; }
+  return 0.82 + (h%19)/100;
 }
 function offsetFor(book){
   // 책마다 좌우로 살짝 어긋나게 배치해서 지그재그로 쌓인 느낌을 줌 (-9% ~ +9%)
@@ -1471,12 +1485,24 @@ function renderShelf(){
     html += `<div class="bookcase"><div class="bookcase-books" style="min-height:${minTiers*period}px;gap:${boardH}px 2px;background-image:${boardsBg};background-size:100% ${period}px;background-repeat:repeat-y;background-position:top left;">`;
     sorted.forEach((book,i)=>{
       const isLast = i===sorted.length-1;
+      // 책마다 키를 다르게(실측 세로 길이가 있으면 그 비율로, 없으면 대충 그럴듯하게
+      // 흩어지도록) 해서 실제 책장처럼 보이게 함 - 단 자체 높이(tierH)는 그대로 두고
+      // 책 개별 높이만 그 안에서 줄임(바닥엔 항상 붙어 있음, align-items:flex-end)
+      const bookH = Math.round(tierH * bookHeightFactor(book));
       // 맨 마지막(최신) 한 권만 이전 책에 기대듯 기울여 꽂음. 피벗을 책 밑변 오른쪽
       // 끝(이전 책과 맞닿는 쪽)에 두면 그 점은 고정된 채 왼쪽(이전 책 쪽)으로만 기울고,
       // 밑변 왼쪽 끝(빈 공간 쪽)은 아주 살짝만 내려감 - 대신 미리 오른쪽으로 여백을
-      // 벌려둬서(margin-left) 기운 윗부분이 이전 책과 겹치지 않고 그 앞에서 멈추게 함
-      const extraStyle = `height:${tierH}px;` + (isLast ? `transform:rotate(-9deg);transform-origin:bottom right;margin-left:24px;` : '');
-      html += spineUnitHtml(book, tierH, style, '', extraStyle, '');
+      // 벌려둬서(margin-left) 기운 윗부분이 이전 책과 겹치지 않고 그 앞에서 멈추게 함.
+      // 여백은 그 책 자신의 실제 높이(bookH) 기준으로 계산해야 화면 폭이 넓어져
+      // 단 높이(tierH)가 커져도 항상 충분한 여백이 나옴(고정 px면 큰 화면에서 부족해짐)
+      const tiltMargin = Math.round(bookH * Math.sin(9*Math.PI/180) + 4);
+      const extraStyle = `height:${bookH}px;` + (isLast ? `transform:rotate(-9deg);transform-origin:bottom right;margin-left:${tiltMargin}px;` : '');
+      const spineHtml = spineUnitHtml(book, tierH, style, '', extraStyle, '');
+      // 책마다 높이가 달라지면 그 줄(flex-wrap 한 줄)의 실제 높이도 제일 큰 책 기준으로
+      // 줄어들어서, 미리 계산해둔 선반 배경 간격(period)과 안 맞아 선반이 어긋나 보임 -
+      // 항상 단 높이(tierH)만큼의 "칸"으로 감싸서 줄 높이를 고정시킴(책은 그 안에서
+      // 바닥에 붙은 채 짧게 보임)
+      html += `<div class="case-slot" style="height:${tierH}px">${spineHtml}</div>`;
     });
     html += `</div></div>`;
   }else{
