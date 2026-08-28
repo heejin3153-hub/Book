@@ -1296,46 +1296,55 @@ async function saveBook(){
     return;
   }
 
-  let color = colorFor(title);
-  if(selectedCover){ const extracted = await extractDominantColor(selectedCover); if(extracted) color = extracted; }
+  // 표지 색 추출 + 클라우드 저장에 시간이 걸릴 수 있는데(특히 동기화 계정) 버튼이
+  // 아무 반응 없이 그대로라 눌렀는지 안 눌렸는지 헷갈려서 여러 번 누르게 됐음
+  const btn = document.getElementById('saveBtn');
+  const origText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = editingId!==null ? '저장하는 중...' : '추가하는 중...'; }
+  try{
+    let color = colorFor(title);
+    if(selectedCover){ const extracted = await extractDominantColor(selectedCover); if(extracted) color = extracted; }
 
-  const payload = {
-    title, pages, tags, status: currentStatus,
-    startDate: currentStatus==='wishlist' ? null : startDate,
-    completedDate: currentStatus==='completed' ? completedDate : null,
-    rating: currentStatus==='completed' ? currentRating : 0,
-    review: currentStatus==='completed' ? review : '',
-    wishComment: currentStatus==='wishlist' ? wishComment : (books.find(b=>b.id===editingId)?.wishComment || ''),
-    folderId: currentStatus==='wishlist' ? folderId : (books.find(b=>b.id===editingId)?.folderId ?? null),
-    quotes,
-    cover: selectedCover, color,
-    author: selectedAuthor || (books.find(b=>b.id===editingId)?.author || ''),
-    aladinItemId: selectedAladinItemId || (books.find(b=>b.id===editingId)?.aladinItemId || null),
-    depthMm: selectedDepthMm, spineMm: selectedSpineMm,
-    // 예스24 책등 조회가 아직 안 끝났으면 spineImage를 아예 안 남겨서(undefined),
-    // 나중에 새로고침할 때 다시 조회하도록 함 (조회 중 저장하면 못 찾은 걸로 영구 고정되는 버그 방지)
-    ...(spineImageLoaded ? { spineImage: selectedSpineImage } : {})
-  };
+    const payload = {
+      title, pages, tags, status: currentStatus,
+      startDate: currentStatus==='wishlist' ? null : startDate,
+      completedDate: currentStatus==='completed' ? completedDate : null,
+      rating: currentStatus==='completed' ? currentRating : 0,
+      review: currentStatus==='completed' ? review : '',
+      wishComment: currentStatus==='wishlist' ? wishComment : (books.find(b=>b.id===editingId)?.wishComment || ''),
+      folderId: currentStatus==='wishlist' ? folderId : (books.find(b=>b.id===editingId)?.folderId ?? null),
+      quotes,
+      cover: selectedCover, color,
+      author: selectedAuthor || (books.find(b=>b.id===editingId)?.author || ''),
+      aladinItemId: selectedAladinItemId || (books.find(b=>b.id===editingId)?.aladinItemId || null),
+      depthMm: selectedDepthMm, spineMm: selectedSpineMm,
+      // 예스24 책등 조회가 아직 안 끝났으면 spineImage를 아예 안 남겨서(undefined),
+      // 나중에 새로고침할 때 다시 조회하도록 함 (조회 중 저장하면 못 찾은 걸로 영구 고정되는 버그 방지)
+      ...(spineImageLoaded ? { spineImage: selectedSpineImage } : {})
+    };
 
-  let savedBook;
-  if(editingId!==null){
-    const idx = books.findIndex(b=>b.id===editingId);
-    if(idx>-1){
-      books[idx] = { ...books[idx], ...payload,
-        cover: selectedCover || books[idx].cover,
-        color: selectedCover ? color : books[idx].color,
-        depthMm: selectedDepthMm || books[idx].depthMm,
-        spineMm: selectedSpineMm || books[idx].spineMm,
-        spineImage: spineImageLoaded ? selectedSpineImage : books[idx].spineImage };
-      savedBook = books[idx];
+    let savedBook;
+    if(editingId!==null){
+      const idx = books.findIndex(b=>b.id===editingId);
+      if(idx>-1){
+        books[idx] = { ...books[idx], ...payload,
+          cover: selectedCover || books[idx].cover,
+          color: selectedCover ? color : books[idx].color,
+          depthMm: selectedDepthMm || books[idx].depthMm,
+          spineMm: selectedSpineMm || books[idx].spineMm,
+          spineImage: spineImageLoaded ? selectedSpineImage : books[idx].spineImage };
+        savedBook = books[idx];
+      }
+    }else{
+      savedBook = { id: Date.now(), ...payload };
+      books.push(savedBook);
     }
-  }else{
-    savedBook = { id: Date.now(), ...payload };
-    books.push(savedBook);
+    saveBooksRaw();
+    await saveBookToCloud(savedBook);
+    closeAddModal(); render();
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = origText; }
   }
-  saveBooksRaw();
-  await saveBookToCloud(savedBook);
-  closeAddModal(); render();
 }
 
 async function markWishStart(id){
