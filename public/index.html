@@ -823,8 +823,14 @@ function applyTheme(){
 function canvasThemeColors(){
   const dark = document.documentElement.getAttribute('data-theme')==='dark';
   return dark
-    ? { bg:'#111114', text:'#eeeef0', muted:'#9494a0', accent:'#8080e8', caseFrame:'#3a342a', caseBoard:'#241f18' }
-    : { bg:'#fafafa', text:'#18181b', muted:'#8a8a92', accent:'#5b5bd6', caseFrame:'#ded2ba', caseBoard:'#b89f78' };
+    ? { bg:'#111114', surface:'#1c1c21', text:'#eeeef0', muted:'#9494a0', accent:'#8080e8',
+        caseFrame:'#3a342a', caseBoard:'#241f18', border:'#2a2a30', star:'#f5bb45',
+        dow:'#77778a', dateNum:'#5c5c68', dateNumOther:'#38383f', dateNumSmall:'#8a8a96',
+        coverBorder:'rgba(255,255,255,0.08)' }
+    : { bg:'#fafafa', surface:'#ffffff', text:'#18181b', muted:'#8a8a92', accent:'#5b5bd6',
+        caseFrame:'#ded2ba', caseBoard:'#b89f78', border:'#ececec', star:'#f0ac1f',
+        dow:'#a8a8b0', dateNum:'#c4c4cc', dateNumOther:'#e4e4e8', dateNumSmall:'#9a9aa4',
+        coverBorder:'rgba(0,0,0,0.06)' };
 }
 function setThemeMode(v){
   localStorage.setItem('theme-mode', v);
@@ -1582,7 +1588,7 @@ function renderCalendar(){
   while(cursor<=endDate){ days.push(new Date(cursor)); cursor.setDate(cursor.getDate()+1); }
   const dow=['일','월','화','수','목','금','토'];
 
-  let html = `<div class="section-h"><div class="h">캘린더</div><button class="icon-btn" onclick="openShareCalendarCard()">📤 이미지</button></div>`;
+  let html = `<div class="section-h"><div class="h">캘린더</div><button class="icon-btn" onclick="openShareCalendarCard(this)">📤 이미지</button></div>`;
   html += `<div class="cal-summary">
     <div class="box"><div class="v">${completedThisMonth.length}권</div><div class="l">이번 달 완독</div></div>
     <div class="box"><div class="v">${monthPages.toLocaleString()}p</div><div class="l">이번 달 읽은 페이지</div></div>
@@ -2095,15 +2101,21 @@ function renderCalShareOptionButtons(){
   document.querySelectorAll('#calShareFullPicker button').forEach(b=> b.classList.toggle('on', b.dataset.v===String(calShareFull)));
 }
 
-async function openShareCalendarCard(){
-  document.getElementById('shareModal').classList.remove('hidden');
-  document.getElementById('calShareOptions').classList.remove('hidden');
-  lockBodyScroll();
-  renderCalShareOptionButtons();
-  await generateCalShareImage();
+async function openShareCalendarCard(btn){
+  if(btn){ btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = '⏳ 준비 중...'; }
+  try{
+    document.getElementById('shareModal').classList.remove('hidden');
+    document.getElementById('calShareOptions').classList.remove('hidden');
+    lockBodyScroll();
+    renderCalShareOptionButtons();
+    await generateCalShareImage();
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = btn.dataset.origText || '📤 이미지'; }
+  }
 }
 
 async function generateCalShareImage(){
+  const theme = canvasThemeColors();
   const year=currentMonth.getFullYear(), month=currentMonth.getMonth();
   const firstDay=new Date(year,month,1), lastDay=new Date(year,month+1,0);
   const monthStartStr = toLocalDateStr(firstDay), monthEndStr = toLocalDateStr(lastDay);
@@ -2143,8 +2155,8 @@ async function generateCalShareImage(){
   const canvasLoading = document.getElementById('shareCanvas');
   canvasLoading.width=800; canvasLoading.height=200;
   const lctx = canvasLoading.getContext('2d');
-  lctx.fillStyle='#fafafa'; lctx.fillRect(0,0,800,200);
-  lctx.fillStyle='#8a8a92'; lctx.font='500 16px Inter, sans-serif'; lctx.textAlign='center';
+  lctx.fillStyle=theme.bg; lctx.fillRect(0,0,800,200);
+  lctx.fillStyle=theme.muted; lctx.font='500 16px Inter, sans-serif'; lctx.textAlign='center';
   lctx.fillText('이미지를 준비하는 중...', 400, 100); lctx.textAlign='left';
 
   const loadedPairs = await Promise.all(uniqueCovers.map(async url => [url, await loadImage(proxied(url))]));
@@ -2174,16 +2186,16 @@ async function generateCalShareImage(){
   const canvas = document.getElementById('shareCanvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = theme.bg; ctx.fillRect(0,0,W,H);
 
   // 큰 날짜 타이틀 "YYYY.MM."
-  ctx.fillStyle = '#18181b'; ctx.font = '800 52px Inter, sans-serif';
+  ctx.fillStyle = theme.text; ctx.font = '800 52px Inter, sans-serif';
   ctx.fillText(`${year}.${String(month+1).padStart(2,'0')}.`, padX, 88);
-  ctx.fillStyle = '#8a8a92'; ctx.font = '600 17px Inter, sans-serif';
+  ctx.fillStyle = theme.muted; ctx.font = '600 17px Inter, sans-serif';
   ctx.fillText(`이번 달 완독 ${completedThisMonth.length}권 · ${monthPages.toLocaleString()}페이지${calShareScope==='all'?' · 읽은 기록 전체 표시':''}`, padX, 122);
 
   const dow = ['일','월','화','수','목','금','토'];
-  ctx.font = '700 18px Inter, sans-serif'; ctx.fillStyle = '#a8a8b0'; ctx.textAlign = 'center';
+  ctx.font = '700 18px Inter, sans-serif'; ctx.fillStyle = theme.dow; ctx.textAlign = 'center';
   dow.forEach((d,i)=> ctx.fillText(d, padX + i*colW + colW/2, dowY));
 
   let y = gridTop;
@@ -2196,7 +2208,7 @@ async function generateCalShareImage(){
 
       if(dayBooks.length===0){
         // 책 없는 날: 숫자만 표시
-        ctx.fillStyle = isOther ? '#e4e4e8' : '#c4c4cc';
+        ctx.fillStyle = isOther ? theme.dateNumOther : theme.dateNum;
         ctx.font = '700 23px Inter, sans-serif'; ctx.textAlign = 'center';
         ctx.fillText(String(day.getDate()), centerX, y + emptyRowH/2 + 8);
         return;
@@ -2223,13 +2235,13 @@ async function generateCalShareImage(){
           ctx.fillStyle = book.color; ctx.fillRect(bx,by,w,h);
         }
         ctx.restore();
-        ctx.strokeStyle='rgba(0,0,0,0.06)'; ctx.lineWidth=1;
+        ctx.strokeStyle=theme.coverBorder; ctx.lineWidth=1;
         roundRect(ctx, bx, by, w, h, 8); ctx.stroke();
         bx += w+gap;
       });
 
       // 날짜 숫자 - 표지 그룹 아래에 작게
-      ctx.fillStyle = '#9a9aa4'; ctx.font='700 15px Inter, sans-serif'; ctx.textAlign='center';
+      ctx.fillStyle = theme.dateNumSmall; ctx.font='700 15px Inter, sans-serif'; ctx.textAlign='center';
       ctx.fillText(String(day.getDate()), centerX, by+h+21);
     });
     y += row.height;
@@ -2239,10 +2251,10 @@ async function generateCalShareImage(){
   // "달력 + 목록 전체" 옵션이면 아래에 이번 달 완독 목록을 이어서 그림
   if(calShareFull){
     y += 16;
-    ctx.strokeStyle = '#ececec'; ctx.lineWidth = 1;
+    ctx.strokeStyle = theme.border; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(padX, y); ctx.lineTo(W-padX, y); ctx.stroke();
     y += 34;
-    ctx.fillStyle = '#8a8a92'; ctx.font = '700 13px Inter, sans-serif';
+    ctx.fillStyle = theme.muted; ctx.font = '700 13px Inter, sans-serif';
     ctx.fillText('이번 달의 완독', padX, y);
     y += 22;
 
@@ -2262,18 +2274,18 @@ async function generateCalShareImage(){
       ctx.restore();
 
       const textX = padX + coverW + 16;
-      ctx.fillStyle = '#18181b'; ctx.font = '700 16px Inter, sans-serif';
+      ctx.fillStyle = theme.text; ctx.font = '700 16px Inter, sans-serif';
       let title = book.title;
       while(ctx.measureText(title).width > W-padX-textX-16 && title.length>3){ title = title.slice(0,-2); }
       if(title!==book.title) title += '…';
       ctx.fillText(title, textX, y+22);
 
-      ctx.fillStyle = '#9a9aa4'; ctx.font = '500 13px Inter, sans-serif';
+      ctx.fillStyle = theme.dateNumSmall; ctx.font = '500 13px Inter, sans-serif';
       const meta = [book.completedDate, cleanAuthor(book.author), book.pages?`${book.pages}p`:null].filter(Boolean).join(' · ');
       ctx.fillText(meta, textX, y+42);
 
       if(book.rating){
-        ctx.fillStyle = '#f0ac1f'; ctx.font = '700 13px Inter, sans-serif';
+        ctx.fillStyle = theme.star; ctx.font = '700 13px Inter, sans-serif';
         ctx.fillText(`★ ${book.rating}`, textX, y+60);
       }
       y += listRowH;
