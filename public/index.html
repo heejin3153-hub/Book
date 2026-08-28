@@ -623,9 +623,15 @@ function currentPanelScale(){
   if(!panel || !panel.clientWidth) return 1;
   return panel.clientWidth / 340; // 340px를 기준 폭으로 삼음 (일반적인 모바일 폭)
 }
+// spineHeightPx()는 "세워진 책"의 높이(책등 길이)가 340px일 때를 기준으로 잡은 두께(폭)임.
+// 책장에 꽂기처럼 실제 세워지는 높이(단 높이)가 그보다 훨씬 작으면 그 비율만큼 두께도
+// 같이 줄여야 함 - 안 그러면 이미지가 없어 페이지수로 폭을 정하는 책만 키(높이)에 비해
+// 유난히 뚱뚱하게 나옴 (책 쌓기는 세워진 높이가 항상 panelScale*340이라 결과가 그대로 유지됨)
+function spineWidthPx(book, standHeightPx){ return spineHeightPx(book) * (standHeightPx/340); }
 // 책 한 권의 "세워진" 모습 하나를 만드는 공통 함수 - "책 쌓기"(통째로 돌려 눕힘)와
-// "책장에 꽂기"(여러 단에 나눠 세워서 꽂음) 둘 다 똑같은 낱개 책 모양을 그대로 재사용함
-function spineUnitHtml(book, panelScale, style, transformStyle, extraStyle, extraClass){
+// "책장에 꽂기"(여러 단에 나눠 세워서 꽂음) 둘 다 똑같은 낱개 책 모양을 그대로 재사용함.
+// standHeightPx: 이 책이 실제로 세워지는 높이(책 쌓기는 panelScale*340, 책장에 꽂기는 단 높이)
+function spineUnitHtml(book, standHeightPx, style, transformStyle, extraStyle, extraClass){
   transformStyle = transformStyle || ''; extraStyle = extraStyle || ''; extraClass = extraClass || '';
   const useRealSpine = style==='cover' && !!book.spineImage;
   // 실제 책등 이미지가 없어도 "이미지로 보기" 모드면 표지 이미지로 대신 채움 - 단색보기일 때만 색+제목 막대
@@ -636,14 +642,14 @@ function spineUnitHtml(book, panelScale, style, transformStyle, extraStyle, extr
     // 비율을 그대로 쓰면(=사진 원본 비율로 폭이 정해지면) 두께감이 실제 책과 안 맞음.
     // 그래서 표지로 대신할 때는 폭을 페이지수 기반으로 직접 정하고, 표지 원본은 흐린 배경으로만
     // 채움(선명한 사진을 따로 안 겹쳐서 "배경이 두 겹"으로 보이던 문제 방지) + 세로 제목을 겹쳐 씀
-    const coverW = useCoverImg ? spineHeightPx(book) * panelScale : null;
+    const coverW = useCoverImg ? spineWidthPx(book, standHeightPx) : null;
     return `<div class="shelf-spine${extraClass}${useCoverImg?' shelf-cover-fixed':''}" style="${useCoverImg?`width:${coverW}px;`:''}${transformStyle}${extraStyle}background:${book.color}" onclick="openEditModal(${book.id})">
       <div class="shelf-spine-blur" style="background-image:url('${imgUrl}')"></div>
       <img src="${imgUrl}" alt="" ${useCoverImg?'style="display:none"':''} onerror="spineImgFailed(this, ${book.id})"/>
       ${useCoverImg ? `<span class="shelf-title shelf-title-overlay">${escapeHtml(book.title)}</span>` : ''}
     </div>`;
   }else{
-    const w = spineHeightPx(book) * panelScale;
+    const w = spineWidthPx(book, standHeightPx);
     return `<div class="shelf-spine shelf-fallback${extraClass}" style="width:${w}px;${transformStyle}${extraStyle}background:${book.color}" onclick="openEditModal(${book.id})">
       <span class="shelf-title">${escapeHtml(book.title)}</span>
     </div>`;
@@ -1053,11 +1059,14 @@ function spineImgFailed(img, id){
   const book = books.find(b=>b.id===id);
   const el = img.closest('.shelf-spine');
   if(!book || !el) return;
-  const w = spineHeightPx(book) * currentPanelScale();
+  // 이 책이 실제로 세워지는 높이를 요소에서 직접 읽음(책 쌓기/책장에 꽂기 어느 쪽이든
+  // 이미 적용된 실제 높이를 그대로 기준으로 삼아 두께 비율이 안 맞는 일이 없게 함)
+  const standHeightPx = el.clientHeight || (currentPanelScale()*340);
+  const w = spineWidthPx(book, standHeightPx);
   el.classList.add('shelf-fallback');
   el.style.width = w+'px';
   el.innerHTML = `<span class="shelf-title">${escapeHtml(book.title)}</span>`;
-  layoutLyingShelf();
+  if(!el.closest('.bookcase-books')) layoutLyingShelf();
 }
 function finishReading(){
   if(editingId===null) return;
@@ -1386,8 +1395,8 @@ function renderShelf(){
     // 다음 단으로 넘기게 해서(브라우저가 실제 렌더된 폭으로 줄바꿈) 폭 계산을 직접 안 해도 됨.
     const panelScale = currentPanelScale();
     const style = getStackStyle();
-    const tierH = Math.round(108 * panelScale);
-    const boardH = Math.max(6, Math.round(9 * panelScale));
+    const tierH = Math.round(168 * panelScale);
+    const boardH = Math.max(6, Math.round(10 * panelScale));
     const period = tierH + boardH;
     const minTiers = 5;
     // 책이 적어도 최소 단수만큼은 빈 칸이라도 보이게 - 배경 그라데이션은 실제 내용과 무관하게
@@ -1398,7 +1407,7 @@ function renderShelf(){
       const isLast = i===sorted.length-1;
       // 맨 마지막(최신) 한 권만 옆 책에 기대듯 살짝 기울여 꽂음
       const extraStyle = `height:${tierH}px;` + (isLast ? `transform:rotate(-10deg);transform-origin:bottom right;margin-left:7px;` : '');
-      html += spineUnitHtml(book, panelScale, style, '', extraStyle, '');
+      html += spineUnitHtml(book, tierH, style, '', extraStyle, '');
     });
     html += `</div></div>`;
   }else{
@@ -1411,7 +1420,7 @@ function renderShelf(){
       // 세워진 상태에서 위아래로 살짝(양쪽 방향 다) 밀어서 지그재그 느낌을 줌. 높이는 94%로 통일해서
       // 밀려도 화면 밖으로 잘리지 않을 여유(±3%)만 확보 - 책마다 높이 자체는 똑같이 유지됨
       const off = (offsetFor(book)/3).toFixed(2);
-      html += spineUnitHtml(book, panelScale, style, `transform:translateY(${off}%);`, '', '');
+      html += spineUnitHtml(book, panelScale*340, style, `transform:translateY(${off}%);`, '', '');
     });
     html += `</div></div></div>`;
   }
