@@ -1409,10 +1409,11 @@ function renderShelf(){
     html += `<div class="bookcase"><div class="bookcase-books" style="min-height:${minTiers*period}px;gap:${boardH}px 2px;background-image:${boardsBg};background-size:100% ${period}px;background-repeat:repeat-y;background-position:top left;">`;
     sorted.forEach((book,i)=>{
       const isLast = i===sorted.length-1;
-      // 맨 마지막(최신) 한 권만 살짝 기울여 꽂음. 이전 책 쪽으로 기울이면(피벗을 오른쪽
-      // 아래에 두고 왼쪽으로 회전) 회전한 윗부분이 이전 책 쪽으로 넘어가 겹쳐 보였음 -
-      // 반대로(피벗을 왼쪽 아래에 두고 오른쪽으로) 기울여서 항상 빈 공간 쪽으로만 넘어가게 함
-      const extraStyle = `height:${tierH}px;` + (isLast ? `transform:rotate(9deg);transform-origin:bottom left;margin-left:10px;` : '');
+      // 맨 마지막(최신) 한 권만 이전 책에 기대듯 기울여 꽂음. 피벗을 책 밑변 오른쪽
+      // 끝(이전 책과 맞닿는 쪽)에 두면 그 점은 고정된 채 왼쪽(이전 책 쪽)으로만 기울고,
+      // 밑변 왼쪽 끝(빈 공간 쪽)은 아주 살짝만 내려감 - 대신 미리 오른쪽으로 여백을
+      // 벌려둬서(margin-left) 기운 윗부분이 이전 책과 겹치지 않고 그 앞에서 멈추게 함
+      const extraStyle = `height:${tierH}px;` + (isLast ? `transform:rotate(-9deg);transform-origin:bottom right;margin-left:24px;` : '');
       html += spineUnitHtml(book, tierH, style, '', extraStyle, '');
     });
     html += `</div></div>`;
