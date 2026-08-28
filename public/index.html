@@ -30,6 +30,7 @@
     --accent:#5b5bd6; --accent-soft:#eeeeff; --accent-dark:#4747b8;
     --danger:#e05252; --star:#f0ac1f; --green:#3fa88a;
     --radius:16px; --safe-b: env(safe-area-inset-bottom, 0px);
+    --case-frame:#ded2ba; --case-board:#b89f78;
   }
   html[data-theme="dark"]{
     color-scheme: dark;
@@ -37,6 +38,7 @@
     --text:#eeeef0; --text-muted:#9494a0;
     --accent:#8080e8; --accent-soft:#26264a; --accent-dark:#a0a0f0;
     --danger:#f27272; --star:#f5bb45; --green:#57c397;
+    --case-frame:#3a342a; --case-board:#241f18;
   }
   html[data-theme="light"]{ color-scheme: light; }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -107,6 +109,12 @@
   .shelf-title{ writing-mode:vertical-rl; text-orientation:upright; color:#fff; font-size:12px; font-weight:700; white-space:nowrap; max-height:100%; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,0.25); }
   /* 책등 사진이 없어 표지 사진을 흐리게 깔아 대신 쓸 때, 표지엔 세로 제목이 없으니 위에 겹쳐서 써줌 */
   .shelf-title-overlay{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2; font-size:15px; }
+
+  /* 책장에 꽂기 - 실제 책장처럼 모던하고 심플한 색의 케이스 안에, 고정 높이의 여러 단으로
+     나눠 책을 세워서 꽂음. 단 사이 선반은 배경 그라데이션으로만 표현해서(실제 DOM을
+     여러 단으로 안 나눠도 됨) 책이 늘어나면 flex-wrap이 알아서 다음 단으로 넘김 */
+  .bookcase{ background:var(--case-frame); border-radius:14px; padding:10px; box-sizing:border-box; }
+  .bookcase-books{ display:flex; flex-wrap:wrap; align-items:flex-end; align-content:flex-start; border-radius:6px; }
 
   .empty-shelf{ text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7; padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500; }
 
@@ -608,6 +616,32 @@ function currentPanelScale(){
   if(!panel || !panel.clientWidth) return 1;
   return panel.clientWidth / 340; // 340px를 기준 폭으로 삼음 (일반적인 모바일 폭)
 }
+// 책 한 권의 "세워진" 모습 하나를 만드는 공통 함수 - "책 쌓기"(통째로 돌려 눕힘)와
+// "책장에 꽂기"(여러 단에 나눠 세워서 꽂음) 둘 다 똑같은 낱개 책 모양을 그대로 재사용함
+function spineUnitHtml(book, panelScale, style, transformStyle, extraStyle, extraClass){
+  transformStyle = transformStyle || ''; extraStyle = extraStyle || ''; extraClass = extraClass || '';
+  const useRealSpine = style==='cover' && !!book.spineImage;
+  // 실제 책등 이미지가 없어도 "이미지로 보기" 모드면 표지 이미지로 대신 채움 - 단색보기일 때만 색+제목 막대
+  const useCoverImg = !useRealSpine && style==='cover' && !!book.cover;
+  if(useRealSpine || useCoverImg){
+    const imgUrl = useRealSpine ? book.spineImage : book.cover;
+    // 표지 사진은 책등 사진과 달리 두께와 무관하게 다 비슷한 비율이라, 표지의 실제 가로세로
+    // 비율을 그대로 쓰면(=사진 원본 비율로 폭이 정해지면) 두께감이 실제 책과 안 맞음.
+    // 그래서 표지로 대신할 때는 폭을 페이지수 기반으로 직접 정하고, 표지 원본은 흐린 배경으로만
+    // 채움(선명한 사진을 따로 안 겹쳐서 "배경이 두 겹"으로 보이던 문제 방지) + 세로 제목을 겹쳐 씀
+    const coverW = useCoverImg ? spineHeightPx(book) * panelScale : null;
+    return `<div class="shelf-spine${extraClass}${useCoverImg?' shelf-cover-fixed':''}" style="${useCoverImg?`width:${coverW}px;`:''}${transformStyle}${extraStyle}background:${book.color}" onclick="openEditModal(${book.id})">
+      <div class="shelf-spine-blur" style="background-image:url('${imgUrl}')"></div>
+      <img src="${imgUrl}" alt="" ${useCoverImg?'style="display:none"':''} onerror="spineImgFailed(this, ${book.id})"/>
+      ${useCoverImg ? `<span class="shelf-title shelf-title-overlay">${escapeHtml(book.title)}</span>` : ''}
+    </div>`;
+  }else{
+    const w = spineHeightPx(book) * panelScale;
+    return `<div class="shelf-spine shelf-fallback${extraClass}" style="width:${w}px;${transformStyle}${extraStyle}background:${book.color}" onclick="openEditModal(${book.id})">
+      <span class="shelf-title">${escapeHtml(book.title)}</span>
+    </div>`;
+  }
+}
 function heightLabel(totalPages,bookCount){
   const cm=((totalPages*MM_PER_PAGE)+(bookCount*COVER_MM))/10;
   if(cm<1) return null;
@@ -698,6 +732,12 @@ function switchView(view){
 function applyTitleFromStorage(){
   document.getElementById('appTitle').textContent = localStorage.getItem('app-title') || DEFAULT_TITLE;
   document.getElementById('appSubtitle').textContent = localStorage.getItem('app-subtitle') || DEFAULT_SUBTITLE;
+}
+// 책장 배치 방식 - 'stack'(세워서 나란히 놓은 걸 통째로 돌려 눕힌 모습) / 'case'(실제 책장에 여러 단으로 꽂은 모습)
+function getShelfLayout(){ return localStorage.getItem('shelf-layout') || 'stack'; }
+function setShelfLayout(v){
+  localStorage.setItem('shelf-layout', v);
+  if(currentView==='shelf') renderShelf();
 }
 function getStackStyle(){ return localStorage.getItem('stack-style') || 'cover'; }
 function setStackStyle(v){
@@ -1325,9 +1365,35 @@ function renderShelf(){
   if(hObjLabel) html += `<div style="font-size:12px;color:var(--text-muted);margin-top:8px;font-weight:500">${hObjLabel}</div>`;
   html += `</div>`;
 
+  const shelfLayout = getShelfLayout();
+  html += `<div class="status-picker" id="shelfLayoutPicker" style="margin-bottom:10px">
+    <button type="button" onclick="setShelfLayout('stack')" class="${shelfLayout==='stack'?'on':''}">📚 책 쌓기</button>
+    <button type="button" onclick="setShelfLayout('case')" class="${shelfLayout==='case'?'on':''}">🗄️ 책장에 꽂기</button>
+  </div>`;
+
   html += `<div class="shelf-area">`;
   if(filtered.length===0){
     html += `<div class="empty-shelf">${completed.length===0 ? '아직 쌓은 책이 없어요.<br/>오른쪽 아래 + 버튼으로 첫 책을 올려보세요.' : '이 조건에 해당하는 책이 없어요.'}</div>`;
+  }else if(shelfLayout==='case'){
+    // 실제 책장처럼 여러 단으로 나눠 세워서 꽂음. 단 높이를 고정해두고 flex-wrap이 알아서
+    // 다음 단으로 넘기게 해서(브라우저가 실제 렌더된 폭으로 줄바꿈) 폭 계산을 직접 안 해도 됨.
+    const panelScale = currentPanelScale();
+    const style = getStackStyle();
+    const tierH = Math.round(108 * panelScale);
+    const boardH = Math.max(6, Math.round(9 * panelScale));
+    const period = tierH + boardH;
+    const minTiers = 5;
+    // 책이 적어도 최소 단수만큼은 빈 칸이라도 보이게 - 배경 그라데이션은 실제 내용과 무관하게
+    // 컨테이너 전체 높이에 반복되므로, min-height만 확보해두면 빈 단도 선반이 그려짐
+    const boardsBg = `repeating-linear-gradient(to bottom, transparent 0px, transparent ${tierH}px, var(--case-board) ${tierH}px, var(--case-board) ${period}px)`;
+    html += `<div class="bookcase"><div class="bookcase-books" style="min-height:${minTiers*period}px;gap:${boardH}px 2px;background-image:${boardsBg};background-size:100% ${period}px;background-repeat:repeat-y;background-position:top left;">`;
+    sorted.forEach((book,i)=>{
+      const isLast = i===sorted.length-1;
+      // 맨 마지막(최신) 한 권만 옆 책에 기대듯 살짝 기울여 꽂음
+      const extraStyle = `height:${tierH}px;` + (isLast ? `transform:rotate(-10deg);transform-origin:bottom right;margin-left:7px;` : '');
+      html += spineUnitHtml(book, panelScale, style, '', extraStyle, '');
+    });
+    html += `</div></div>`;
   }else{
     // 책을 "세워서 나란히" 놓은 모습을 그대로 만든 다음, 통째로 90도 돌려서 눕힘.
     // 개별 이미지마다 회전/크롭을 계산하지 않아도 되니 잘림/여백/사파리 버그가 아예 생길 수 없음.
@@ -1335,34 +1401,10 @@ function renderShelf(){
     const style = getStackStyle();
     html += `<div class="lay-wrap" id="layWrap"><div class="lay-rotate" id="layRotate"><div class="shelf-row" id="shelfRow">`;
     sorted.forEach(book=>{
-      const useRealSpine = style==='cover' && !!book.spineImage;
-      // 실제 책등 이미지가 없어도 "이미지로 보기" 모드면 표지 이미지로 대신 채움 - 단색보기일 때만 색+제목 막대
-      const useCoverImg = !useRealSpine && style==='cover' && !!book.cover;
       // 세워진 상태에서 위아래로 살짝(양쪽 방향 다) 밀어서 지그재그 느낌을 줌. 높이는 94%로 통일해서
       // 밀려도 화면 밖으로 잘리지 않을 여유(±3%)만 확보 - 책마다 높이 자체는 똑같이 유지됨
       const off = (offsetFor(book)/3).toFixed(2);
-      if(useRealSpine || useCoverImg){
-        const imgUrl = useRealSpine ? book.spineImage : book.cover;
-        // 표지 사진은 책등 사진과 달리 두께와 무관하게 다 비슷한 비율이라, 표지의 실제 가로세로
-        // 비율을 그대로 쓰면(=사진 원본 비율로 폭이 정해지면) 두께감이 실제 책과 안 맞음.
-        // 그래서 표지로 대신할 때는 폭을 페이지수 기반으로 직접 정하고, 표지 원본은 흐린 배경으로만
-        // 채움(선명한 사진을 따로 안 겹쳐서 "배경이 두 겹"으로 보이던 문제 방지) + 세로 제목을 겹쳐 씀
-        const coverW = useCoverImg ? spineHeightPx(book) * panelScale : null;
-        // 실제 책등 사진은 원본 비율(width:auto) 그대로 그림 - 최소 폭을 강제로 걸면
-        // height는 고정인 채 width만 늘어나서 사진 비율 자체가 찌그러지는 부작용이 있었음.
-        // 서버의 "이미지 준비중" 감지가 확인됐으니(디버그로 검증) 최소 폭 강제는 빼고
-        // 원본 비율을 그대로 존중함 - 잘못된 이미지는 onerror/재조회로 걸러냄
-        html += `<div class="shelf-spine${useCoverImg?' shelf-cover-fixed':''}" style="${useCoverImg?`width:${coverW}px;`:''}transform:translateY(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
-          <div class="shelf-spine-blur" style="background-image:url('${imgUrl}')"></div>
-          <img src="${imgUrl}" alt="" ${useCoverImg?'style="display:none"':''} onerror="spineImgFailed(this, ${book.id})"/>
-          ${useCoverImg ? `<span class="shelf-title shelf-title-overlay">${escapeHtml(book.title)}</span>` : ''}
-        </div>`;
-      }else{
-        const w = spineHeightPx(book) * panelScale;
-        html += `<div class="shelf-spine shelf-fallback" style="width:${w}px;transform:translateY(${off}%);background:${book.color}" onclick="openEditModal(${book.id})">
-          <span class="shelf-title">${escapeHtml(book.title)}</span>
-        </div>`;
-      }
+      html += spineUnitHtml(book, panelScale, style, `transform:translateY(${off}%);`, '', '');
     });
     html += `</div></div></div>`;
   }
@@ -1407,7 +1449,7 @@ function renderShelf(){
     html += `</div>`;
   }
   document.getElementById('shelfView').innerHTML = html;
-  layoutLyingShelf();
+  if(shelfLayout!=='case') layoutLyingShelf();
 }
 
 // "세워서 나란히" 만든 .shelf-row(각 책은 그냥 height:100%로 자기 비율대로 그려짐 - 개별
@@ -1452,7 +1494,11 @@ function layoutLyingShelf(){
 let shelfResizeTimer = null;
 window.addEventListener('resize', ()=>{
   clearTimeout(shelfResizeTimer);
-  shelfResizeTimer = setTimeout(layoutLyingShelf, 150);
+  shelfResizeTimer = setTimeout(()=>{
+    // 책장에 꽂기 모드는 폭에 따라 단 높이/여백을 다시 계산해야 해서 통째로 다시 그림
+    if(currentView==='shelf' && getShelfLayout()==='case') renderShelf();
+    else layoutLyingShelf();
+  }, 150);
 });
 
 function toggleTag(t){
