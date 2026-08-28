@@ -769,12 +769,21 @@ function setStackStyle(v){
 
 // 기존에 등록된 책들(알라딘으로 추가했지만 spineImage가 없는 책)의 예스24 책등 이미지를 한 번씩 조회해서 채워넣음
 // force=true면 이미 "못 찾음(null)"으로 표시된 책도 다시 조회함 (수동 새로고침 버튼용)
-let spineBackfillRunning = false;
 // manualRefreshSpineImages()가 "실패해서 0건"인지 "대상 자체가 0건"인지 구분해서
 // 알려줄 수 있도록 마지막 실행 결과를 따로 기록해둠
 let lastBackfillStats = {total:0, failed:0};
-async function backfillSpineImages(force=false){
-  if(spineBackfillRunning) return false;
+// 페이지 로드 시 자동으로 도는 백그라운드 조회와, 사용자가 누르는 수동 조회가 동시에
+// 겹치면 예전엔 나중 호출이 그냥 조용히 무시되면서 "실패했다"는 엉뚱한 결과가 나왔음.
+// 불리언 플래그 대신 프로미스를 이어붙여서, 겹치면 그냥 순서대로 기다렸다가 실행되게 함.
+let spineBackfillPromise = Promise.resolve(false);
+function backfillSpineImages(force=false){
+  spineBackfillPromise = spineBackfillPromise.then(
+    ()=>runSpineBackfill(force),
+    ()=>runSpineBackfill(force)
+  );
+  return spineBackfillPromise;
+}
+async function runSpineBackfill(force){
   // aladinItemId가 있어야만 조회 대상으로 삼았었는데, 그 필드가 생기기 전에 추가된
   // (알라딘 검색으로 추가했지만 이 필드는 없는) 책은 영원히 대상에서 빠지는 문제가 있었음.
   // isbn 조회는 안 되더라도 제목+저자만으로도 예스24 쪽 폴백 검색이 되니, 제목만 있으면
@@ -782,7 +791,6 @@ async function backfillSpineImages(force=false){
   const targets = books.filter(b => b.title && (force || b.spineImage === undefined));
   lastBackfillStats = {total: targets.length, failed: 0};
   if(targets.length===0) return false;
-  spineBackfillRunning = true;
   let changed = false;
   for(const book of targets){
     try{
@@ -809,7 +817,6 @@ async function backfillSpineImages(force=false){
     }
   }
   if(changed) saveBooksRaw();
-  spineBackfillRunning = false;
   return changed;
 }
 async function manualRefreshSpineImages(btn){
