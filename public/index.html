@@ -772,22 +772,30 @@ function setStackStyle(v){
 let spineBackfillRunning = false;
 async function backfillSpineImages(force=false){
   if(spineBackfillRunning) return false;
-  const targets = books.filter(b => b.aladinItemId && (force || b.spineImage === undefined));
+  // aladinItemId가 있어야만 조회 대상으로 삼았었는데, 그 필드가 생기기 전에 추가된
+  // (알라딘 검색으로 추가했지만 이 필드는 없는) 책은 영원히 대상에서 빠지는 문제가 있었음.
+  // isbn 조회는 안 되더라도 제목+저자만으로도 예스24 쪽 폴백 검색이 되니, 제목만 있으면
+  // 일단 대상에 포함시킴.
+  const targets = books.filter(b => b.title && (force || b.spineImage === undefined));
   if(targets.length===0) return false;
   spineBackfillRunning = true;
   let changed = false;
   for(const book of targets){
     try{
-      const detailRes = await fetch(`/api/detail/${book.aladinItemId}`);
-      const detail = await detailRes.json();
-      let spineUrl = null;
-      if(detail.isbn){
-        const q = `isbn=${encodeURIComponent(detail.isbn)}&title=${encodeURIComponent(detail.title||book.title||'')}&author=${encodeURIComponent(detail.author||book.author||'')}`;
-        const spineRes = await fetch(`/api/yes24-spine?${q}`);
-        const spineData = await spineRes.json();
-        spineUrl = spineData.spineUrl || null;
+      let isbn = '', title = book.title, author = book.author || '';
+      if(book.aladinItemId){
+        const detailRes = await fetch(`/api/detail/${book.aladinItemId}`);
+        const detail = await detailRes.json();
+        isbn = detail.isbn || '';
+        title = detail.title || book.title;
+        author = detail.author || book.author || '';
       }
-      book.spineImage = spineUrl; // 못 찾아도 null로 표시해 다음부턴 다시 조회하지 않음
+      // isbn이 없어도(수동 추가 등) 제목+저자 폴백 검색은 여전히 시도함 - /api/yes24-spine은
+      // isbn이 안 맞으면 자동으로 제목+저자 검색으로 넘어감
+      const q = `isbn=${encodeURIComponent(isbn||'x')}&title=${encodeURIComponent(title||'')}&author=${encodeURIComponent(author)}`;
+      const spineRes = await fetch(`/api/yes24-spine?${q}`);
+      const spineData = await spineRes.json();
+      book.spineImage = spineData.spineUrl || null; // 못 찾아도 null로 표시해 다음부턴 다시 조회하지 않음
       changed = true;
       saveBookToCloud(book);
     }catch(e){ /* 네트워크 오류 등으로 실패한 건 값을 건드리지 않아 다음에 다시 시도되게 함 */ }
@@ -801,7 +809,7 @@ async function manualRefreshSpineImages(btn){
   const changed = await backfillSpineImages(true);
   if(currentView==='shelf') renderShelf();
   if(btn){ btn.disabled = false; btn.textContent = '📚 책등 이미지 다시 조회하기'; }
-  alert(changed ? '책등 이미지를 다시 조회했어요!' : '알라딘 검색으로 추가한 책이 없어요.');
+  alert(changed ? '책등 이미지를 다시 조회했어요!' : '등록된 책이 없어요.');
 }
 function renderStackStylePicker(){
   const cur = getStackStyle();
