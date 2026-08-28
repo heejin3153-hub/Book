@@ -115,6 +115,9 @@
      여러 단으로 안 나눠도 됨) 책이 늘어나면 flex-wrap이 알아서 다음 단으로 넘김 */
   .bookcase{ background:var(--case-frame); border-radius:14px; padding:10px; box-sizing:border-box; }
   .bookcase-books{ display:flex; flex-wrap:wrap; align-items:flex-end; align-content:flex-start; border-radius:6px; }
+  /* 책장에 꽂기는 한 단에 책이 훨씬 여러 권 붙어있어서, 책 쌓기와 같은 두께의 블러
+     테두리를 쓰면 여백이 누적되어 훨씬 두꺼워 보임 - 좌우 여백을 더 줄임 */
+  .bookcase-books .shelf-spine{ padding:0 1px; }
 
   .empty-shelf{ text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7; padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500; }
 
@@ -598,7 +601,11 @@ function offsetFor(book){
   for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; }
   return (h%19) - 9;
 }
-const MM_PER_PAGE=0.07, COVER_MM=3;
+// 인쇄업계에서 쓰는 무선제본 책등(세네카) 두께 공식: (페이지수÷2, 즉 종이 장수) × 종이 1장
+// 두께 + 풀 여유(0.5mm). 실제 종이 평량/지질별 두께는 알라딘 API에 없어서, 일반 단행본에
+// 흔히 쓰이는 80~100g 미색모조지 기준 1장(2페이지) 두께 약 0.12mm를 대표값으로 사용함
+// (MM_PER_PAGE = 0.12 ÷ 2). 실측 packing 정보(depthMm)가 있으면 이 추정치보다 항상 우선함.
+const MM_PER_PAGE=0.06, COVER_MM=0.5;
 function thicknessMm(pages){ return pages*MM_PER_PAGE+COVER_MM; }
 const PX_PER_MM=1.8;
 function spineHeightPx(book){
