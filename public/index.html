@@ -776,6 +776,9 @@ let lastBackfillStats = {total:0, failed:0};
 // 겹치면 예전엔 나중 호출이 그냥 조용히 무시되면서 "실패했다"는 엉뚱한 결과가 나왔음.
 // 불리언 플래그 대신 프로미스를 이어붙여서, 겹치면 그냥 순서대로 기다렸다가 실행되게 함.
 let spineBackfillPromise = Promise.resolve(false);
+// 일괄 조회 도중엔 attachBooksListener()의 실시간 구독이 매번 화면을 다시 그리지
+// 않도록 잠깐 꺼둠(위 참고) - 끝나면 반드시 다시 켜야 하니 finally에서 되돌림
+let suppressCloudRender = false;
 function backfillSpineImages(force=false){
   spineBackfillPromise = spineBackfillPromise.then(
     ()=>runSpineBackfill(force),
@@ -791,30 +794,35 @@ async function runSpineBackfill(force){
   const targets = books.filter(b => b.title && (force || b.spineImage === undefined));
   lastBackfillStats = {total: targets.length, failed: 0};
   if(targets.length===0) return false;
+  suppressCloudRender = true;
   let changed = false;
-  for(const book of targets){
-    try{
-      let isbn = '', title = book.title, author = book.author || '';
-      if(book.aladinItemId){
-        const detailRes = await fetch(`/api/detail/${book.aladinItemId}`);
-        const detail = await detailRes.json();
-        isbn = detail.isbn || '';
-        title = detail.title || book.title;
-        author = detail.author || book.author || '';
+  try{
+    for(const book of targets){
+      try{
+        let isbn = '', title = book.title, author = book.author || '';
+        if(book.aladinItemId){
+          const detailRes = await fetch(`/api/detail/${book.aladinItemId}`);
+          const detail = await detailRes.json();
+          isbn = detail.isbn || '';
+          title = detail.title || book.title;
+          author = detail.author || book.author || '';
+        }
+        // isbn이 없어도(수동 추가 등) 제목+저자 폴백 검색은 여전히 시도함 - /api/yes24-spine은
+        // isbn이 안 맞으면 자동으로 제목+저자 검색으로 넘어감
+        const q = `isbn=${encodeURIComponent(isbn||'x')}&title=${encodeURIComponent(title||'')}&author=${encodeURIComponent(author)}`;
+        const spineRes = await fetch(`/api/yes24-spine?${q}`);
+        if(!spineRes.ok) throw new Error(`HTTP ${spineRes.status}`);
+        const spineData = await spineRes.json();
+        book.spineImage = spineData.spineUrl || null; // 못 찾아도 null로 표시해 다음부턴 다시 조회하지 않음
+        changed = true;
+        saveBookToCloud(book);
+      }catch(e){
+        lastBackfillStats.failed++;
+        console.error('[spine-backfill]', book.title, e);
       }
-      // isbn이 없어도(수동 추가 등) 제목+저자 폴백 검색은 여전히 시도함 - /api/yes24-spine은
-      // isbn이 안 맞으면 자동으로 제목+저자 검색으로 넘어감
-      const q = `isbn=${encodeURIComponent(isbn||'x')}&title=${encodeURIComponent(title||'')}&author=${encodeURIComponent(author)}`;
-      const spineRes = await fetch(`/api/yes24-spine?${q}`);
-      if(!spineRes.ok) throw new Error(`HTTP ${spineRes.status}`);
-      const spineData = await spineRes.json();
-      book.spineImage = spineData.spineUrl || null; // 못 찾아도 null로 표시해 다음부턴 다시 조회하지 않음
-      changed = true;
-      saveBookToCloud(book);
-    }catch(e){
-      lastBackfillStats.failed++;
-      console.error('[spine-backfill]', book.title, e);
     }
+  } finally {
+    suppressCloudRender = false;
   }
   if(changed) saveBooksRaw();
   return changed;
@@ -2454,7 +2462,10 @@ function attachBooksListener(){
     snap.forEach(doc=> cloudBooks.push(normalizeBook(doc.data())));
     books = cloudBooks;
     saveBooksRaw();
-    render();
+    // 책등 이미지 일괄 조회처럼 책을 한 권씩 여러 번 연달아 저장할 때, 저장할 때마다
+    // 이 구독이 매번 화면 전체를 다시 그려서 책이 하나씩 깜빡이며 새로고침되는 것처럼
+    // 보였음 - 그런 일괄 작업 중에는(suppressCloudRender) 화면을 안 그리고 건너뜀
+    if(!suppressCloudRender) render();
     localStorage.setItem('last-sync', new Date().toISOString());
     renderSyncArea();
   }, err=>{
