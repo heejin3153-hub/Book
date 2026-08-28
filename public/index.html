@@ -58,7 +58,7 @@
 
   .panel{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:22px 16px; box-shadow:0 1px 2px rgba(0,0,0,0.02); }
 
-  .stats{ text-align:center; margin-bottom:18px; }
+  .stats{ text-align:center; margin-bottom:28px; }
   .stats .num{ font-size:38px; font-weight:800; line-height:1; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
   .stats .label{ color:var(--text-muted); font-size:12px; margin-top:8px; font-weight:600; }
   .stats .height{ display:inline-flex; align-items:center; gap:5px; margin-top:12px; padding:6px 12px; background:var(--accent-soft); color:var(--accent-dark); border-radius:20px; font-size:12px; font-weight:700; }
@@ -79,8 +79,12 @@
 
   /* 태그 필터 */
   .tag-filters{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
-  .period-row{ display:flex; gap:8px; margin-bottom:16px; }
+  .period-row{ display:flex; gap:8px; margin-bottom:16px; align-items:center; }
   .period-select{ background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:12px; font-weight:600; color:var(--text); font-family:'Inter',sans-serif; }
+  /* 책 쌓기/책장에 꽂기 - 전체기간 토글 옆에 붙는 작은 버전 */
+  .layout-toggle{ display:flex; gap:4px; margin-left:auto; }
+  .layout-toggle button{ background:var(--bg); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:8px; padding:7px 9px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .layout-toggle button.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .tag-chip{ background:var(--bg); border:1px solid var(--border); color:var(--text-muted); border-radius:20px; padding:6px 12px; font-size:11.5px; font-weight:600; cursor:pointer; }
   .tag-chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
 
@@ -486,7 +490,6 @@
     <div class="share-preview">
       <canvas id="shareCanvas"></canvas>
       <div class="share-actions">
-        <button class="btn-secondary" onclick="downloadShareImage()" style="margin-top:0">⬇ 저장</button>
         <button class="btn-add" onclick="shareImage()" id="shareBtn">공유하기</button>
       </div>
     </div>
@@ -814,6 +817,14 @@ function applyTheme(){
     actual = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   }
   document.documentElement.setAttribute('data-theme', actual);
+}
+// 캔버스로 그리는 공유 이미지는 CSS 변수를 못 쓰니, 지금 실제 적용된 화면 테마를 그대로
+// 따라가도록 색을 직접 골라줌 - :root/[data-theme=dark] CSS 변수 값과 동일하게 맞춤
+function canvasThemeColors(){
+  const dark = document.documentElement.getAttribute('data-theme')==='dark';
+  return dark
+    ? { bg:'#111114', text:'#eeeef0', muted:'#9494a0', accent:'#8080e8', caseFrame:'#3a342a', caseBoard:'#241f18' }
+    : { bg:'#fafafa', text:'#18181b', muted:'#8a8a92', accent:'#5b5bd6', caseFrame:'#ded2ba', caseBoard:'#b89f78' };
 }
 function setThemeMode(v){
   localStorage.setItem('theme-mode', v);
@@ -1364,32 +1375,30 @@ function renderShelf(){
     html += `</div>`;
   }
 
-  html += `<div class="section-h"><div class="h">책 쌓기</div><button class="icon-btn" onclick="openShareStackCard()">📤 이미지</button></div>`;
+  const shelfLayout = getShelfLayout();
+  html += `<div class="section-h"><div class="h"></div><button class="icon-btn" onclick="openShareStackCard(this)">📤 이미지</button></div>`;
 
+  html += `<div class="period-row">`;
   if(availableYears.length>0){
-    html += `<div class="period-row">
-      <select class="period-select" onchange="onPeriodYearChange(this.value)">
-        <option value="all" ${periodYear==='all'?'selected':''}>전체 기간</option>
-        ${availableYears.map(y=>`<option value="${y}" ${periodYear===String(y)?'selected':''}>${y}년</option>`).join('')}
-      </select>
-      ${periodYear!=='all' ? `<select class="period-select" onchange="onPeriodMonthChange(this.value)">
-        <option value="all" ${periodMonth==='all'?'selected':''}>${periodYear}년 전체</option>
-        ${Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${periodMonth===String(m)?'selected':''}>${m}월</option>`).join('')}
-      </select>` : ''}
-    </div>`;
+    html += `<select class="period-select" onchange="onPeriodYearChange(this.value)">
+      <option value="all" ${periodYear==='all'?'selected':''}>전체 기간</option>
+      ${availableYears.map(y=>`<option value="${y}" ${periodYear===String(y)?'selected':''}>${y}년</option>`).join('')}
+    </select>
+    ${periodYear!=='all' ? `<select class="period-select" onchange="onPeriodMonthChange(this.value)">
+      <option value="all" ${periodMonth==='all'?'selected':''}>${periodYear}년 전체</option>
+      ${Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${periodMonth===String(m)?'selected':''}>${m}월</option>`).join('')}
+    </select>` : ''}`;
   }
+  html += `<div class="layout-toggle">
+    <button type="button" onclick="setShelfLayout('stack')" class="${shelfLayout==='stack'?'on':''}">📚 쌓기</button>
+    <button type="button" onclick="setShelfLayout('case')" class="${shelfLayout==='case'?'on':''}">🗄️ 책장</button>
+  </div></div>`;
 
   const hObjLabel = heightObjectLabel(totalPages, filtered.length);
   html += `<div class="stats"><div class="num">${filtered.length.toLocaleString()}권</div><div class="label">읽은 책 · 총 ${totalPages.toLocaleString()}페이지</div>`;
   if(hLabel) html += `<div class="height">📏 다 쌓으면 약 ${hLabel}</div>`;
   if(hObjLabel) html += `<div style="font-size:12px;color:var(--text-muted);margin-top:8px;font-weight:500">${hObjLabel}</div>`;
   html += `</div>`;
-
-  const shelfLayout = getShelfLayout();
-  html += `<div class="status-picker" id="shelfLayoutPicker" style="margin-bottom:10px">
-    <button type="button" onclick="setShelfLayout('stack')" class="${shelfLayout==='stack'?'on':''}">📚 책 쌓기</button>
-    <button type="button" onclick="setShelfLayout('case')" class="${shelfLayout==='case'?'on':''}">🗄️ 책장에 꽂기</button>
-  </div>`;
 
   html += `<div class="shelf-area">`;
   if(filtered.length===0){
@@ -1849,59 +1858,78 @@ function roundRect(ctx,x,y,w,h,r){
 
 let currentShareBlob = null;
 
-async function openShareStackCard(){
+async function openShareStackCard(btn){
   document.getElementById('calShareOptions').classList.add('hidden');
   const allCompleted = books.filter(b=>b.status==='completed');
   if(allCompleted.length===0){ alert('완독한 책이 있어야 이미지를 만들 수 있어요.'); return; }
   const completed = allCompleted.filter(inPeriod); // 책장 탭에서 선택한 기간을 그대로 반영
   if(completed.length===0){ alert('선택한 기간에 완독한 책이 없어요.'); return; }
-  const periodText = periodYear==='all' ? '전체 기간' : (periodMonth==='all' ? `${periodYear}년` : `${periodYear}년 ${periodMonth}월`);
-  const sorted = [...completed].sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
-  const totalPages = completed.reduce((s,b)=>s+b.pages,0);
-  const hLabel = heightLabel(totalPages, completed.length);
-  const hObjLabel = heightObjectLabel(totalPages, completed.length);
+  // 버튼을 누르고 이미지가 준비되는 동안 아무 반응이 없어 보여서 두 번 누르는 일이
+  // 없도록, 준비되는 동안엔 버튼을 비활성화하고 문구를 바꿔둠
+  if(btn){ btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = '⏳ 준비 중...'; }
+  try{
+    const periodText = periodYear==='all' ? '전체 기간' : (periodMonth==='all' ? `${periodYear}년` : `${periodYear}년 ${periodMonth}월`);
+    const sorted = [...completed].sort((a,b)=> new Date(a.completedDate)-new Date(b.completedDate));
+    const totalPages = completed.reduce((s,b)=>s+b.pages,0);
+    const hLabel = heightLabel(totalPages, completed.length);
+    const hObjLabel = heightObjectLabel(totalPages, completed.length);
+    const theme = canvasThemeColors();
 
-  // 표지 이미지를 서버 프록시로 미리 로드 (캔버스에 안전하게 그리기 위함)
-  document.getElementById('shareModal').classList.remove('hidden');
-  lockBodyScroll();
-  const loadingCanvas = document.getElementById('shareCanvas');
-  loadingCanvas.width=800; loadingCanvas.height=200;
-  const lctx = loadingCanvas.getContext('2d');
-  lctx.fillStyle='#fafafa'; lctx.fillRect(0,0,800,200);
-  lctx.fillStyle='#8a8a92'; lctx.font='500 16px Inter, sans-serif'; lctx.textAlign='center';
-  lctx.fillText('이미지를 준비하는 중...', 400, 100); lctx.textAlign='left';
+    // 표지 이미지를 서버 프록시로 미리 로드 (캔버스에 안전하게 그리기 위함)
+    document.getElementById('shareModal').classList.remove('hidden');
+    lockBodyScroll();
+    const loadingCanvas = document.getElementById('shareCanvas');
+    loadingCanvas.width=800; loadingCanvas.height=200;
+    const lctx = loadingCanvas.getContext('2d');
+    lctx.fillStyle=theme.bg; lctx.fillRect(0,0,800,200);
+    lctx.fillStyle=theme.muted; lctx.font='500 16px Inter, sans-serif'; lctx.textAlign='center';
+    lctx.fillText('이미지를 준비하는 중...', 400, 100); lctx.textAlign='left';
 
-  const useCover = getStackStyle()==='cover';
-  const uniqueCovers = useCover ? [...new Set(sorted.map(b=>b.cover).filter(Boolean))] : [];
-  const uniqueSpineImgs = useCover ? [...new Set(sorted.map(b=>b.spineImage).filter(Boolean))] : [];
-  const loadedPairs = await Promise.all([...uniqueCovers, ...uniqueSpineImgs].map(async url => [url, await loadImage(proxied(url))]));
-  const imageMap = new Map(loadedPairs);
+    const useCover = getStackStyle()==='cover';
+    const uniqueCovers = useCover ? [...new Set(sorted.map(b=>b.cover).filter(Boolean))] : [];
+    const uniqueSpineImgs = useCover ? [...new Set(sorted.map(b=>b.spineImage).filter(Boolean))] : [];
+    const loadedPairs = await Promise.all([...uniqueCovers, ...uniqueSpineImgs].map(async url => [url, await loadImage(proxied(url))]));
+    const imageMap = new Map(loadedPairs);
 
+    const canvas = document.getElementById('shareCanvas');
+    if(getShelfLayout()==='case'){
+      drawBookcaseShareCanvas(canvas, theme, {periodText, sorted, totalPages, hLabel, hObjLabel, useCover, imageMap});
+    }else{
+      drawStackShareCanvas(canvas, theme, {periodText, sorted, totalPages, hLabel, hObjLabel, useCover, imageMap});
+    }
+
+    document.getElementById('shareModal').classList.remove('hidden');
+    canvas.toBlob(blob=> currentShareBlob = blob, 'image/png');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = btn.dataset.origText || '📤 이미지'; }
+  }
+}
+
+function drawStackShareCanvas(canvas, theme, {periodText, sorted, totalPages, hLabel, hObjLabel, useCover, imageMap}){
   const W = 800, padX=56;
   const SCALE = W/420; // 폰 화면 대비 캔버스가 넓은 만큼 두께도 비례해서 키움 (화면과 동일한 비율 유지)
   const gap=5;
   const stackH = sorted.reduce((s,b)=> s + spineHeightPx(b)*SCALE + gap, 0);
   const H = 340 + stackH + 50;
 
-  const canvas = document.getElementById('shareCanvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
   // 배경
-  ctx.fillStyle = '#fafafa'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle = '#5b5bd6'; ctx.font='700 18px Inter, sans-serif';
+  ctx.fillStyle = theme.bg; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = theme.accent; ctx.font='700 18px Inter, sans-serif';
   ctx.fillText(periodText, padX, 44);
-  ctx.fillStyle = '#18181b';
+  ctx.fillStyle = theme.text;
   ctx.font = '800 44px Inter, sans-serif';
-  ctx.fillText(`${completed.length}권`, padX, 100);
-  ctx.fillStyle = '#8a8a92'; ctx.font='500 20px Inter, sans-serif';
+  ctx.fillText(`${sorted.length}권`, padX, 100);
+  ctx.fillStyle = theme.muted; ctx.font='500 20px Inter, sans-serif';
   ctx.fillText(`읽은 책 · 총 ${totalPages.toLocaleString()}페이지`, padX, 136);
   if(hLabel){
-    ctx.fillStyle = '#5b5bd6'; ctx.font='700 20px Inter, sans-serif';
+    ctx.fillStyle = theme.accent; ctx.font='700 20px Inter, sans-serif';
     ctx.fillText(`📏 다 쌓으면 약 ${hLabel}`, padX, 170);
   }
   if(hObjLabel){
-    ctx.fillStyle = '#8a8a92'; ctx.font='500 17px Inter, sans-serif';
+    ctx.fillStyle = theme.muted; ctx.font='500 17px Inter, sans-serif';
     ctx.fillText(hObjLabel, padX, 200);
   }
 
@@ -1959,9 +1987,91 @@ async function openShareStackCard(){
     }
     y += rowH+gap;
   });
+}
 
-  document.getElementById('shareModal').classList.remove('hidden');
-  canvas.toBlob(blob=> currentShareBlob = blob, 'image/png');
+// "책장에 꽂기"와 같은 모습으로 공유 이미지를 그림 - 세워진 책을 왼쪽부터 채우다가
+// 폭을 넘기면 다음 단으로 내려감(라이브 화면의 flex-wrap 줄바꿈과 같은 방식을 직접 계산)
+function drawBookcaseShareCanvas(canvas, theme, {periodText, sorted, totalPages, hLabel, hObjLabel, useCover, imageMap}){
+  const W = 800, padX=56, framePad=14;
+  const SCALE = W/420;
+  const tierH = 168*SCALE, boardH = 10*SCALE, bookGap = 4;
+  const maxW = W - padX*2 - framePad*2;
+
+  // 실제 렌더 폭 기준으로 단을 미리 나눔(폭 계산은 spineWidthPx로 라이브 화면과 동일하게 맞춤)
+  const rows = [];
+  let cur = [], curW = 0;
+  sorted.forEach(book=>{
+    const spineImg = (useCover && book.spineImage) ? imageMap.get(book.spineImage) : null;
+    const img = spineImg ? null : ((useCover && book.cover) ? imageMap.get(book.cover) : null);
+    const w = spineImg ? Math.min(tierH*(spineImg.width/spineImg.height), maxW*0.9) : spineWidthPx(book, tierH);
+    if(cur.length>0 && curW + bookGap + w > maxW){ rows.push(cur); cur=[]; curW=0; }
+    cur.push({book, w, spineImg, img});
+    curW += w + bookGap;
+  });
+  if(cur.length>0) rows.push(cur);
+
+  const headerH = 250;
+  const caseH = rows.length*tierH + Math.max(0, rows.length-1)*boardH + framePad*2;
+  const H = headerH + caseH + 40;
+
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = theme.bg; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = theme.accent; ctx.font='700 18px Inter, sans-serif';
+  ctx.fillText(periodText, padX, 44);
+  ctx.fillStyle = theme.text;
+  ctx.font = '800 44px Inter, sans-serif';
+  ctx.fillText(`${sorted.length}권`, padX, 100);
+  ctx.fillStyle = theme.muted; ctx.font='500 20px Inter, sans-serif';
+  ctx.fillText(`읽은 책 · 총 ${totalPages.toLocaleString()}페이지`, padX, 136);
+  if(hLabel){
+    ctx.fillStyle = theme.accent; ctx.font='700 20px Inter, sans-serif';
+    ctx.fillText(`📏 다 쌓으면 약 ${hLabel}`, padX, 170);
+  }
+  if(hObjLabel){
+    ctx.fillStyle = theme.muted; ctx.font='500 17px Inter, sans-serif';
+    ctx.fillText(hObjLabel, padX, 200);
+  }
+
+  // 책장 케이스
+  roundRect(ctx, padX, headerH, maxW+framePad*2, caseH, 14);
+  ctx.fillStyle = theme.caseFrame; ctx.fill();
+
+  rows.forEach((row,ri)=>{
+    const y = headerH + framePad + ri*(tierH+boardH);
+    let x = padX + framePad;
+    row.forEach(({book,w,spineImg,img})=>{
+      if(spineImg){
+        // 실제 책등 사진은 이미 세워진 방향(세로로 긴 사진)이라 회전 없이 그대로 채움
+        ctx.drawImage(spineImg, x, y, w, tierH);
+      }else{
+        ctx.fillStyle = book.color; ctx.fillRect(x, y, w, tierH);
+        if(img){
+          const scale = Math.min(w/img.width, tierH/img.height);
+          const iw=img.width*scale, ih=img.height*scale;
+          ctx.drawImage(img, x+(w-iw)/2, y+(tierH-ih)/2, iw, ih);
+        }
+        // 책등 사진이 없는 책은 제목을 옆으로 눕혀서 표시(실제 책등 인쇄 방식과 비슷함)
+        ctx.save();
+        ctx.translate(x+w/2, y+tierH/2);
+        ctx.rotate(Math.PI/2);
+        ctx.fillStyle = 'rgba(255,255,255,0.97)';
+        ctx.font = '700 16px Inter, sans-serif';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        let title = book.title;
+        while(ctx.measureText(title).width > tierH-24 && title.length>3){ title = title.slice(0,-2); }
+        if(title !== book.title) title += '…';
+        ctx.fillText(title, 0, 0);
+        ctx.restore();
+      }
+      x += w + bookGap;
+    });
+    if(ri < rows.length-1){
+      ctx.fillStyle = theme.caseBoard;
+      ctx.fillRect(padX+framePad, y+tierH, maxW, boardH);
+    }
+  });
 }
 
 function proxied(url){ return url ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url; }
