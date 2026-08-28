@@ -770,6 +770,9 @@ function setStackStyle(v){
 // 기존에 등록된 책들(알라딘으로 추가했지만 spineImage가 없는 책)의 예스24 책등 이미지를 한 번씩 조회해서 채워넣음
 // force=true면 이미 "못 찾음(null)"으로 표시된 책도 다시 조회함 (수동 새로고침 버튼용)
 let spineBackfillRunning = false;
+// manualRefreshSpineImages()가 "실패해서 0건"인지 "대상 자체가 0건"인지 구분해서
+// 알려줄 수 있도록 마지막 실행 결과를 따로 기록해둠
+let lastBackfillStats = {total:0, failed:0};
 async function backfillSpineImages(force=false){
   if(spineBackfillRunning) return false;
   // aladinItemId가 있어야만 조회 대상으로 삼았었는데, 그 필드가 생기기 전에 추가된
@@ -777,6 +780,7 @@ async function backfillSpineImages(force=false){
   // isbn 조회는 안 되더라도 제목+저자만으로도 예스24 쪽 폴백 검색이 되니, 제목만 있으면
   // 일단 대상에 포함시킴.
   const targets = books.filter(b => b.title && (force || b.spineImage === undefined));
+  lastBackfillStats = {total: targets.length, failed: 0};
   if(targets.length===0) return false;
   spineBackfillRunning = true;
   let changed = false;
@@ -794,11 +798,15 @@ async function backfillSpineImages(force=false){
       // isbn이 안 맞으면 자동으로 제목+저자 검색으로 넘어감
       const q = `isbn=${encodeURIComponent(isbn||'x')}&title=${encodeURIComponent(title||'')}&author=${encodeURIComponent(author)}`;
       const spineRes = await fetch(`/api/yes24-spine?${q}`);
+      if(!spineRes.ok) throw new Error(`HTTP ${spineRes.status}`);
       const spineData = await spineRes.json();
       book.spineImage = spineData.spineUrl || null; // 못 찾아도 null로 표시해 다음부턴 다시 조회하지 않음
       changed = true;
       saveBookToCloud(book);
-    }catch(e){ /* 네트워크 오류 등으로 실패한 건 값을 건드리지 않아 다음에 다시 시도되게 함 */ }
+    }catch(e){
+      lastBackfillStats.failed++;
+      console.error('[spine-backfill]', book.title, e);
+    }
   }
   if(changed) saveBooksRaw();
   spineBackfillRunning = false;
@@ -809,7 +817,13 @@ async function manualRefreshSpineImages(btn){
   const changed = await backfillSpineImages(true);
   if(currentView==='shelf') renderShelf();
   if(btn){ btn.disabled = false; btn.textContent = '📚 책등 이미지 다시 조회하기'; }
-  alert(changed ? '책등 이미지를 다시 조회했어요!' : '등록된 책이 없어요.');
+  if(changed){
+    alert('책등 이미지를 다시 조회했어요!');
+  }else if(lastBackfillStats.total===0){
+    alert('등록된 책이 없어요.');
+  }else{
+    alert(`책등 이미지 조회에 실패했어요. (${lastBackfillStats.total}권 중 ${lastBackfillStats.failed}건 오류)\n네트워크 상태를 확인하고 다시 시도해주세요.`);
+  }
 }
 function renderStackStylePicker(){
   const cur = getStackStyle();
