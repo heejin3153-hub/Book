@@ -1483,12 +1483,13 @@ function renderShelf(){
       // 흩어지도록) 해서 실제 책장처럼 보이게 함 - 단 자체 높이(tierH)는 그대로 두고
       // 책 개별 높이만 그 안에서 줄임(바닥엔 항상 붙어 있음, align-items:flex-end)
       const bookH = Math.round(tierH * bookHeightFactor(book));
-      // 맨 마지막(최신) 한 권만 이전 책에 기대듯 기울여 꽂음. 겹침을 완전히 피하려고
-      // 여백을 넉넉히 뒀더니 이번엔 반대로 이전 책과 너무 떨어져 보였음 - 여백을
-      // 확 줄이고 각도도 살짝 줄여서, 위쪽은 살짝 겹치듯 닿고 아래쪽만 아주 조금
-      // 벌어지는 정도로(실제로 기대 있는 책들이 대개 이런 모습) 조정함
-      const tiltMargin = Math.round(bookH * 0.05);
-      const extraStyle = `height:${bookH}px;` + (isLast ? `transform:rotate(-7deg);transform-origin:bottom right;margin-left:${tiltMargin}px;` : '');
+      // 맨 마지막(최신) 한 권만 이전 책에 기대듯 기울여 꽂음. 피벗이 책 밑변 오른쪽
+      // 끝에 있어서, 회전각 θ만큼 돌리면 반대쪽(왼쪽 위) 모서리가 대략 bookH*sin(θ)만큼
+      // 왼쪽으로 밀려남 - 겹치지 않을 최소한의 여백을 정확히 그만큼만 줘서, 겹치지도
+      // 않고 필요 이상으로 떨어지지도 않게 딱 맞닿는 정도로 맞춤
+      const tiltAngle = 6;
+      const tiltMargin = Math.round(bookH * Math.sin(tiltAngle*Math.PI/180)) + 1;
+      const extraStyle = `height:${bookH}px;` + (isLast ? `transform:rotate(-${tiltAngle}deg);transform-origin:bottom right;margin-left:${tiltMargin}px;` : '');
       const spineHtml = spineUnitHtml(book, tierH, style, '', extraStyle, '');
       // 책마다 높이가 달라지면 그 줄(flex-wrap 한 줄)의 실제 높이도 제일 큰 책 기준으로
       // 줄어들어서, 미리 계산해둔 선반 배경 간격(period)과 안 맞아 선반이 어긋나 보임 -
