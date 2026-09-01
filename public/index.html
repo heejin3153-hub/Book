@@ -1965,7 +1965,28 @@ function drawStackShareCanvas(canvas, theme, {periodText, sorted, totalPages, hL
   const W = 800, padX=56;
   const SCALE = W/420; // 폰 화면 대비 캔버스가 넓은 만큼 두께도 비례해서 키움 (화면과 동일한 비율 유지)
   const gap=5;
-  const stackH = sorted.reduce((s,b)=> s + spineHeightPx(b)*SCALE + gap, 0);
+  const maxW = W - padX*2;
+
+  // 책마다 두께(rowH)/길이(w)를 먼저 계산해둠. 라이브 화면(책 쌓기)은 책의 "길이"를
+  // 거의 고정해두고 실제 책등 사진이 있으면 그 사진의 실제 가로세로 비율로 두께를
+  // 정하는데(사진 비율 자체에 그 책의 진짜 두께감이 녹아있음), 여기선 반대로 두께를
+  // 페이지수 공식으로 먼저 고정해버려서 사진 비율이 유별난 책(예: 얇아서 표지 전체
+  // 사진을 책등으로 대신 쓴 책)은 라이브 화면보다 훨씬 작게 나오는 문제가 있었음 -
+  // 사진이 있을 때는 라이브와 똑같이 "길이 고정, 두께는 사진 비율로" 계산하도록 맞춤
+  const items = sorted.map(book=>{
+    const spineImg = (useCover && book.spineImage) ? imageMap.get(book.spineImage) : null;
+    const img = spineImg ? null : ((useCover && book.cover) ? imageMap.get(book.cover) : null);
+    let rowH, w;
+    if(spineImg){
+      w = Math.min(maxW * 0.9 * bookHeightFactor(book), maxW*0.95);
+      rowH = Math.max(6, w * (spineImg.width/spineImg.height));
+    }else{
+      rowH = spineHeightPx(book) * SCALE;
+      w = maxW * 0.9 * bookHeightFactor(book);
+    }
+    return {book, rowH, w, spineImg, img};
+  });
+  const stackH = items.reduce((s,it)=> s + it.rowH + gap, 0);
   const H = 340 + stackH + 50;
 
   const ctx = setupHiDPICanvas(canvas, W, H);
@@ -1989,17 +2010,7 @@ function drawStackShareCanvas(canvas, theme, {periodText, sorted, totalPages, hL
   }
 
   let y = 250;
-  const maxW = W - padX*2;
-  [...sorted].reverse().forEach(book=>{
-    const rowH = spineHeightPx(book) * SCALE;
-    const spineImg = (useCover && book.spineImage) ? imageMap.get(book.spineImage) : null;
-    const img = spineImg ? null : ((useCover && book.cover) ? imageMap.get(book.cover) : null);
-    // 실제 책등 이미지가 있으면 임의 폭 대신 이미지의 실제 비율에 맞춘 폭을 씀(사진 자체
-    // 비율에 이미 그 책의 실제 세로 길이감이 녹아있음) - 없으면 bookHeightFactor로
-    // 책마다 실제 세로 길이(또는 그럴듯한 값) 비율만큼 길이가 다르게 보이게 함
-    const w = spineImg
-      ? Math.min(rowH * (spineImg.height/spineImg.width), maxW*0.95)
-      : maxW * 0.9 * bookHeightFactor(book);
+  [...items].reverse().forEach(({book, rowH, w, spineImg, img})=>{
     const off = offsetFor(book)/100;
     const x = padX + (maxW-w)/2 + maxW*off*0.5;
 
