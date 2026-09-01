@@ -741,7 +741,7 @@ function setStackStyle(v){
   localStorage.setItem('stack-style', v);
   renderStackStylePicker();
   if(currentView==='shelf') renderShelf();
-  if(v==='cover') backfillSpineImages().then(changed=>{ if(changed && currentView==='shelf') renderShelf(); });
+  if(v==='cover') backfillSpineImages().then(changed=>{ if(changed) render(); });
 }
 
 // 기존에 등록된 책들(알라딘으로 추가했지만 spineImage가 없는 책)의 예스24 책등 이미지를 한 번씩 조회해서 채워넣음
@@ -1313,6 +1313,13 @@ async function saveBook(){
     saveBooksRaw();
     await saveBookToCloud(savedBook);
     closeAddModal(); render();
+    // 예스24 책등 조회가 저장 시점까지 안 끝난 책은 spineImage가 비어있는 채로 저장되는데,
+    // 이걸 채워주는 일괄 조회는 원래 페이지를 새로고침해야만 돌았음 - 그래서 방금 추가한
+    // 책이 책장/위시리스트에 책등 사진 없이(두께가 얇아 보이는 등) 반쪽짜리로 보이다가
+    // 새로고침해야만 제대로 나오는 문제가 있었음. 저장 직후에도 한 번 돌려서 바로 채움.
+    if(!spineImageLoaded && getStackStyle()==='cover'){
+      backfillSpineImages().then(changed=>{ if(changed) render(); });
+    }
   } finally {
     if(btn){ btn.disabled = false; btn.textContent = origText; }
   }
@@ -2630,7 +2637,7 @@ applyTheme();
 applyTitleFromStorage();
 render();
 initFirebase();
-if(getStackStyle()==='cover') backfillSpineImages().then(changed=>{ if(changed && currentView==='shelf') renderShelf(); });
+if(getStackStyle()==='cover') backfillSpineImages().then(changed=>{ if(changed) render(); });
 </script>
 </body>
 </html>
