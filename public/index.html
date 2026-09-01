@@ -132,17 +132,6 @@
      줄여도 잘 읽혀서 글씨 크기도 같이 줄임 */
   .bookcase-books .shelf-title{ font-size:10px; }
   .bookcase-books .shelf-title-overlay{ font-size:13px; }
-  /* 책장에 꽂기에서만 - 책등 표면이 살짝 둥근 실제 책처럼 보이도록 왼쪽엔 그림자,
-     그 안쪽엔 빛이 스치는 하이라이트, 오른쪽엔 다시 그림자를 얹어 입체감을 줌 */
-  .bookcase-books .shelf-spine::after{
-    content:''; position:absolute; inset:0; z-index:1; pointer-events:none; border-radius:inherit;
-    background:linear-gradient(to right,
-      rgba(0,0,0,0.32) 0%,
-      rgba(255,255,255,0.22) 12%,
-      rgba(255,255,255,0) 28%,
-      rgba(0,0,0,0) 72%,
-      rgba(0,0,0,0.28) 100%);
-  }
 
   .empty-shelf{ text-align:center; color:var(--text-muted); font-size:13px; line-height:1.7; padding:40px 10px; border:1.5px dashed var(--border-2); border-radius:12px; font-weight:500; }
 
@@ -1509,7 +1498,7 @@ function renderShelf(){
       const tiltMargin = Math.round(bookH * Math.sin(tiltAngle*Math.PI/180)) + 1;
       // 기본 모서리 반경(4px)이 화면 배율(panelScale)에 안 맞춰져 있어서 화면이 넓을수록
       // 상대적으로 거의 안 보였음 - 책장에 꽂기에서는 화면 크기에 비례해서 키움
-      const bookRadius = Math.max(4, Math.round(7*panelScale));
+      const bookRadius = Math.max(3, Math.round(4*panelScale));
       const extraStyle = `height:${bookH}px;border-radius:${bookRadius}px;` + (isLast ? `transform:rotate(-${tiltAngle}deg);transform-origin:bottom right;margin-left:${tiltMargin}px;` : '');
       const spineHtml = spineUnitHtml(book, tierH, style, '', extraStyle, '');
       // 책마다 높이가 달라지면 그 줄(flex-wrap 한 줄)의 실제 높이도 제일 큰 책 기준으로
@@ -2156,7 +2145,7 @@ function drawBookcaseShareCanvas(canvas, theme, {periodText, sorted, totalPages,
     row.forEach(({book,w,bookH,spineImg,img})=>{
       const by = y + (tierH - bookH); // 단 바닥에 붙여서(책 키가 짧아도 아래쪽 기준) 그림
       // 실제 책처럼 모서리를 둥글리기 위해 이 영역만 클립해서 그림
-      const radius = Math.max(3, Math.min(7*SCALE, w/2, bookH/2));
+      const radius = Math.max(2, Math.min(4*SCALE, w/2, bookH/2));
       ctx.save();
       roundRect(ctx, x, by, w, bookH, radius);
       ctx.clip();
@@ -2183,15 +2172,6 @@ function drawBookcaseShareCanvas(canvas, theme, {periodText, sorted, totalPages,
         ctx.fillText(title, 0, 0);
         ctx.restore();
       }
-      // 책등 표면이 살짝 둥근 실제 책처럼 보이도록 좌우에 그림자+하이라이트를 얹어 입체감을 줌
-      const depthGrad = ctx.createLinearGradient(x, 0, x+w, 0);
-      depthGrad.addColorStop(0, 'rgba(0,0,0,0.32)');
-      depthGrad.addColorStop(0.12, 'rgba(255,255,255,0.22)');
-      depthGrad.addColorStop(0.28, 'rgba(255,255,255,0)');
-      depthGrad.addColorStop(0.72, 'rgba(0,0,0,0)');
-      depthGrad.addColorStop(1, 'rgba(0,0,0,0.28)');
-      ctx.fillStyle = depthGrad;
-      ctx.fillRect(x, by, w, bookH);
       ctx.restore();
       x += w + bookGap;
     });
