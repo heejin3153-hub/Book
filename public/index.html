@@ -1928,6 +1928,19 @@ function renderWishlist(){
 }
 
 /* ---------------- 이미지 카드 생성 (공유) ---------------- */
+// 캔버스 픽셀 크기를 논리적 크기(W,H) 그대로 두면 레티나 화면에서 저장/공유했을 때
+// 해상도가 낮아 흐릿하게 보임 - 실제 픽셀 수를 화면 배율(devicePixelRatio)만큼 늘리고
+// 그리기 좌표는 그대로 쓰도록 컨텍스트를 그만큼 확대해둠(3배 이상은 파일만 커지니 상한을 둠)
+function setupHiDPICanvas(canvas, W, H){
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  // style.width/height는 일부러 안 정함 - width/height 속성(실제 픽셀 수)만 키우면
+  // 캔버스의 "원본 크기"가 커진 것뿐이라, max-width:100%가 화면에서는 기존과
+  // 똑같이 줄여서 보여주면서 저장/공유될 실제 파일 해상도만 높아짐
+  canvas.width = Math.round(W*dpr); canvas.height = Math.round(H*dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return ctx;
+}
 function roundRect(ctx,x,y,w,h,r){
   ctx.beginPath();
   ctx.moveTo(x+r,y);
@@ -1994,8 +2007,7 @@ function drawStackShareCanvas(canvas, theme, {periodText, sorted, totalPages, hL
   const stackH = sorted.reduce((s,b)=> s + spineHeightPx(b)*SCALE + gap, 0);
   const H = 340 + stackH + 50;
 
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
+  const ctx = setupHiDPICanvas(canvas, W, H);
 
   // 배경
   ctx.fillStyle = theme.bg; ctx.fillRect(0,0,W,H);
@@ -2101,8 +2113,7 @@ function drawBookcaseShareCanvas(canvas, theme, {periodText, sorted, totalPages,
   const caseH = rows.length*tierH + Math.max(0, rows.length-1)*boardH + framePad*2;
   const H = headerH + caseH + 40;
 
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
+  const ctx = setupHiDPICanvas(canvas, W, H);
 
   ctx.fillStyle = theme.bg; ctx.fillRect(0,0,W,H);
   ctx.fillStyle = theme.accent; ctx.font='700 18px Inter, sans-serif';
@@ -2266,8 +2277,7 @@ async function generateCalShareImage(){
   const H = gridTop + gridH + 36 + listH;
 
   const canvas = document.getElementById('shareCanvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
+  const ctx = setupHiDPICanvas(canvas, W, H);
   ctx.fillStyle = theme.bg; ctx.fillRect(0,0,W,H);
 
   // 큰 날짜 타이틀 "YYYY.MM."
