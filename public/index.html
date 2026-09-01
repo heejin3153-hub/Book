@@ -65,7 +65,7 @@
 
   .section-h{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .section-h .h{ font-size:11px; letter-spacing:0.03em; text-transform:uppercase; color:var(--text-muted); font-weight:700; }
-  .icon-btn{ background:var(--bg); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:20px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+  .icon-btn{ background:var(--bg); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:20px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
   .icon-btn:active{ background:var(--accent-soft); color:var(--accent-dark); }
 
   /* 읽는 중 */
@@ -88,11 +88,6 @@
      알약 모양으로 보이게 함 - 동작은 그대로 네이티브 select라 모바일에서 휠 선택 등
      익숙한 방식 그대로 씀 */
   .period-select{ appearance:none; -webkit-appearance:none; background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a8a92' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center; border:1.5px solid var(--border-2); border-radius:20px; padding:7px 26px 7px 12px; font-size:12px; font-weight:700; color:var(--text); font-family:'Inter',sans-serif; }
-  /* 책 쌓기/책장에 꽂기 - 기간 선택(연도/월)과 같은 줄에 두되, select와 똑같은
-     알약 모양/크기로 통일해서 한 줄의 버튼들이 다 같은 모양으로 보이게 함 */
-  .layout-toggle{ display:flex; gap:4px; margin-left:auto; flex-shrink:0; }
-  .layout-toggle button{ background:var(--bg); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:20px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
-  .layout-toggle button.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .tag-chip{ background:var(--bg); border:1px solid var(--border); color:var(--text-muted); border-radius:20px; padding:6px 12px; font-size:11.5px; font-weight:600; cursor:pointer; }
   .tag-chip.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
 
@@ -774,6 +769,11 @@ function getShelfLayout(){ return localStorage.getItem('shelf-layout') || 'stack
 function setShelfLayout(v){
   localStorage.setItem('shelf-layout', v);
   if(currentView==='shelf') renderShelf();
+}
+// 버튼 두 개 대신 하나로 - 누를 때마다 쌓아보기/책장보기가 서로 바뀜(줄 폭을 줄여서
+// 기간 선택 버튼들과 한 줄에 다 들어가게 함)
+function toggleShelfLayout(){
+  setShelfLayout(getShelfLayout()==='stack' ? 'case' : 'stack');
 }
 function getStackStyle(){ return localStorage.getItem('stack-style') || 'cover'; }
 function setStackStyle(v){
@@ -1457,10 +1457,7 @@ function renderShelf(){
       ${Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${periodMonth===String(m)?'selected':''}>${m}월</option>`).join('')}
     </select>` : ''}`;
   }
-  html += `<div class="layout-toggle">
-    <button type="button" onclick="setShelfLayout('stack')" class="${shelfLayout==='stack'?'on':''}">📚 쌓기</button>
-    <button type="button" onclick="setShelfLayout('case')" class="${shelfLayout==='case'?'on':''}">🗄️ 책장</button>
-  </div>
+  html += `<button type="button" class="icon-btn" style="margin-left:auto" onclick="toggleShelfLayout()">${shelfLayout==='stack' ? '📚 쌓아보기' : '🗄️ 책장보기'}</button>
   <button class="icon-btn" onclick="openShareStackCard(this)">📤</button>
   </div>`;
 
