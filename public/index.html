@@ -217,8 +217,6 @@
   .wish-row .bd{ font-size:11px; color:var(--text-muted); margin-top:1px; }
   .wish-row .start-btn{ margin-left:auto; background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 12px; font-size:11.5px; font-weight:700; cursor:pointer; flex-shrink:0; }
   .wish-comment{ font-size:11.5px; color:var(--text-muted); margin-top:3px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .folder-edit{ margin-left:4px; opacity:0.85; }
-  .folder-add{ border-style:dashed; color:var(--accent); }
 
   .fab{ position:fixed; right:18px; bottom:calc(20px + var(--safe-b)); width:56px; height:56px; border-radius:50%; background:var(--accent); border:none; color:#fff; font-size:27px; cursor:pointer; box-shadow:0 8px 20px rgba(91,91,214,0.35), 0 2px 6px rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:center; z-index:20; }
   .fab:active{ transform:scale(0.95); }
@@ -375,7 +373,6 @@
       <div class="field" id="pagesField"><label>페이지 수</label><input id="pagesInput" type="number" placeholder="예: 472" min="1" inputmode="numeric"></div>
       <div class="field" id="tagsField"><label>태그 / 장르</label><input id="tagsInput" type="text" placeholder="알라딘 자동입력 (수정가능)"></div>
     </div>
-    <div class="field hidden" id="wishFolderField"><label>폴더</label><select id="wishFolderSelectField"></select></div>
     <div class="field hidden" id="wishCommentField"><label>코멘트</label><textarea id="wishCommentInput" placeholder="왜 읽고 싶은지, 누가 추천했는지 등을 적어보세요 (선택)"></textarea></div>
     <div class="field-row">
       <div class="field" id="startDateField"><label>읽기 시작한 날짜</label><input id="startDateInput" type="date"></div>
@@ -549,52 +546,6 @@ let currentQuotes = [];
 let expandedBooks = new Set();
 let startDateManuallyEdited = false;
 let activeTags = [];
-
-/* ---------------- 위시리스트 폴더 ---------------- */
-let wishFolders = JSON.parse(localStorage.getItem('wish-folders') || '[]');
-let activeWishFolder = 'all';
-function saveFolders(){ localStorage.setItem('wish-folders', JSON.stringify(wishFolders)); pushMetaToCloud(); }
-
-function addWishFolder(){
-  const name = prompt('새 폴더 이름을 입력해주세요');
-  if(name===null) return;
-  const trimmed = name.trim();
-  if(!trimmed) return;
-  wishFolders.push({ id: Date.now(), name: trimmed });
-  saveFolders();
-  renderWishlist();
-}
-function editWishFolder(id, event){
-  if(event) event.stopPropagation();
-  const folder = wishFolders.find(f=>f.id===id);
-  if(!folder) return;
-  const name = prompt('폴더 이름 수정 (빈 칸으로 저장하면 삭제돼요)', folder.name);
-  if(name===null) return;
-  const trimmed = name.trim();
-  if(!trimmed){
-    if(!confirm(`"${folder.name}" 폴더를 삭제할까요? 안에 있던 책은 삭제되지 않고 미분류로 이동해요.`)) return;
-    wishFolders = wishFolders.filter(f=>f.id!==id);
-    const affected = books.filter(b=> b.folderId===id);
-    affected.forEach(b=>{ b.folderId=null; });
-    if(activeWishFolder===id) activeWishFolder='all';
-    saveBooksRaw();
-    saveFolders();
-    affected.forEach(b=> saveBookToCloud(b));
-    renderWishlist();
-    return;
-  }
-  folder.name = trimmed;
-  saveFolders();
-  renderWishlist();
-}
-function selectWishFolder(id){ activeWishFolder = id; renderWishlist(); }
-function renderWishFolderOptions(selectedId){
-  const el = document.getElementById('wishFolderSelectField');
-  if(!el) return;
-  el.innerHTML = `<option value="">미분류</option>` +
-    wishFolders.map(f=>`<option value="${f.id}" ${String(selectedId)===String(f.id)?'selected':''}>${escapeHtml(f.name)}</option>`).join('');
-}
-
 
 const DEFAULT_TITLE = '독서기록';
 const DEFAULT_SUBTITLE = '책을 검색하면 페이지 수를 자동으로 가져와요';
@@ -775,6 +726,15 @@ function setShelfLayout(v){
 // 기간 선택 버튼들과 한 줄에 다 들어가게 함)
 function toggleShelfLayout(){
   setShelfLayout(getShelfLayout()==='stack' ? 'case' : 'stack');
+}
+// 위시리스트 화면 방식 - 'list'(코멘트가 보이는 목록) / 'case'(책장에 꽂은 모습)
+function getWishLayout(){ return localStorage.getItem('wish-layout') || 'list'; }
+function setWishLayout(v){
+  localStorage.setItem('wish-layout', v);
+  if(currentView==='wishlist') renderWishlist();
+}
+function toggleWishLayout(){
+  setWishLayout(getWishLayout()==='list' ? 'case' : 'list');
 }
 function getStackStyle(){ return localStorage.getItem('stack-style') || 'cover'; }
 function setStackStyle(v){
@@ -1019,9 +979,7 @@ function setStatus(s){
   document.getElementById('pagesField').style.display = s==='wishlist' ? 'none' : '';
   document.getElementById('tagsField').style.display = '';
   const showWish = s==='wishlist' ? '' : 'none';
-  document.getElementById('wishFolderField').classList.toggle('hidden', s!=='wishlist');
   document.getElementById('wishCommentField').classList.toggle('hidden', s!=='wishlist');
-  if(s==='wishlist') renderWishFolderOptions();
   document.getElementById('finishBtn').classList.add('hidden'); // 새로 추가할 때는 안 보임(수정時만)
   document.getElementById('saveBtn').textContent = editingId!==null ? '저장하기' : (s==='wishlist' ? '위시리스트에 추가' : '추가하기');
 }
@@ -1102,7 +1060,6 @@ function openEditModal(id){
   renderQuotesContainer();
   renderBookInfoButton();
   setStatus(book.status||'completed');
-  if((book.status||'completed')==='wishlist') renderWishFolderOptions(book.folderId);
   document.getElementById('finishBtn').classList.toggle('hidden', book.status!=='reading');
   document.getElementById('addModal').classList.remove('hidden');
   lockBodyScroll();
@@ -1303,8 +1260,6 @@ async function saveBook(){
   const completedDate = document.getElementById('dateInput').value || null;
   const review = document.getElementById('reviewInput').value.trim();
   const wishComment = document.getElementById('wishCommentInput').value.trim();
-  const folderSelect = document.getElementById('wishFolderSelectField');
-  const folderId = (currentStatus==='wishlist' && folderSelect.value) ? Number(folderSelect.value) : null;
   const quotes = (currentStatus==='completed' || currentStatus==='reading') ? currentQuotes.filter(q=>q.text && q.text.trim()).map(q=>({page:(q.page||'').trim(), text:q.text.trim()})) : [];
 
   if(currentStatus==='completed' && !completedDate){ alert('완독 날짜를 입력해주세요!'); return; }
@@ -1329,7 +1284,6 @@ async function saveBook(){
       rating: currentStatus==='completed' ? currentRating : 0,
       review: currentStatus==='completed' ? review : '',
       wishComment: currentStatus==='wishlist' ? wishComment : (books.find(b=>b.id===editingId)?.wishComment || ''),
-      folderId: currentStatus==='wishlist' ? folderId : (books.find(b=>b.id===editingId)?.folderId ?? null),
       quotes,
       cover: selectedCover, color,
       author: selectedAuthor || (books.find(b=>b.id===editingId)?.author || ''),
@@ -1415,6 +1369,46 @@ function sortedBookList(list){
   return arr;
 }
 
+// 실제 책장처럼 여러 단으로 나눠 세워서 꽂은 모습을 만듦. 단 높이를 고정해두고 flex-wrap이
+// 알아서 다음 단으로 넘기게 해서(브라우저가 실제 렌더된 폭으로 줄바꿈) 폭 계산을 직접 안 해도
+// 됨. "책장에 꽂기"(책 쌓기 탭)와 위시리스트 책장보기 둘 다 똑같은 케이스 모양을 그대로 재사용함.
+function renderBookcaseHtml(sorted, minTiers){
+  const panelScale = currentPanelScale();
+  const style = getStackStyle();
+  const tierH = Math.round(168 * panelScale);
+  const boardH = Math.max(6, Math.round(10 * panelScale));
+  const period = tierH + boardH;
+  // 책이 적어도 최소 단수만큼은 빈 칸이라도 보이게 - 배경 그라데이션은 실제 내용과 무관하게
+  // 컨테이너 전체 높이에 반복되므로, min-height만 확보해두면 빈 단도 선반이 그려짐
+  const boardsBg = `repeating-linear-gradient(to bottom, transparent 0px, transparent ${tierH}px, var(--case-board) ${tierH}px, var(--case-board) ${period}px)`;
+  let html = `<div class="bookcase"><div class="bookcase-books" style="min-height:${minTiers*period}px;gap:${boardH}px 2px;background-image:${boardsBg};background-size:100% ${period}px;background-repeat:repeat-y;background-position:top left;">`;
+  sorted.forEach((book,i)=>{
+    const isLast = i===sorted.length-1;
+    // 책마다 키를 다르게(실측 세로 길이가 있으면 그 비율로, 없으면 대충 그럴듯하게
+    // 흩어지도록) 해서 실제 책장처럼 보이게 함 - 단 자체 높이(tierH)는 그대로 두고
+    // 책 개별 높이만 그 안에서 줄임(바닥엔 항상 붙어 있음, align-items:flex-end)
+    const bookH = Math.round(tierH * bookHeightFactor(book));
+    // 맨 마지막(최신) 한 권만 이전 책에 기대듯 기울여 꽂음. 피벗이 책 밑변 오른쪽
+    // 끝에 있어서, 회전각 θ만큼 돌리면 반대쪽(왼쪽 위) 모서리가 대략 bookH*sin(θ)만큼
+    // 왼쪽으로 밀려남 - 겹치지 않을 최소한의 여백을 정확히 그만큼만 줘서, 겹치지도
+    // 않고 필요 이상으로 떨어지지도 않게 딱 맞닿는 정도로 맞춤
+    const tiltAngle = 6;
+    const tiltMargin = Math.round(bookH * Math.sin(tiltAngle*Math.PI/180)) + 1;
+    // 기본 모서리 반경(4px)이 화면 배율(panelScale)에 안 맞춰져 있어서 화면이 넓을수록
+    // 상대적으로 거의 안 보였음 - 책장에 꽂기에서는 화면 크기에 비례해서 키움
+    const bookRadius = Math.max(3, Math.round(4*panelScale));
+    const extraStyle = `height:${bookH}px;border-radius:${bookRadius}px;` + (isLast ? `transform:rotate(-${tiltAngle}deg);transform-origin:bottom right;margin-left:${tiltMargin}px;` : '');
+    const spineHtml = spineUnitHtml(book, tierH, style, '', extraStyle, '');
+    // 책마다 높이가 달라지면 그 줄(flex-wrap 한 줄)의 실제 높이도 제일 큰 책 기준으로
+    // 줄어들어서, 미리 계산해둔 선반 배경 간격(period)과 안 맞아 선반이 어긋나 보임 -
+    // 항상 단 높이(tierH)만큼의 "칸"으로 감싸서 줄 높이를 고정시킴(책은 그 안에서
+    // 바닥에 붙은 채 짧게 보임)
+    html += `<div class="case-slot" style="height:${tierH}px">${spineHtml}</div>`;
+  });
+  html += `</div></div>`;
+  return html;
+}
+
 function renderShelf(){
   const completed = books.filter(b=>b.status==='completed');
   const reading = books.filter(b=>b.status==='reading');
@@ -1472,42 +1466,7 @@ function renderShelf(){
   if(filtered.length===0){
     html += `<div class="empty-shelf">${completed.length===0 ? '아직 쌓은 책이 없어요.<br/>오른쪽 아래 + 버튼으로 첫 책을 올려보세요.' : '이 조건에 해당하는 책이 없어요.'}</div>`;
   }else if(shelfLayout==='case'){
-    // 실제 책장처럼 여러 단으로 나눠 세워서 꽂음. 단 높이를 고정해두고 flex-wrap이 알아서
-    // 다음 단으로 넘기게 해서(브라우저가 실제 렌더된 폭으로 줄바꿈) 폭 계산을 직접 안 해도 됨.
-    const panelScale = currentPanelScale();
-    const style = getStackStyle();
-    const tierH = Math.round(168 * panelScale);
-    const boardH = Math.max(6, Math.round(10 * panelScale));
-    const period = tierH + boardH;
-    const minTiers = 5;
-    // 책이 적어도 최소 단수만큼은 빈 칸이라도 보이게 - 배경 그라데이션은 실제 내용과 무관하게
-    // 컨테이너 전체 높이에 반복되므로, min-height만 확보해두면 빈 단도 선반이 그려짐
-    const boardsBg = `repeating-linear-gradient(to bottom, transparent 0px, transparent ${tierH}px, var(--case-board) ${tierH}px, var(--case-board) ${period}px)`;
-    html += `<div class="bookcase"><div class="bookcase-books" style="min-height:${minTiers*period}px;gap:${boardH}px 2px;background-image:${boardsBg};background-size:100% ${period}px;background-repeat:repeat-y;background-position:top left;">`;
-    sorted.forEach((book,i)=>{
-      const isLast = i===sorted.length-1;
-      // 책마다 키를 다르게(실측 세로 길이가 있으면 그 비율로, 없으면 대충 그럴듯하게
-      // 흩어지도록) 해서 실제 책장처럼 보이게 함 - 단 자체 높이(tierH)는 그대로 두고
-      // 책 개별 높이만 그 안에서 줄임(바닥엔 항상 붙어 있음, align-items:flex-end)
-      const bookH = Math.round(tierH * bookHeightFactor(book));
-      // 맨 마지막(최신) 한 권만 이전 책에 기대듯 기울여 꽂음. 피벗이 책 밑변 오른쪽
-      // 끝에 있어서, 회전각 θ만큼 돌리면 반대쪽(왼쪽 위) 모서리가 대략 bookH*sin(θ)만큼
-      // 왼쪽으로 밀려남 - 겹치지 않을 최소한의 여백을 정확히 그만큼만 줘서, 겹치지도
-      // 않고 필요 이상으로 떨어지지도 않게 딱 맞닿는 정도로 맞춤
-      const tiltAngle = 6;
-      const tiltMargin = Math.round(bookH * Math.sin(tiltAngle*Math.PI/180)) + 1;
-      // 기본 모서리 반경(4px)이 화면 배율(panelScale)에 안 맞춰져 있어서 화면이 넓을수록
-      // 상대적으로 거의 안 보였음 - 책장에 꽂기에서는 화면 크기에 비례해서 키움
-      const bookRadius = Math.max(3, Math.round(4*panelScale));
-      const extraStyle = `height:${bookH}px;border-radius:${bookRadius}px;` + (isLast ? `transform:rotate(-${tiltAngle}deg);transform-origin:bottom right;margin-left:${tiltMargin}px;` : '');
-      const spineHtml = spineUnitHtml(book, tierH, style, '', extraStyle, '');
-      // 책마다 높이가 달라지면 그 줄(flex-wrap 한 줄)의 실제 높이도 제일 큰 책 기준으로
-      // 줄어들어서, 미리 계산해둔 선반 배경 간격(period)과 안 맞아 선반이 어긋나 보임 -
-      // 항상 단 높이(tierH)만큼의 "칸"으로 감싸서 줄 높이를 고정시킴(책은 그 안에서
-      // 바닥에 붙은 채 짧게 보임)
-      html += `<div class="case-slot" style="height:${tierH}px">${spineHtml}</div>`;
-    });
-    html += `</div></div>`;
+    html += renderBookcaseHtml(sorted, 5);
   }else{
     // 책을 "세워서 나란히" 놓은 모습을 그대로 만든 다음, 통째로 90도 돌려서 눕힘.
     // 개별 이미지마다 회전/크롭을 계산하지 않아도 되니 잘림/여백/사파리 버그가 아예 생길 수 없음.
@@ -1614,6 +1573,7 @@ window.addEventListener('resize', ()=>{
   shelfResizeTimer = setTimeout(()=>{
     // 책장에 꽂기 모드는 폭에 따라 단 높이/여백을 다시 계산해야 해서 통째로 다시 그림
     if(currentView==='shelf' && getShelfLayout()==='case') renderShelf();
+    else if(currentView==='wishlist' && getWishLayout()==='case') renderWishlist();
     else layoutLyingShelf();
   }, 150);
 });
@@ -1900,21 +1860,19 @@ function fitStatBoxText(){
 
 /* ---------------- 위시리스트 ---------------- */
 function renderWishlist(){
-  const allWishlist = books.filter(b=>b.status==='wishlist');
-  const wishlist = activeWishFolder==='all' ? allWishlist : allWishlist.filter(b=> String(b.folderId||'')===String(activeWishFolder));
+  const wishlist = books.filter(b=>b.status==='wishlist');
+  const layout = getWishLayout();
 
-  let html = `<div class="section-h"><div class="h">위시리스트 · ${allWishlist.length}권</div></div>`;
-
-  html += `<div class="tag-filters">
-    <button class="tag-chip ${activeWishFolder==='all'?'on':''}" onclick="selectWishFolder('all')">전체</button>`;
-  wishFolders.forEach(f=>{
-    const isOn = String(activeWishFolder)===String(f.id);
-    html += `<button class="tag-chip folder-chip ${isOn?'on':''}" onclick="selectWishFolder(${f.id})">${escapeHtml(f.name)}${isOn?` <span class="folder-edit" onclick="editWishFolder(${f.id}, event)">✎</span>`:''}</button>`;
-  });
-  html += `<button class="tag-chip folder-add" onclick="addWishFolder()">+ 폴더</button></div>`;
+  let html = `<div class="section-h"><div class="h">위시리스트 · ${wishlist.length}권</div>
+    <button type="button" class="icon-btn" onclick="toggleWishLayout()">${layout==='list' ? '🗄️ 책장보기' : '📋 목록보기'}</button>
+  </div>`;
 
   if(wishlist.length===0){
-    html += `<div class="empty-shelf">${allWishlist.length===0 ? '읽고 싶은 책을 미리 등록해보세요.<br/>오른쪽 아래 + 버튼으로 추가할 수 있어요.' : '이 폴더에는 책이 없어요.'}</div>`;
+    html += `<div class="empty-shelf">읽고 싶은 책을 미리 등록해보세요.<br/>오른쪽 아래 + 버튼으로 추가할 수 있어요.</div>`;
+  }else if(layout==='case'){
+    // 등록한 순서(오래된 것부터)대로 꽂고, 가장 최근에 추가한 한 권만 기대듯 기울임
+    const sorted = [...wishlist].sort((a,b)=> a.id-b.id);
+    html += renderBookcaseHtml(sorted, 3);
   }else{
     wishlist.forEach(book=>{
       html += `<div class="wish-row">
@@ -2549,12 +2507,11 @@ async function deleteBookFromCloud(id){
   catch(e){ console.error('책 삭제(클라우드) 실패', e); }
 }
 
-// 제목/부제목/위시폴더 등 자잘한 설정값은 그대로 문서 하나에 저장 (변경이 드물어서 안전함)
+// 제목/부제목 등 자잘한 설정값은 그대로 문서 하나에 저장 (변경이 드물어서 안전함)
 async function pushMetaToCloud(){
   if(!currentUser || !fbDb) return;
   try{
     await fbDb.collection('users').doc(currentUser.uid).set({
-      wishFolders,
       appTitle: localStorage.getItem('app-title') || null,
       appSubtitle: localStorage.getItem('app-subtitle') || null,
       updatedAt: Date.now()
@@ -2567,12 +2524,6 @@ async function pullMetaFromCloud(){
     const snap = await fbDb.collection('users').doc(currentUser.uid).get();
     if(!snap.exists) return;
     const data = snap.data();
-    if(Array.isArray(data.wishFolders)){
-      const cloudFolderIds = new Set(data.wishFolders.map(f=>f.id));
-      const localOnlyFolders = wishFolders.filter(f=>!cloudFolderIds.has(f.id));
-      wishFolders = [...data.wishFolders, ...localOnlyFolders];
-      localStorage.setItem('wish-folders', JSON.stringify(wishFolders));
-    }
     if(data.appTitle) localStorage.setItem('app-title', data.appTitle);
     if(data.appSubtitle) localStorage.setItem('app-subtitle', data.appSubtitle);
     applyTitleFromStorage();
