@@ -291,6 +291,8 @@
   .btn-add:disabled{ opacity:0.4; }
   .btn-delete{ flex:1; background:#fdeeee; color:var(--danger); border:none; border-radius:12px; padding:14px; font-size:14px; font-weight:700; cursor:pointer; text-align:center; }
   .btn-secondary{ width:100%; background:var(--bg); border:1.5px solid var(--border-2); color:var(--text); border-radius:12px; padding:12px; font-size:13px; font-weight:700; cursor:pointer; margin-top:0; }
+  /* 지금 완독으로 표시하기 / 책등 이미지 잘못됐어요 버튼이 둘 다 보일 때 서로 붙어버리던 것 방지 */
+  #clearSpineBtn{ margin-top:10px; }
 
   .settings-row{ display:flex; gap:8px; margin-top:6px; }
   .sync-card{ background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:14px; }
@@ -358,7 +360,7 @@
       </div>
     </div>
 
-    <button type="button" class="btn-secondary hidden" id="reSearchToggle" style="margin-top:0" onclick="toggleSearchSection()">🔍 책 정보 다시 검색하기</button>
+    <button type="button" class="btn-secondary hidden" id="reSearchToggle" onclick="toggleSearchSection()">🔍 책 정보 다시 검색하기</button>
     <div id="searchSection">
       <div class="search-row">
         <div class="field"><label>책 제목 검색</label>
@@ -442,8 +444,8 @@
     <div class="card-divider"></div>
     <div class="field"><label>데이터 백업</label></div>
     <div class="settings-row">
-      <button class="btn-secondary" onclick="exportData()" style="margin-top:0">⬇ 내보내기</button>
-      <button class="btn-secondary" onclick="document.getElementById('importFile').click()" style="margin-top:0">⬆ 가져오기</button>
+      <button class="btn-secondary" onclick="exportData()">⬇ 내보내기</button>
+      <button class="btn-secondary" onclick="document.getElementById('importFile').click()">⬆ 가져오기</button>
     </div>
     <input type="file" id="importFile" accept="application/json" class="hidden" onchange="importData(event)">
 
@@ -982,7 +984,6 @@ function setStatus(s){
   document.getElementById('quotesField').style.display = showQuotes;
   document.getElementById('pagesField').style.display = s==='wishlist' ? 'none' : '';
   document.getElementById('tagsField').style.display = '';
-  const showWish = s==='wishlist' ? '' : 'none';
   document.getElementById('wishCommentField').classList.toggle('hidden', s!=='wishlist');
   document.getElementById('finishBtn').classList.add('hidden'); // 새로 추가할 때는 안 보임(수정時만)
   document.getElementById('saveBtn').textContent = editingId!==null ? '저장하기' : (s==='wishlist' ? '위시리스트에 추가' : '추가하기');
