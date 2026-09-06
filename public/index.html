@@ -269,6 +269,7 @@
   .quote-entry{ background:var(--bg); border:1px solid var(--border-2); border-radius:10px; padding:10px; margin-bottom:8px; }
   .quote-entry input{ width:100%; border:none; background:transparent; font-size:12px; font-weight:600; color:var(--text-muted); padding:0 0 6px; outline:none; }
   .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:vertical; min-height:80px; font-family:'Inter',sans-serif; line-height:1.5; }
+  .quote-entry .quote-mythought{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); min-height:50px; font-size:12.5px; color:var(--text-muted); }
   .quote-remove{ background:none; border:none; color:var(--danger); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0 0; }
   .quote-toggle{ background:none; border:none; color:var(--accent); font-size:11.5px; font-weight:700; cursor:pointer; padding:6px 0 0; }
   .quote-list{ margin-top:16px; padding-top:20px; border-top:1px dashed var(--border); cursor:pointer; }
@@ -276,6 +277,8 @@
   .quote-item .mark{ display:block; font-size:34px; font-weight:800; color:var(--accent); line-height:1; font-family:Georgia,'Times New Roman',serif; margin-bottom:2px; margin-top:-6px; }
   .quote-item .text{ font-size:13px; color:var(--text); line-height:1.65; white-space:pre-line; }
   .quote-item .src{ display:block; font-size:11px; color:var(--text-muted); font-weight:600; margin-top:6px; }
+  .quote-item .mythought-label{ font-size:10px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.02em; margin-top:12px; margin-bottom:4px; }
+  .quote-item .mythought{ padding:10px 12px; background:var(--accent-soft); border-radius:8px; font-size:12.5px; color:var(--text); line-height:1.6; white-space:pre-line; }
   .star-picker{ position:relative; display:inline-block; font-size:30px; letter-spacing:5px; cursor:pointer; line-height:1; -webkit-user-select:none; user-select:none; }
   .star-picker .bg{ color:var(--border-2); }
   .star-picker .fg{ position:absolute; top:0; left:0; overflow:hidden; color:var(--star); white-space:nowrap; width:0%; }
@@ -950,11 +953,12 @@ function renderQuotesContainer(){
     <div class="quote-entry">
       <input type="text" placeholder="페이지 또는 챕터 (예: p.152, 3장)" value="${(q.page||'').replace(/"/g,'&quot;')}" oninput="updateQuote(${i},'page',this.value)">
       <textarea placeholder="인상 깊었던 문장을 적어보세요" oninput="updateQuote(${i},'text',this.value)">${(q.text||'')}</textarea>
+      <textarea class="quote-mythought" placeholder="이 문구에 대한 내 생각 (선택)" oninput="updateQuote(${i},'myThought',this.value)">${(q.myThought||'')}</textarea>
       <button type="button" class="quote-remove" onclick="removeQuote(${i})">이 문구 삭제</button>
     </div>
   `).join('');
 }
-function addQuoteField(){ currentQuotes.push({page:'', text:''}); renderQuotesContainer(); }
+function addQuoteField(){ currentQuotes.push({page:'', text:'', myThought:''}); renderQuotesContainer(); }
 function updateQuote(i, field, val){ if(currentQuotes[i]) currentQuotes[i][field]=val; }
 function removeQuote(i){ if(!confirm('이 문구를 삭제할까요?')) return; currentQuotes.splice(i,1); renderQuotesContainer(); }
 
@@ -1260,7 +1264,7 @@ async function saveBook(){
   const completedDate = document.getElementById('dateInput').value || null;
   const review = document.getElementById('reviewInput').value.trim();
   const wishComment = document.getElementById('wishCommentInput').value.trim();
-  const quotes = (currentStatus==='completed' || currentStatus==='reading') ? currentQuotes.filter(q=>q.text && q.text.trim()).map(q=>({page:(q.page||'').trim(), text:q.text.trim()})) : [];
+  const quotes = (currentStatus==='completed' || currentStatus==='reading') ? currentQuotes.filter(q=>q.text && q.text.trim()).map(q=>({page:(q.page||'').trim(), text:q.text.trim(), myThought:(q.myThought||'').trim()})) : [];
 
   if(currentStatus==='completed' && !completedDate){ alert('완독 날짜를 입력해주세요!'); return; }
   if(currentStatus==='completed' && startDate && completedDate && new Date(startDate) > new Date(completedDate)){
@@ -1526,7 +1530,7 @@ function renderShelf(){
           ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
         </div>
         ${hasQuotes ? `<button type="button" class="quote-toggle" onclick="toggleBookExpand(${book.id}, event)">${isExpanded ? '접기 ▲' : `인용구 ${book.quotes.length}개 보기 ▼`}</button>` : ''}
-        ${hasQuotes && isExpanded ? `<div class="quote-list" onclick="openEditModal(${book.id})">${book.quotes.map(q=>`<div class="quote-item"><span class="mark">&ldquo;</span><div class="text">${escapeHtml(q.text)}</div>${q.page?`<span class="src">${escapeHtml(q.page)}</span>`:''}</div>`).join('')}</div>` : ''}
+        ${hasQuotes && isExpanded ? `<div class="quote-list" onclick="openEditModal(${book.id})">${book.quotes.map(q=>`<div class="quote-item"><span class="mark">&ldquo;</span><div class="text">${escapeHtml(q.text)}</div>${q.page?`<span class="src">${escapeHtml(q.page)}</span>`:''}${q.myThought?`<div class="mythought-label">💭 내 생각</div><div class="mythought">${escapeHtml(q.myThought)}</div>`:''}</div>`).join('')}</div>` : ''}
       </div>`;
     });
     html += `</div>`;
