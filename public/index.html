@@ -270,7 +270,10 @@
   .quote-entry input{ width:100%; border:none; background:transparent; font-size:12px; font-weight:600; color:var(--text-muted); padding:0 0 6px; outline:none; }
   .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:vertical; min-height:80px; font-family:'Inter',sans-serif; line-height:1.5; }
   .quote-entry .quote-mythought{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); min-height:50px; font-size:12.5px; color:var(--text-muted); }
-  .quote-remove{ background:none; border:none; color:var(--danger); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0 0; }
+  .quote-actions{ display:flex; align-items:center; gap:12px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border-2); }
+  .quote-move{ background:none; border:none; color:var(--text-muted); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0; }
+  .quote-move:disabled{ opacity:0.3; cursor:default; }
+  .quote-remove{ background:none; border:none; color:var(--danger); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0; margin-left:auto; }
   .quote-toggle{ background:none; border:none; color:var(--accent); font-size:11.5px; font-weight:700; cursor:pointer; padding:6px 0 0; }
   .quote-list{ margin-top:16px; padding-top:20px; border-top:1px dashed var(--border); cursor:pointer; }
   .quote-item{ position:relative; padding-left:16px; padding-top:2px; border-left:3px solid var(--accent); margin-bottom:20px; }
@@ -392,7 +395,10 @@
     <div class="field" id="quotesField">
       <label>인상 깊은 문구</label>
       <div id="quotesContainer"></div>
-      <button type="button" class="btn-secondary" style="margin-top:4px" onclick="addQuoteField()">+ 문구 추가</button>
+      <div class="settings-row">
+        <button type="button" class="btn-secondary" onclick="addQuoteField()">+ 문구 추가</button>
+        <button type="button" class="btn-secondary" onclick="sortQuotesByPage()">🔢 페이지순 정렬</button>
+      </div>
     </div>
 
     <button class="btn-secondary hidden" id="finishBtn" onclick="finishReading()">📖 지금 완독으로 표시하기</button>
@@ -956,13 +962,36 @@ function renderQuotesContainer(){
       <input type="text" placeholder="페이지 또는 챕터 (예: p.152, 3장)" value="${(q.page||'').replace(/"/g,'&quot;')}" oninput="updateQuote(${i},'page',this.value)">
       <textarea placeholder="인상 깊었던 문장을 적어보세요" oninput="updateQuote(${i},'text',this.value)">${(q.text||'')}</textarea>
       <textarea class="quote-mythought" placeholder="이 문구에 대한 내 생각 (선택)" oninput="updateQuote(${i},'myThought',this.value)">${(q.myThought||'')}</textarea>
-      <button type="button" class="quote-remove" onclick="removeQuote(${i})">이 문구 삭제</button>
+      <div class="quote-actions">
+        <button type="button" class="quote-move" onclick="moveQuote(${i},-1)" ${i===0?'disabled':''}>▲ 위로</button>
+        <button type="button" class="quote-move" onclick="moveQuote(${i},1)" ${i===currentQuotes.length-1?'disabled':''}>▼ 아래로</button>
+        <button type="button" class="quote-remove" onclick="removeQuote(${i})">이 문구 삭제</button>
+      </div>
     </div>
   `).join('');
 }
 function addQuoteField(){ currentQuotes.push({page:'', text:'', myThought:''}); renderQuotesContainer(); }
 function updateQuote(i, field, val){ if(currentQuotes[i]) currentQuotes[i][field]=val; }
 function removeQuote(i){ if(!confirm('이 문구를 삭제할까요?')) return; currentQuotes.splice(i,1); renderQuotesContainer(); }
+function moveQuote(i, dir){
+  const j = i+dir;
+  if(j<0 || j>=currentQuotes.length) return;
+  [currentQuotes[i], currentQuotes[j]] = [currentQuotes[j], currentQuotes[i]];
+  renderQuotesContainer();
+}
+// 페이지 입력칸은 자유 텍스트("p.152", "3장" 등)라 숫자만 뽑아서 정렬함 - 숫자가
+// 없으면 맨 뒤로 보내고, 값이 같으면 원래 순서를 유지함(정렬 안정성)
+function extractPageNum(str){
+  const m = String(str||'').match(/\d+/);
+  return m ? parseInt(m[0],10) : Infinity;
+}
+function sortQuotesByPage(){
+  currentQuotes = currentQuotes
+    .map((q,i)=>({q,i}))
+    .sort((a,b)=> extractPageNum(a.q.page)-extractPageNum(b.q.page) || a.i-b.i)
+    .map(x=>x.q);
+  renderQuotesContainer();
+}
 
 function toggleBookExpand(id, event){
   if(event) event.stopPropagation();
