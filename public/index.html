@@ -272,7 +272,10 @@
   .error-msg{ font-size:12.5px; color:var(--danger); background:rgba(224,82,82,0.08); padding:10px; border-radius:8px; }
 
   .quote-entry{ background:var(--bg); border:1px solid var(--border-2); border-radius:10px; padding:10px; margin-bottom:8px; }
-  .quote-entry input{ width:100%; border:none; background:transparent; font-size:12px; font-weight:600; color:var(--text-muted); padding:0 0 6px; outline:none; }
+  .quote-entry input{ width:100%; border:none; background:transparent; font-size:12px; font-weight:600; color:var(--text-muted); padding:0; outline:none; }
+  .quote-page-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .quote-page-row input{ flex:1; min-width:0; }
+  .p-insert-btn{ flex-shrink:0; width:26px; height:26px; border-radius:6px; border:1px solid var(--border-2); background:var(--surface); color:var(--text-muted); font-size:12px; font-weight:700; font-style:italic; cursor:pointer; padding:0; }
   .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:vertical; min-height:80px; font-family:'Inter',sans-serif; line-height:1.5; -webkit-appearance:none; appearance:none; }
   .quote-entry .quote-mythought{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); min-height:50px; font-size:12.5px; color:var(--text-muted); }
   .quote-actions{ display:flex; align-items:center; gap:12px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border-2); }
@@ -968,7 +971,10 @@ function renderQuotesContainer(){
   if(!el) return;
   el.innerHTML = currentQuotes.map((q,i)=>`
     <div class="quote-entry">
-      <input type="text" placeholder="페이지 또는 챕터 (예: p.152, 3장)" value="${(q.page||'').replace(/"/g,'&quot;')}" oninput="updateQuote(${i},'page',this.value)">
+      <div class="quote-page-row">
+        <input type="text" inputmode="numeric" id="quotePage${i}" placeholder="페이지 또는 챕터 (예: p.152, 3장)" value="${(q.page||'').replace(/"/g,'&quot;')}" oninput="updateQuote(${i},'page',this.value)">
+        <button type="button" class="p-insert-btn" onclick="insertPageP(${i})" title="p 입력">p</button>
+      </div>
       <textarea placeholder="인상 깊었던 문장을 적어보세요" oninput="updateQuote(${i},'text',this.value)">${(q.text||'')}</textarea>
       <textarea class="quote-mythought" placeholder="이 문구에 대한 내 생각 (선택)" oninput="updateQuote(${i},'myThought',this.value)">${(q.myThought||'')}</textarea>
       <div class="quote-actions">
@@ -981,6 +987,21 @@ function renderQuotesContainer(){
 }
 function addQuoteField(){ currentQuotes.push({page:'', text:'', myThought:''}); renderQuotesContainer(); }
 function updateQuote(i, field, val){ if(currentQuotes[i]) currentQuotes[i][field]=val; }
+// 페이지 입력칸은 숫자 키패드(inputmode=numeric)로 바꿔서 빨리 칠 수 있게 했는데,
+// 숫자 키패드에는 글자가 없어서 "p.152" 처럼 p를 직접 못 침 - 커서 위치에 p를
+// 끼워넣는 작은 버튼으로 대신함(마침표/숫자는 숫자 키패드에서 그대로 입력 가능)
+function insertPageP(i){
+  const input = document.getElementById(`quotePage${i}`);
+  if(!input) return;
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  const newVal = input.value.slice(0,start) + 'p' + input.value.slice(end);
+  input.value = newVal;
+  updateQuote(i, 'page', newVal);
+  input.focus();
+  const pos = start+1;
+  input.setSelectionRange(pos, pos);
+}
 function removeQuote(i){ if(!confirm('이 문구를 삭제할까요?')) return; currentQuotes.splice(i,1); renderQuotesContainer(); }
 function moveQuote(i, dir){
   const j = i+dir;
