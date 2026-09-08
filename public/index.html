@@ -252,6 +252,7 @@
   .title-row{ display:flex; gap:6px; }
   .title-row input{ flex:1; min-width:0; }
   .icon-sq-btn{ flex-shrink:0; width:44px; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); font-size:16px; cursor:pointer; box-sizing:border-box; padding:0; }
+  #bookInfoBtnWrap{ display:flex; flex-shrink:0; }
 
   .status-picker{ display:flex; gap:6px; }
   .status-picker button{ flex:1; background:var(--bg); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:10px; padding:11px 4px; font-size:13px; font-weight:700; cursor:pointer; }
@@ -405,7 +406,7 @@
       <div id="quotesContainer"></div>
       <div class="settings-row">
         <button type="button" class="btn-secondary" onclick="addQuoteField()">+ 문구 추가</button>
-        <button type="button" class="btn-secondary" onclick="sortQuotesByPage()">🔢 페이지순 정렬</button>
+        <button type="button" class="btn-secondary" id="sortPageBtn" onclick="sortQuotesByPage()">🔢 페이지순 정렬 (오름차순)</button>
       </div>
     </div>
 
@@ -993,12 +994,19 @@ function extractPageNum(str){
   const m = String(str||'').match(/\d+/);
   return m ? parseInt(m[0],10) : Infinity;
 }
+// 버튼을 누를 때마다 오름차순/내림차순이 번갈아 적용되게 함 - 버튼 글자에 다음 클릭에서
+// 어느 방향으로 정렬될지 미리 보여줘서 두 번 눌러봐야 아는 일이 없게 함
+let quoteSortAsc = true;
 function sortQuotesByPage(){
+  const dir = quoteSortAsc ? 1 : -1;
   currentQuotes = currentQuotes
     .map((q,i)=>({q,i}))
-    .sort((a,b)=> extractPageNum(a.q.page)-extractPageNum(b.q.page) || a.i-b.i)
+    .sort((a,b)=> dir*(extractPageNum(a.q.page)-extractPageNum(b.q.page)) || a.i-b.i)
     .map(x=>x.q);
   renderQuotesContainer();
+  quoteSortAsc = !quoteSortAsc;
+  const btn = document.getElementById('sortPageBtn');
+  if(btn) btn.textContent = `🔢 페이지순 정렬 (${quoteSortAsc ? '오름차순' : '내림차순'})`;
 }
 
 function toggleBookExpand(id, event){
