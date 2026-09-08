@@ -283,7 +283,7 @@
   .quote-list{ margin-top:16px; padding-top:20px; border-top:1px dashed var(--border); cursor:pointer; }
   .quote-item{ position:relative; padding-left:16px; padding-top:2px; border-left:3px solid var(--accent); margin-bottom:20px; }
   .quote-item .mark{ display:block; font-size:34px; font-weight:800; color:var(--accent); line-height:1; font-family:Georgia,'Times New Roman',serif; margin-bottom:2px; margin-top:-6px; }
-  .quote-item .text{ font-size:13px; color:var(--text); line-height:1.65; white-space:pre-line; }
+  .quote-item .text{ font-size:13px; color:var(--text); line-height:1.65; white-space:pre-wrap; }
   .quote-item .src{ display:block; font-size:11px; color:var(--text-muted); font-weight:600; margin-top:6px; }
   .quote-item .mythought-label{ font-size:10px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.02em; margin-top:12px; margin-bottom:4px; }
   .quote-item .mythought{ padding:10px 12px; background:var(--accent-soft); border-radius:8px; font-size:12.5px; color:var(--text); line-height:1.6; white-space:pre-line; }
@@ -1310,7 +1310,9 @@ async function saveBook(){
   const completedDate = document.getElementById('dateInput').value || null;
   const review = document.getElementById('reviewInput').value.trim();
   const wishComment = document.getElementById('wishCommentInput').value.trim();
-  const quotes = (currentStatus==='completed' || currentStatus==='reading') ? currentQuotes.filter(q=>q.text && q.text.trim()).map(q=>({page:(q.page||'').trim(), text:q.text.trim(), myThought:(q.myThought||'').trim()})) : [];
+  // 문구 앞에 일부러 넣은 공백(들여쓰기 등)이 저장할 때 사라지지 않도록 text는 trim하지
+  // 않음 - 완전히 빈 문구인지 판단할 때만(저장은 안 하고) trim해서 검사함
+  const quotes = (currentStatus==='completed' || currentStatus==='reading') ? currentQuotes.filter(q=>q.text && q.text.trim()).map(q=>({page:(q.page||'').trim(), text:q.text, myThought:(q.myThought||'').trim()})) : [];
 
   if(currentStatus==='completed' && !completedDate){ alert('완독 날짜를 입력해주세요!'); return; }
   if(currentStatus==='completed' && startDate && completedDate && new Date(startDate) > new Date(completedDate)){
