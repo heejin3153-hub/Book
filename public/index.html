@@ -276,8 +276,8 @@
   .quote-page-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
   .quote-page-row input{ flex:1; min-width:0; }
   .p-insert-btn{ flex-shrink:0; width:26px; height:26px; border-radius:6px; border:1px solid var(--border-2); background:var(--surface); color:var(--text-muted); font-size:12px; font-weight:700; font-style:italic; cursor:pointer; padding:0; }
-  .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:vertical; min-height:80px; font-family:'Inter',sans-serif; line-height:1.5; -webkit-appearance:none; appearance:none; }
-  .quote-entry .quote-mythought{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); min-height:50px; font-size:12.5px; color:var(--text-muted); }
+  .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:none; overflow:hidden; min-height:60px; font-family:'Inter',sans-serif; line-height:1.5; -webkit-appearance:none; appearance:none; }
+  .quote-entry .quote-mythought{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); min-height:40px; font-size:12.5px; color:var(--text-muted); }
   .quote-actions{ display:flex; align-items:center; gap:12px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border-2); }
   .quote-move{ background:none; border:none; color:var(--text-muted); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0; }
   .quote-move:disabled{ opacity:0.3; cursor:default; }
@@ -975,8 +975,8 @@ function renderQuotesContainer(){
         <input type="text" inputmode="numeric" id="quotePage${i}" placeholder="페이지 또는 챕터 (예: p.152, 3장)" value="${(q.page||'').replace(/"/g,'&quot;')}" oninput="updateQuote(${i},'page',this.value)">
         <button type="button" class="p-insert-btn" onclick="insertPageP(${i})" title="p 입력">p</button>
       </div>
-      <textarea placeholder="인상 깊었던 문장을 적어보세요" oninput="updateQuote(${i},'text',this.value)">${(q.text||'')}</textarea>
-      <textarea class="quote-mythought" placeholder="이 문구에 대한 내 생각 (선택)" oninput="updateQuote(${i},'myThought',this.value)">${(q.myThought||'')}</textarea>
+      <textarea placeholder="인상 깊었던 문장을 적어보세요" oninput="updateQuote(${i},'text',this.value); autoGrowQuote(this)">${(q.text||'')}</textarea>
+      <textarea class="quote-mythought" placeholder="이 문구에 대한 내 생각 (선택)" oninput="updateQuote(${i},'myThought',this.value); autoGrowQuote(this)">${(q.myThought||'')}</textarea>
       <div class="quote-actions">
         <button type="button" class="quote-move" onclick="moveQuote(${i},-1)" ${i===0?'disabled':''}>▲ 위로</button>
         <button type="button" class="quote-move" onclick="moveQuote(${i},1)" ${i===currentQuotes.length-1?'disabled':''}>▼ 아래로</button>
@@ -984,9 +984,18 @@ function renderQuotesContainer(){
       </div>
     </div>
   `).join('');
+  // 기존에 길게 써둔 문구를 다시 열었을 때도 처음부터 늘어난 높이로 보이게(입력 이벤트가
+  // 나기 전이라 자동 계산이 안 된 상태) 렌더 직후 한 번씩 직접 맞춰줌
+  el.querySelectorAll('textarea').forEach(autoGrowQuote);
 }
 function addQuoteField(){ currentQuotes.push({page:'', text:'', myThought:''}); renderQuotesContainer(); }
 function updateQuote(i, field, val){ if(currentQuotes[i]) currentQuotes[i][field]=val; }
+// 글을 많이 쓸수록 칸이 늘어나도록 - 일단 auto로 줄였다가 실제 내용 높이(scrollHeight)만큼
+// 다시 늘림(줄였다 늘리지 않으면 글을 지웠을 때 칸이 줄지 않고 그대로 남아있게 됨)
+function autoGrowQuote(el){
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
 // 페이지 입력칸은 숫자 키패드(inputmode=numeric)로 바꿔서 빨리 칠 수 있게 했는데,
 // 숫자 키패드에는 글자가 없어서 "p.152" 처럼 p를 직접 못 침 - 커서 위치에 p를
 // 끼워넣는 작은 버튼으로 대신함(마침표/숫자는 숫자 키패드에서 그대로 입력 가능)
@@ -1134,6 +1143,10 @@ function openEditModal(id){
   document.getElementById('finishBtn').classList.toggle('hidden', book.status!=='reading');
   document.getElementById('addModal').classList.remove('hidden');
   lockBodyScroll();
+  // renderQuotesContainer()는 모달이 아직 숨겨진(display:none) 상태에서 호출돼서
+  // 그때 계산한 scrollHeight가 0으로 나와 문구 칸이 찌그러져 보임 - 모달이 실제로
+  // 보이게 된 지금 다시 한 번 정확한 높이로 맞춰줌
+  document.getElementById('quotesContainer').querySelectorAll('textarea').forEach(autoGrowQuote);
 }
 
 function closeAddModal(){
