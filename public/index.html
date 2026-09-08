@@ -199,7 +199,6 @@
   .tagrow .name{ font-weight:600; }
   .tagrow .cnt{ color:var(--text-muted); font-variant-numeric:tabular-nums; }
   .stat-empty{ text-align:center; color:var(--text-muted); font-size:13px; padding:30px 0; }
-  .book-info-btn{ width:100%; background:var(--accent-soft); color:var(--accent-dark); border:none; border-radius:10px; padding:11px; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:14px; }
   .info-section{ margin-bottom:20px; }
   .info-section .h{ font-size:11px; letter-spacing:0.03em; text-transform:uppercase; color:var(--text-muted); font-weight:700; margin-bottom:8px; }
   .info-section .body{ font-size:13.5px; color:var(--text); line-height:1.7; white-space:pre-line; }
@@ -245,9 +244,14 @@
   .field input, .field select{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none; box-sizing:border-box; -webkit-appearance:none; appearance:none; text-align:center; }
   .field textarea{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; color:var(--text); font-family:'Inter',sans-serif; outline:none; box-sizing:border-box; }
   .field input[type="date"]{ min-width:0; padding:11px 10px; text-align:center; }
-  #pagesInput, #tagsInput{ text-align:center; }
+  #pagesInput, #tagsInput{ text-align:center; padding:9px; font-size:14px; }
   .field textarea{ resize:vertical; min-height:96px; font-size:14px; line-height:1.5; }
   .field input:focus, .field textarea:focus{ border-color:var(--accent); background:var(--surface); }
+
+  /* 책 제목 옆에 다시검색/자세히보기를 큰 버튼 대신 작은 아이콘 버튼으로 나란히 둠 */
+  .title-row{ display:flex; gap:6px; }
+  .title-row input{ flex:1; min-width:0; }
+  .icon-sq-btn{ flex-shrink:0; width:44px; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); font-size:16px; cursor:pointer; box-sizing:border-box; padding:0; }
 
   .status-picker{ display:flex; gap:6px; }
   .status-picker button{ flex:1; background:var(--bg); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:10px; padding:11px 4px; font-size:13px; font-weight:700; cursor:pointer; }
@@ -352,7 +356,6 @@
       <button class="card-close" onclick="closeAddModal()">&times;</button>
     </div>
     <div class="card-body">
-    <div class="card-divider"></div>
 
     <div class="field">
       <label>상태</label>
@@ -363,7 +366,6 @@
       </div>
     </div>
 
-    <button type="button" class="btn-secondary hidden" id="reSearchToggle" onclick="toggleSearchSection()">🔍 책 정보 다시 검색하기</button>
     <div id="searchSection">
       <div class="search-row">
         <div class="field"><label>책 제목 검색</label>
@@ -375,8 +377,14 @@
       <div class="card-divider"></div>
     </div>
 
-    <div class="field"><label>책 제목</label><input id="titleInput" type="text" placeholder="검색해서 선택하거나 직접 입력"></div>
-    <div id="bookInfoBtnWrap"></div>
+    <div class="field">
+      <label>책 제목</label>
+      <div class="title-row">
+        <input id="titleInput" type="text" placeholder="검색해서 선택하거나 직접 입력">
+        <button type="button" class="icon-sq-btn hidden" id="reSearchToggle" onclick="toggleSearchSection()" title="책 정보 다시 검색하기">🔍</button>
+        <span id="bookInfoBtnWrap"></span>
+      </div>
+    </div>
     <div class="field-row">
       <div class="field" id="pagesField"><label>페이지 수</label><input id="pagesInput" type="number" placeholder="예: 472" min="1" inputmode="numeric"></div>
       <div class="field" id="tagsField"><label>태그 / 장르</label><input id="tagsInput" type="text" placeholder="알라딘 자동입력 (수정가능)"></div>
@@ -1182,7 +1190,7 @@ function renderBookInfoButton(){
   const wrap = document.getElementById('bookInfoBtnWrap');
   if(!wrap) return;
   wrap.innerHTML = selectedAladinItemId
-    ? `<button type="button" class="book-info-btn" onclick="openBookInfoModal()">📖 책 정보 자세히 보기 (책소개·줄거리·책속에서)</button>`
+    ? `<button type="button" class="icon-sq-btn" onclick="openBookInfoModal()" title="책 정보 자세히 보기 (책소개·줄거리·책속에서)">ℹ️</button>`
     : '';
 }
 
