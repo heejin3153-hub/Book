@@ -146,7 +146,7 @@
   .book-row .tags span{ font-size:10px; background:var(--accent-soft); color:var(--accent-dark); padding:2px 7px; border-radius:8px; margin-right:4px; font-weight:600; }
   .book-row .stars{ color:var(--star); font-size:14px; margin-top:3px; letter-spacing:1px; flex-shrink:0; text-align:right; }
   .quote-count-badge{ font-size:12px; color:var(--text-muted); font-weight:700; white-space:nowrap; }
-  .quote-count-badge .hl-mark{ margin-right:3px; font-variant-emoji:text; }
+  .quote-count-badge .hl-icon{ margin-right:3px; vertical-align:-1.5px; }
   .book-row .rv{ font-size:12.5px; color:var(--text-muted); margin-top:4px; font-style:italic; line-height:1.4; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; max-width:100%; white-space:pre-line; }
   /* 인용구를 펼쳤을 때는 리뷰도 3줄로 잘리지 않고 전체가 다 보이게 함 */
   .book-row .rv.rv-full{ display:block; -webkit-line-clamp:unset; overflow:visible; }
@@ -601,6 +601,11 @@ let activeTags = [];
 const DEFAULT_TITLE = '독서기록';
 const DEFAULT_SUBTITLE = '책을 검색하면 페이지 수를 자동으로 가져와요';
 const PALETTE = ['#5b5bd6','#e0748c','#3fa88a','#e8a23f','#4a90d9','#9b6fd6','#e0645a','#3fb5b5'];
+// 인용구/내 생각 개수 뱃지 아이콘 - 유니코드 기호(연필/봉투 등)는 폰트마다 크기와
+// 스타일(이모지냐 텍스트냐)이 제각각이라 둘을 나란히 쓰면 크기가 안 맞아 보였음.
+// 직접 그린 SVG로 두 아이콘의 크기/굵기를 완전히 똑같이 맞춤
+const QUOTE_ICON = `<svg class="hl-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M3.2 4.6c-1.15 0-2 .9-2 2.1 0 1.3.95 2.2 2.1 2.2.15 0 .3 0 .45-.05-.2 1-1 1.75-1.95 2.05v1.55c2-.4 3.4-2 3.4-4.2v-1.4c0-1.3-.85-2.25-2-2.25zM10.7 4.6c-1.15 0-2 .9-2 2.1 0 1.3.95 2.2 2.1 2.2.15 0 .3 0 .45-.05-.2 1-1 1.75-1.95 2.05v1.55c2-.4 3.4-2 3.4-4.2v-1.4c0-1.3-.85-2.25-2-2.25z"/></svg>`;
+const THOUGHT_ICON = `<svg class="hl-icon" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round"><path d="M10.6 1.9a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L5.4 14.1l-3.5.9.9-3.5z"/></svg>`;
 
 function colorFor(seed){ let h=0; for(let i=0;i<seed.length;i++){ h=(h*31+seed.charCodeAt(i))>>>0; } return PALETTE[h%PALETTE.length]; }
 // 책장에 꽂기 - 책마다 키를 다르게 보이도록. 알라딘 실측 세로 길이(spineMm)가 있으면
@@ -1653,7 +1658,7 @@ function renderShelf(){
             ${hasReview?`<div class="rv${isExpanded?' rv-full':''}">${escapeHtml(book.review)}</div>`:''}
           </div>
           ${quoteCount>0||book.rating?`<div style="flex-shrink:0;text-align:right">
-            ${quoteCount>0?`<div class="quote-count-badge">&ldquo;${quoteCount}${thoughtCount>0?` <span class="hl-mark">✎︎</span>${thoughtCount}`:''}</div>`:''}
+            ${quoteCount>0?`<div class="quote-count-badge">${QUOTE_ICON}${quoteCount}${thoughtCount>0?` ${THOUGHT_ICON}${thoughtCount}`:''}</div>`:''}
             ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
           </div>`:''}
         </div>
