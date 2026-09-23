@@ -1062,6 +1062,14 @@ function setStatus(s){
   document.getElementById('wishCommentField').classList.toggle('hidden', s!=='wishlist');
   document.getElementById('finishBtn').classList.add('hidden'); // 새로 추가할 때는 안 보임(수정時만)
   document.getElementById('saveBtn').textContent = editingId!==null ? '저장하기' : (s==='wishlist' ? '위시리스트에 추가' : '추가하기');
+  // 상태를 완독으로 바꿨는데 완독 날짜가 비어있으면(예: 읽는 중이던 책을 상태 버튼만
+  // 눌러서 완독으로 바꾼 경우) 오늘 날짜로 자동 채움 - "지금 완독으로 표시하기" 버튼을
+  // 안 거쳐도 항상 자동으로 채워지게 함
+  if(s==='completed'){
+    const dateEl = document.getElementById('dateInput');
+    if(!dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
+    autoFillStartDate();
+  }
 }
 
 /* ---------------- 모달 열기/닫기 ---------------- */
@@ -1102,9 +1110,12 @@ function openAddModal(defaultStatus){
   setTimeout(()=>document.getElementById('searchInput').focus(),50);
 }
 
-// 완독 날짜가 바뀌면 시작 날짜를 자동으로 그 전날로 채움 - 단, 사용자가 시작 날짜를 직접 수정한 뒤에는 더 이상 덮어쓰지 않음
+// 완독 날짜가 바뀌면 시작 날짜를 자동으로 그 전날로 채움 - 단, 사용자가 시작 날짜를 직접
+// 수정했거나(startDateManuallyEdited) 위시리스트 "읽기 시작"으로 실제 시작일이 이미
+// 기록돼 있으면 그 값을 덮어쓰지 않음(완독 처리할 때마다 진짜 시작일이 지워지던 문제 방지)
 function autoFillStartDate(){
   if(startDateManuallyEdited) return;
+  if(document.getElementById('startDateInput').value) return;
   const completedVal = document.getElementById('dateInput').value;
   if(!completedVal) return;
   const d = new Date(completedVal + 'T00:00:00');
