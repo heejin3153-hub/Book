@@ -146,7 +146,7 @@
   .book-row .tags span{ font-size:10px; background:var(--accent-soft); color:var(--accent-dark); padding:2px 7px; border-radius:8px; margin-right:4px; font-weight:600; }
   .book-row .stars{ color:var(--star); font-size:14px; margin-top:3px; letter-spacing:1px; flex-shrink:0; text-align:right; }
   .quote-count-badge{ font-size:12px; color:var(--text-muted); font-weight:700; white-space:nowrap; }
-  .quote-count-badge .hl-mark{ margin-right:3px; }
+  .quote-count-badge .hl-mark{ margin-right:3px; font-variant-emoji:text; }
   .book-row .rv{ font-size:12.5px; color:var(--text-muted); margin-top:4px; font-style:italic; line-height:1.4; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; max-width:100%; white-space:pre-line; }
   /* 인용구를 펼쳤을 때는 리뷰도 3줄로 잘리지 않고 전체가 다 보이게 함 */
   .book-row .rv.rv-full{ display:block; -webkit-line-clamp:unset; overflow:visible; }
@@ -1653,7 +1653,7 @@ function renderShelf(){
             ${hasReview?`<div class="rv${isExpanded?' rv-full':''}">${escapeHtml(book.review)}</div>`:''}
           </div>
           ${quoteCount>0||book.rating?`<div style="flex-shrink:0;text-align:right">
-            ${quoteCount>0?`<div class="quote-count-badge"><span class="hl-mark">✎</span>${quoteCount}${thoughtCount>0?` <span class="hl-mark">✉</span>${thoughtCount}`:''}</div>`:''}
+            ${quoteCount>0?`<div class="quote-count-badge"><span class="hl-mark">✎︎</span>${quoteCount}${thoughtCount>0?` <span class="hl-mark">✉︎</span>${thoughtCount}`:''}</div>`:''}
             ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
           </div>`:''}
         </div>
