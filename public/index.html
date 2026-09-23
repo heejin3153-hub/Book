@@ -1652,7 +1652,7 @@ function renderShelf(){
             ${hasReview?`<div class="rv${isExpanded?' rv-full':''}">${escapeHtml(book.review)}</div>`:''}
           </div>
           ${quoteCount>0||book.rating?`<div style="flex-shrink:0;text-align:right">
-            ${quoteCount>0?`<div class="quote-count-badge">🖋️${quoteCount}${thoughtCount>0?` 💬${thoughtCount}`:''}</div>`:''}
+            ${quoteCount>0?`<div class="quote-count-badge">&ldquo;${quoteCount}${thoughtCount>0?` ✎${thoughtCount}`:''}</div>`:''}
             ${book.rating?`<div class="stars">${starHtml(book.rating)}</div>`:''}
           </div>`:''}
         </div>
