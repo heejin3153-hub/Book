@@ -209,6 +209,15 @@
   .info-phrase{ background:var(--bg); border-radius:10px; padding:12px; margin-bottom:8px; font-size:13px; line-height:1.6; }
   .info-phrase .pg{ font-size:11px; color:var(--accent); font-weight:700; margin-bottom:4px; }
 
+  /* 리뷰 모아보기(독서 에세이) */
+  .essay-entry{ padding:16px 0; }
+  .essay-entry:first-child{ padding-top:0; }
+  .essay-title{ font-size:15px; font-weight:800; color:var(--text); }
+  .essay-meta{ font-size:11.5px; color:var(--text-muted); margin-top:2px; font-weight:600; }
+  .essay-stars{ color:var(--star); font-size:13px; margin-top:6px; letter-spacing:1px; }
+  .essay-review{ font-size:14px; color:var(--text); line-height:1.75; white-space:pre-line; margin-top:10px; }
+  .essay-divider{ border-top:1px dashed var(--border); }
+
   /* 위시리스트 */
   .wish-row{ display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--border); }
   .wish-row:last-child{ border-bottom:none; }
@@ -487,6 +496,20 @@
     <div class="card-body">
       <div class="card-divider"></div>
       <div id="bookInfoContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 리뷰 모아보기(독서 에세이) 모달 -->
+<div id="essayModal" class="modal-back hidden">
+  <div class="card">
+    <div class="card-top">
+      <div><div class="ct">내 리뷰 모아보기</div><div class="cs" id="essaySubtitle">써온 리뷰를 이어서 읽어요</div></div>
+      <button class="card-close" onclick="closeEssayModal()">&times;</button>
+    </div>
+    <div class="card-body">
+      <div class="card-divider"></div>
+      <div id="essayContent"></div>
     </div>
   </div>
 </div>
@@ -1950,9 +1973,36 @@ function renderStats(){
     html += `</div>`;
   }
 
+  html += `<div class="card-divider"></div>
+    <button type="button" class="btn-secondary" onclick="openEssayView()">📖 내 리뷰 모아보기</button>`;
+
   document.getElementById('statsView').innerHTML = html;
   fitStatBoxText();
 }
+
+// 리뷰 모아보기(독서 에세이) - 완독한 책 중 리뷰를 남긴 것만 최신순으로 이어붙여서 보여줌
+function openEssayView(){
+  const list = books.filter(b=>b.status==='completed' && b.review && b.review.trim())
+    .sort((a,b)=> new Date(b.completedDate)-new Date(a.completedDate));
+  document.getElementById('essaySubtitle').textContent = list.length ? `총 ${list.length}편` : '써온 리뷰를 이어서 읽어요';
+  const el = document.getElementById('essayContent');
+  if(list.length===0){
+    el.innerHTML = `<div class="info-loading">아직 남긴 리뷰가 없어요.</div>`;
+  }else{
+    el.innerHTML = list.map((b,i)=> `
+      <div class="essay-entry">
+        <div class="essay-title">${escapeHtml(b.title)}</div>
+        <div class="essay-meta">${b.completedDate||''}${b.author?` · ${escapeHtml(cleanAuthor(b.author))}`:''}</div>
+        ${b.rating?`<div class="essay-stars">${starHtml(b.rating)}</div>`:''}
+        <div class="essay-review">${escapeHtml(b.review)}</div>
+      </div>
+      ${i<list.length-1?'<div class="essay-divider"></div>':''}
+    `).join('');
+  }
+  document.getElementById('essayModal').classList.remove('hidden');
+  lockBodyScroll();
+}
+function closeEssayModal(){ document.getElementById('essayModal').classList.add('hidden'); unlockBodyScroll(); }
 
 function fitStatBoxText(){
   document.querySelectorAll('.stat-box .v').forEach(el=>{
