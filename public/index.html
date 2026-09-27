@@ -1251,8 +1251,15 @@ async function deleteFromModal(){
 /* ---------------- 검색 ---------------- */
 function toggleSearchSection(){
   const el = document.getElementById('searchSection');
+  const wasHidden = el.classList.contains('hidden');
   el.classList.toggle('hidden');
-  if(!el.classList.contains('hidden')) setTimeout(()=>document.getElementById('searchInput').focus(), 50);
+  if(wasHidden){
+    // 다시 검색할 때 책 제목을 또 입력하지 않아도 되도록, 지금 적힌 책 제목을
+    // 검색창에 미리 채워두고 전체 선택해둠(그대로 검색하거나 바로 고쳐 쓸 수 있음)
+    const searchInput = document.getElementById('searchInput');
+    searchInput.value = document.getElementById('titleInput').value;
+    setTimeout(()=>{ searchInput.focus(); searchInput.select(); }, 50);
+  }
 }
 
 async function searchBooks(){
