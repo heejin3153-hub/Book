@@ -404,7 +404,7 @@
       </div>
     </div>
     <div class="field-row">
-      <div class="field" id="pagesField"><label>페이지 수</label><input id="pagesInput" type="number" placeholder="예: 472" min="1" inputmode="numeric"></div>
+      <div class="field" id="pagesField"><label id="pagesLabel">페이지 수</label><input id="pagesInput" type="number" placeholder="예: 472" min="1" inputmode="numeric"></div>
       <div class="field" id="tagsField"><label>태그 / 장르</label><input id="tagsInput" type="text" placeholder="알라딘 자동입력 (수정가능)"></div>
     </div>
     <div class="field hidden" id="wishCommentField"><label>코멘트</label><textarea id="wishCommentInput" placeholder="왜 읽고 싶은지, 누가 추천했는지 등을 적어보세요 (선택)"></textarea></div>
@@ -1090,7 +1090,11 @@ function setStatus(s){
   document.getElementById('ratingField').style.display = showRatingReview;
   document.getElementById('reviewField').style.display = showRatingReview;
   document.getElementById('quotesField').style.display = showQuotes;
-  document.getElementById('pagesField').style.display = s==='wishlist' ? 'none' : '';
+  // 위시리스트일 때도 페이지 수 입력칸을 계속 보이게 함 - 검색으로 자동으로 가져온
+  // 페이지 수를 확인/수정할 수 있고, 자동으로 못 찾은 경우 직접 입력해둘 수 있어서
+  // 나중에 "읽기 시작 → 완독"으로 넘어갈 때 페이지 수를 다시 입력할 필요가 없어짐
+  document.getElementById('pagesField').style.display = '';
+  document.getElementById('pagesLabel').textContent = s==='wishlist' ? '페이지 수 (선택)' : '페이지 수';
   document.getElementById('tagsField').style.display = '';
   document.getElementById('wishCommentField').classList.toggle('hidden', s!=='wishlist');
   document.getElementById('finishBtn').classList.add('hidden'); // 새로 추가할 때는 안 보임(수정時만)
