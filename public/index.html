@@ -111,10 +111,6 @@
      contain으로 바꿔서 표지 비율을 그대로 유지한 채 축소해서 보여주고(남는 자리는
      책 색으로 채움), 원본과 다르게 늘어나 보이지 않게 함 */
   .shelf-cover-fixed .shelf-spine-blur{ background-size:contain; background-repeat:no-repeat; }
-  /* 실제 책등 사진도 표지 대체와 마찬가지로 폭을 페이지수 공식으로 고정함(사진 원본
-     비율에 맡기면 예스24 사진마다 크롭/비율이 들쭉날쭉해서 페이지수와 안 맞아 보였음)
-     - 사진은 이 고정폭에 꽉 채우되, 크롭돼서 이음매가 안 보이게 object-fit:cover로 채움 */
-  .shelf-spine-crop img{ width:100%; height:100%; object-fit:cover; margin:0; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; }
   /* text-orientation:mixed는 숫자/영문만 따로 90도 돌리는데, 전체를 한 번 더 돌리는 우리 구조에서는
      그게 이중으로 돌아가 뒤집혀 보임 - upright로 통일해서 전체가 딱 한 번만 돌아가게 함 */
@@ -668,13 +664,12 @@ function spineUnitHtml(book, standHeightPx, style, transformStyle, extraStyle, e
   const useCoverImg = !useRealSpine && style==='cover' && !!book.cover;
   if(useRealSpine || useCoverImg){
     const imgUrl = useRealSpine ? book.spineImage : book.cover;
-    // 실제 책등 사진이든 표지 대체든, 두께는 항상 페이지수 공식으로 정함 - 예스24
-    // 책등 사진마다 실제 촬영/크롭 비율이 들쭉날쭉해서, 사진 원본 비율을 그대로 쓰면
-    // 페이지수가 많이 달라도 두께가 비슷해 보이는 문제가 있었음(사진은 크롭해서
-    // 이 고정폭에 꽉 채움 - shelf-spine-crop이 object-fit:cover로 처리)
-    const w = spineWidthPx(book, standHeightPx);
-    const boxClass = useRealSpine ? ' shelf-spine-crop' : ' shelf-cover-fixed';
-    return `<div class="shelf-spine${boxClass}${extraClass}" style="width:${w}px;${transformStyle}${extraStyle}background:${book.color}" onclick="openEditModal(${book.id})">
+    // 표지 사진은 책등 사진과 달리 두께와 무관하게 다 비슷한 비율이라, 표지의 실제 가로세로
+    // 비율을 그대로 쓰면(=사진 원본 비율로 폭이 정해지면) 두께감이 실제 책과 안 맞음.
+    // 그래서 표지로 대신할 때는 폭을 페이지수 기반으로 직접 정하고, 표지 원본은 흐린 배경으로만
+    // 채움(선명한 사진을 따로 안 겹쳐서 "배경이 두 겹"으로 보이던 문제 방지) + 세로 제목을 겹쳐 씀
+    const coverW = useCoverImg ? spineWidthPx(book, standHeightPx) : null;
+    return `<div class="shelf-spine${extraClass}${useCoverImg?' shelf-cover-fixed':''}" style="${useCoverImg?`width:${coverW}px;`:''}${transformStyle}${extraStyle}background:${book.color}" onclick="openEditModal(${book.id})">
       <div class="shelf-spine-blur" style="background-image:url('${imgUrl}')"></div>
       <img src="${imgUrl}" alt="" ${useCoverImg?'style="display:none"':''} onerror="spineImgFailed(this, ${book.id})"/>
       ${useCoverImg ? `<span class="shelf-title shelf-title-overlay">${escapeHtml(book.title)}</span>` : ''}
@@ -2154,14 +2149,23 @@ function drawStackShareCanvas(canvas, theme, {periodText, sorted, totalPages, hL
   const gap=5;
   const maxW = W - padX*2;
 
-  // 책마다 두께(rowH)/길이(w)를 먼저 계산해둠. 책등 사진이 있어도 두께는 항상
-  // 페이지수 공식으로 정함(사진 원본 비율에 맡기면 예스24 사진마다 크롭 비율이
-  // 들쭉날쭉해서 페이지수 차이가 안 드러나 보였음) - 라이브 화면과 동일한 방식
+  // 책마다 두께(rowH)/길이(w)를 먼저 계산해둠. 라이브 화면(책 쌓기)은 책의 "길이"를
+  // 거의 고정해두고 실제 책등 사진이 있으면 그 사진의 실제 가로세로 비율로 두께를
+  // 정하는데(사진 비율 자체에 그 책의 진짜 두께감이 녹아있음), 여기선 반대로 두께를
+  // 페이지수 공식으로 먼저 고정해버려서 사진 비율이 유별난 책(예: 얇아서 표지 전체
+  // 사진을 책등으로 대신 쓴 책)은 라이브 화면보다 훨씬 작게 나오는 문제가 있었음 -
+  // 사진이 있을 때는 라이브와 똑같이 "길이 고정, 두께는 사진 비율로" 계산하도록 맞춤
   const items = sorted.map(book=>{
     const spineImg = (useCover && book.spineImage) ? imageMap.get(book.spineImage) : null;
     const img = spineImg ? null : ((useCover && book.cover) ? imageMap.get(book.cover) : null);
-    const rowH = spineHeightPx(book) * SCALE;
-    const w = maxW * 0.9 * bookHeightFactor(book);
+    let rowH, w;
+    if(spineImg){
+      w = Math.min(maxW * 0.9 * bookHeightFactor(book), maxW*0.95);
+      rowH = Math.max(6, w * (spineImg.width/spineImg.height));
+    }else{
+      rowH = spineHeightPx(book) * SCALE;
+      w = maxW * 0.9 * bookHeightFactor(book);
+    }
     return {book, rowH, w, spineImg, img};
   });
   const stackH = items.reduce((s,it)=> s + it.rowH + gap, 0);
@@ -2195,12 +2199,12 @@ function drawStackShareCanvas(canvas, theme, {periodText, sorted, totalPages, hL
     roundRect(ctx, x, y, w, rowH, 6);
     if(spineImg){
       ctx.save(); ctx.clip();
-      ctx.fillStyle = book.color; ctx.fill(); // 이미지가 상자보다 비율이 달라도 책 색으로 채워짐(크롭 후 남는 자리는 거의 없음)
+      ctx.fillStyle = book.color; ctx.fill(); // 이미지 비율이 안 맞아 여백이 생겨도 책 색으로 채워짐
       // 실제 책등 이미지는 세로로 긴 사진이라 반시계 방향으로 90도 돌려서 가로 막대에 맞춤
-      // 상자를 꽉 채우도록 크롭함(Math.max) - 라이브 화면(object-fit:cover)과 동일하게 맞춤
+      // 절대 크롭하지 않음(항상 Math.min) - 폭이 상한에 걸려도 크롭 대신 여백을 감수함
       ctx.translate(x + w/2, y + rowH/2);
       ctx.rotate(-Math.PI/2);
-      const scale = Math.max(rowH/spineImg.width, w/spineImg.height);
+      const scale = Math.min(rowH/spineImg.width, w/spineImg.height);
       const iw=spineImg.width*scale, ih=spineImg.height*scale;
       ctx.drawImage(spineImg, -iw/2, -ih/2, iw, ih);
       ctx.restore();
@@ -2242,16 +2246,17 @@ function drawBookcaseShareCanvas(canvas, theme, {periodText, sorted, totalPages,
   const tierH = 168*SCALE, boardH = 10*SCALE, bookGap = 4;
   const maxW = W - padX*2 - framePad*2;
 
-  // 실제 렌더 폭 기준으로 단을 미리 나눔(폭 계산은 spineWidthPx로 라이브 화면과 동일하게
-  // 맞춤). 책등 사진이 있어도 폭은 항상 페이지수 공식으로 정함(사진 원본 비율에
-  // 맡기면 예스24 사진마다 크롭 비율이 들쭉날쭉해서 페이지수와 안 맞아 보였음)
+  // 실제 렌더 폭 기준으로 단을 미리 나눔(폭 계산은 spineWidthPx로 라이브 화면과 동일하게 맞춤).
+  // bookHeightFactor로 책마다 키를 다르게 하고(실측 세로 길이 또는 그럴듯한 값), 책등
+  // 사진이 있는 책은 키가 줄어드는 만큼 폭도 같은 비율로 줄여서 사진 비율이 안 찌그러지게 함
   const rows = [];
   let cur = [], curW = 0;
   sorted.forEach(book=>{
     const spineImg = (useCover && book.spineImage) ? imageMap.get(book.spineImage) : null;
     const img = spineImg ? null : ((useCover && book.cover) ? imageMap.get(book.cover) : null);
     const bookH = tierH * bookHeightFactor(book);
-    const w = spineWidthPx(book, tierH);
+    let w = spineImg ? Math.min(tierH*(spineImg.width/spineImg.height), maxW*0.9) : spineWidthPx(book, tierH);
+    if(spineImg) w = w * (bookH/tierH);
     if(cur.length>0 && curW + bookGap + w > maxW){ rows.push(cur); cur=[]; curW=0; }
     cur.push({book, w, bookH, spineImg, img});
     curW += w + bookGap;
@@ -2296,11 +2301,8 @@ function drawBookcaseShareCanvas(canvas, theme, {periodText, sorted, totalPages,
       roundRect(ctx, x, by, w, bookH, radius);
       ctx.clip();
       if(spineImg){
-        // 실제 책등 사진은 이미 세워진 방향(세로로 긴 사진) - 폭에 맞춰 크롭해서 채움
-        // (라이브 화면의 object-fit:cover와 동일, 늘어나 보이지 않게 함)
-        const scale = Math.max(w/spineImg.width, bookH/spineImg.height);
-        const iw=spineImg.width*scale, ih=spineImg.height*scale;
-        ctx.drawImage(spineImg, x+(w-iw)/2, by+(bookH-ih)/2, iw, ih);
+        // 실제 책등 사진은 이미 세워진 방향(세로로 긴 사진)이라 회전 없이 그대로 채움
+        ctx.drawImage(spineImg, x, by, w, bookH);
       }else{
         ctx.fillStyle = book.color; ctx.fillRect(x, by, w, bookH);
         if(img){
