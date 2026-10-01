@@ -99,7 +99,11 @@
   .lay-wrap{ width:100%; overflow:hidden; position:relative; opacity:0; }
   .lay-rotate{ position:relative; transform-origin:top left; }
   .shelf-row{ display:flex; align-items:center; gap:2px; height:100%; }
-  .shelf-spine{ position:relative; flex-shrink:0; height:94%; cursor:pointer; padding:0 4px; box-sizing:content-box; border-radius:4px; overflow:hidden; }
+  /* 책 쌓기는 .lay-rotate 전체가 회전(transform)돼 있는데, 그 안에서 blur 필터가 걸린
+     자식(아래 .shelf-spine-blur)을 가진 요소는 iOS Safari에서 overflow:hidden 클리핑
+     자체가 무시되고 블러 배경이 상자 밖으로 삐져나와 보이는 버그가 있음 - 자신을
+     별도 레이어로 승격시키면(translateZ(0)) 정상적으로 클리핑되게 고쳐짐 */
+  .shelf-spine{ position:relative; flex-shrink:0; height:94%; cursor:pointer; padding:0 4px; box-sizing:content-box; border-radius:4px; overflow:hidden; -webkit-transform:translateZ(0); transform:translateZ(0); }
   .shelf-spine img{ position:relative; z-index:1; height:100%; width:auto; display:block; margin:0 auto; }
   /* cover는 이미지 가운데 부분만 확대해서 잘라 쓰다 보니, 크롭된 부분의 색이 바로 옆
      선명한 이미지의 실제 가장자리 색과 안 맞아 이음매가 어긋나 보였음. 100% 100%로
