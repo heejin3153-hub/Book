@@ -114,11 +114,14 @@
   /* 책 쌓기(가로로 눕혀진 모습)에서 책등 사진 테두리가 너무 딱 떨어져 보인다는 피드백에
      맞춰, 눕히기 전 기준 좌우(=눕힌 뒤에는 위아래, 책 두께 방향) 가장자리를 살짝
      페이드시켜서 아래 블러 배경(확대 없이 원본 비율 그대로)과 컬러가 자연스럽게
-     이어지게 함 - 배경을 확대하면 오히려 어색해 보여서 확대는 넣지 않음 */
+     이어지게 함 - 배경을 확대하면 오히려 어색해 보여서 확대는 넣지 않음. 블러 반경을
+     기본(6px)보다 훨씬 크게 줘서 바코드/로고 같은 또렷한 무늬가 "흐릿한 복사본"처럼
+     비치지 않고 색상만 부드럽게 퍼진 것처럼 보이게 함 */
   #shelfRow .shelf-spine img{
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 14%, black 86%, transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0%, black 14%, black 86%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
   }
+  #shelfRow .shelf-spine-blur{ filter: blur(12px) saturate(1.15); }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; }
   /* text-orientation:mixed는 숫자/영문만 따로 90도 돌리는데, 전체를 한 번 더 돌리는 우리 구조에서는
      그게 이중으로 돌아가 뒤집혀 보임 - upright로 통일해서 전체가 딱 한 번만 돌아가게 함 */
