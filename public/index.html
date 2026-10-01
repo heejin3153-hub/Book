@@ -113,14 +113,12 @@
   .shelf-cover-fixed .shelf-spine-blur{ background-size:contain; background-repeat:no-repeat; }
   /* 책 쌓기(가로로 눕혀진 모습)에서 책등 사진 테두리가 너무 딱 떨어져 보인다는 피드백에
      맞춰, 눕히기 전 기준 좌우(=눕힌 뒤에는 위아래, 책 두께 방향) 가장자리를 살짝
-     페이드시켜서 아래 블러 배경과 자연스럽게 섞이게 함. 배경 블러는 같은 방향으로
-     사진을 확대해서(200%) 더 넓게 번진 느낌을 줌 - 둘 다 실제 눕혀진 화면 기준으로는
-     "상하"지만, 코드에서는 통째로 90도 돌리기 전 기준이라 좌우로 적용함 */
+     페이드시켜서 아래 블러 배경(확대 없이 원본 비율 그대로)과 컬러가 자연스럽게
+     이어지게 함 - 배경을 확대하면 오히려 어색해 보여서 확대는 넣지 않음 */
   #shelfRow .shelf-spine img{
     -webkit-mask-image: linear-gradient(to right, transparent 0%, black 14%, black 86%, transparent 100%);
     mask-image: linear-gradient(to right, transparent 0%, black 14%, black 86%, transparent 100%);
   }
-  #shelfRow .shelf-spine-blur{ background-size:200% 100%; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; }
   /* text-orientation:mixed는 숫자/영문만 따로 90도 돌리는데, 전체를 한 번 더 돌리는 우리 구조에서는
      그게 이중으로 돌아가 뒤집혀 보임 - upright로 통일해서 전체가 딱 한 번만 돌아가게 함 */
