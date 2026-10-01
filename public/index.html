@@ -99,14 +99,7 @@
   .lay-wrap{ width:100%; overflow:hidden; position:relative; opacity:0; }
   .lay-rotate{ position:relative; transform-origin:top left; }
   .shelf-row{ display:flex; align-items:center; gap:2px; height:100%; }
-  /* 책 쌓기는 .lay-rotate 전체가 회전(transform)돼 있는데, 그 안에서 blur 필터가 걸린
-     자식(아래 .shelf-spine-blur)을 가진 요소는 iOS Safari에서 overflow:hidden 클리핑
-     자체가 무시되고 블러 배경이 상자 밖으로(특히 모서리 쪽) 삐져나와 보이는 버그가
-     있음 - 레이어로 승격(translateZ(0))만으로는 모서리 일부에서 여전히 새서,
-     -webkit-mask-image 트릭까지 같이 줘서 클리핑을 강제함. radial-gradient로 하면
-     타원형 경계가 실제 둥근 모서리 곡선과 안 맞아 모서리에 얇은 선이 새서,
-     경계 모양에 영향 없는 단색(흰색) linear-gradient로 바꿔서 그 문제도 없앰 */
-  .shelf-spine{ position:relative; flex-shrink:0; height:94%; cursor:pointer; padding:0 4px; box-sizing:content-box; border-radius:4px; overflow:hidden; -webkit-transform:translateZ(0); transform:translateZ(0); -webkit-mask-image:-webkit-linear-gradient(#fff, #fff); }
+  .shelf-spine{ position:relative; flex-shrink:0; height:94%; cursor:pointer; padding:0 4px; box-sizing:content-box; border-radius:4px; overflow:hidden; }
   .shelf-spine img{ position:relative; z-index:1; height:100%; width:auto; display:block; margin:0 auto; }
   /* cover는 이미지 가운데 부분만 확대해서 잘라 쓰다 보니, 크롭된 부분의 색이 바로 옆
      선명한 이미지의 실제 가장자리 색과 안 맞아 이음매가 어긋나 보였음. 100% 100%로
@@ -128,7 +121,13 @@
     -webkit-mask-image: linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
     mask-image: linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
   }
-  #shelfRow .shelf-spine-blur{ filter: blur(12px) saturate(1.15); }
+  /* 책 쌓기는 .lay-rotate 전체가 회전(transform)돼 있는데, 그 안에서 음수 inset으로
+     상자보다 크게 튀어나온 블러 레이어(위 기본값 inset:-8px)가 있으면 iOS Safari가
+     overflow:hidden 클리핑을 무시해서 그 튀어나온 부분이 그대로 보이는 버그가 있었음.
+     translateZ(0)나 mask 트릭으로 클리핑을 강제해봐도 모서리에서 계속 새서, 아예
+     튀어나오는 부분 자체를 없앰(inset:0, 상자 크기에 딱 맞춤) - 블러의 가장자리가
+     살짝만 흐려져도 그 자리는 책 고유 색(.shelf-spine의 배경색)과 거의 같아서 티가 안 남 */
+  #shelfRow .shelf-spine-blur{ inset:0; filter: blur(12px) saturate(1.15); }
   /* 책 쌓기 모드는 책등 모서리를 기본값(4px)보다 살짝 더 둥글게 */
   #shelfRow .shelf-spine{ border-radius:8px; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; }
