@@ -122,6 +122,8 @@
     mask-image: linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
   }
   #shelfRow .shelf-spine-blur{ filter: blur(12px) saturate(1.15); }
+  /* 책 쌓기 모드는 책등 모서리를 기본값(4px)보다 살짝 더 둥글게 */
+  #shelfRow .shelf-spine{ border-radius:8px; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; }
   /* text-orientation:mixed는 숫자/영문만 따로 90도 돌리는데, 전체를 한 번 더 돌리는 우리 구조에서는
      그게 이중으로 돌아가 뒤집혀 보임 - upright로 통일해서 전체가 딱 한 번만 돌아가게 함 */
