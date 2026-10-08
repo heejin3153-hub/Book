@@ -2697,6 +2697,16 @@ function attachBooksListener(){
   booksListenerUnsub = booksCollection().onSnapshot(snap=>{
     const cloudBooks = [];
     snap.forEach(doc=> cloudBooks.push(normalizeBook(doc.data())));
+    // 네트워크가 불안정할 때 캐시가 아직 안 채워진 "빈 스냅샷"이 먼저 한 번 오는 경우가
+    // 있었음 - 이걸 그대로 믿고 books를 덮어쓰면, 책이 분명히 있었는데 잠깐 0권으로
+    // 보이다가(새로고침해야만 진짜 데이터가 다시 옴) 전부 사라진 것처럼 보이는 버그가
+    // 있었음. snap.metadata.fromCache(서버가 아직 확인 안 해준, 로컬 캐시뿐인 응답)이고
+    // 이미 책이 있던 상태에서 갑자기 0권으로 오면 이 일시적 상태로 보고 무시함 - 서버가
+    // 직접 확인해준(fromCache=false) 0권은 실제로 다 지워진 것일 수 있으니 그대로 반영함
+    if(cloudBooks.length===0 && books.length>0 && snap.metadata.fromCache){
+      console.warn('[sync] 캐시에서 온 빈 책 목록이라 무시함(일시적 동기화 문제로 추정)');
+      return;
+    }
     books = cloudBooks;
     saveBooksRaw();
     // 책등 이미지 일괄 조회처럼 책을 한 권씩 여러 번 연달아 저장할 때, 저장할 때마다
