@@ -131,7 +131,7 @@
      overflow:hidden 클리핑을 무시해서 그 튀어나온 부분이 그대로 보이는 버그가 있었음.
      튀어나오는 부분 자체를 없애고(inset:0, 상자 크기에 딱 맞춤), clip-path도 그에 맞춰
      보정 없이(0) 둥근 모서리(6px)만 적용함 */
-  #shelfRow .shelf-spine-blur{ inset:0; -webkit-clip-path: inset(0 round 6px); clip-path: inset(0 round 6px); filter: blur(12px) saturate(1.15); }
+  #shelfRow .shelf-spine-blur{ inset:0; -webkit-clip-path: inset(0 round 6px); clip-path: inset(0 round 6px); filter: blur(8px) saturate(1.15); }
   /* 책 쌓기 모드는 책등 모서리를 기본값(4px)보다 살짝 더 둥글게 */
   #shelfRow .shelf-spine{ border-radius:6px; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; }
