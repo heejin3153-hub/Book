@@ -123,15 +123,15 @@
      기본(6px)보다 훨씬 크게 줘서 바코드/로고 같은 또렷한 무늬가 "흐릿한 복사본"처럼
      비치지 않고 색상만 부드럽게 퍼진 것처럼 보이게 함 */
   #shelfRow .shelf-spine img{
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
   }
   /* 책 쌓기는 .lay-rotate 전체가 회전(transform)돼 있는데, 그 안에서 음수 inset으로
      상자보다 크게 튀어나온 블러 레이어(위 기본값 inset:-8px)가 있으면 iOS Safari가
      overflow:hidden 클리핑을 무시해서 그 튀어나온 부분이 그대로 보이는 버그가 있었음.
      튀어나오는 부분 자체를 없애고(inset:0, 상자 크기에 딱 맞춤), clip-path도 그에 맞춰
      보정 없이(0) 둥근 모서리(6px)만 적용함 */
-  #shelfRow .shelf-spine-blur{ inset:0; -webkit-clip-path: inset(0 round 6px); clip-path: inset(0 round 6px); filter: blur(8px) saturate(1.15); }
+  #shelfRow .shelf-spine-blur{ inset:0; -webkit-clip-path: inset(0 round 6px); clip-path: inset(0 round 6px); filter: blur(4px) saturate(1.1); }
   /* 책 쌓기 모드는 책등 모서리를 기본값(4px)보다 살짝 더 둥글게 */
   #shelfRow .shelf-spine{ border-radius:6px; }
   .shelf-fallback{ display:flex; align-items:center; justify-content:center; }
