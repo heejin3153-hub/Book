@@ -1948,9 +1948,13 @@ function mountRatingLines(){
     const w = el.clientWidth, h = el.clientHeight;
     if(!w || !h) return;
     const padTop = 18, padBottom = 10;
+    const avgs = pts.map(p=>p.avg);
+    let lo = Math.min(...avgs), hi = Math.max(...avgs);
+    if(lo===hi){ lo -= 0.5; hi += 0.5; } else { const margin=(hi-lo)*0.25; lo -= margin; hi += margin; }
+    lo = Math.max(lo, 0); hi = Math.min(hi, 5);
     const coords = pts.map(p=>{
       const x = ((p.i+0.5)/total)*w;
-      const y = padTop + (1 - p.avg/5) * (h-padTop-padBottom);
+      const y = padTop + (1 - (p.avg-lo)/(hi-lo)) * (h-padTop-padBottom);
       return {x,y,avg:p.avg};
     });
     const lineSeg = coords.map(c=>`${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
