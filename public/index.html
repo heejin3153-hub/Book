@@ -216,12 +216,12 @@
   .edit-pencil{ opacity:0.6; font-size:9px; }
   .stat-box .v{ font-size:22px; font-weight:800; letter-spacing:-0.01em; }
   .stat-box .l{ font-size:10.5px; color:var(--text-muted); font-weight:600; margin-top:4px; }
-  .bar-chart{ position:relative; display:flex; align-items:flex-end; gap:5px; height:110px; margin-bottom:6px; }
+  .bar-chart{ display:flex; align-items:flex-end; gap:5px; height:110px; margin-bottom:6px; }
   .bar-chart .bar-wrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
   .bar-chart .bar{ width:100%; background:var(--accent); border-radius:4px 4px 0 0; min-height:2px; }
   .bar-chart .bn{ font-size:9px; color:var(--text-muted); margin-top:2px; }
-  .rating-line-svg{ position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:2; }
-  .rating-line-label{ position:absolute; transform:translate(-50%,-160%); font-size:9px; color:var(--star); font-weight:700; white-space:nowrap; pointer-events:none; z-index:2; }
+  .rating-line-chart{ position:relative; height:52px; }
+  .rating-line-label{ position:absolute; transform:translate(-50%,-135%); font-size:9px; color:var(--star); font-weight:700; white-space:nowrap; pointer-events:none; }
   .taglist{ display:flex; flex-direction:column; gap:8px; margin-top:6px; }
   .tagrow{ display:flex; justify-content:space-between; align-items:center; font-size:12.5px; }
   .tagrow .name{ font-weight:600; }
@@ -1754,6 +1754,7 @@ window.addEventListener('resize', ()=>{
     if(currentView==='shelf' && getShelfLayout()==='case') renderShelf();
     else if(currentView==='wishlist' && getWishLayout()==='case') renderWishlist();
     else layoutLyingShelf();
+    if(currentView==='stats') mountRatingLines();
   }, 150);
 });
 
@@ -1934,20 +1935,32 @@ function cleanAuthor(name){
 }
 
 function ratingLineOverlay(entries, totalCount){
-  if(entries.length===0) return '';
-  const pad = 12;
-  const pts = entries.map(e=>{
-    const x = ((e.i+0.5)/totalCount)*100;
-    const y = pad + (1 - e.avg/5) * (100-2*pad);
-    return {x,y,avg:e.avg};
+  if(entries.length===0) return '<div class="rating-line-chart"></div>';
+  const safe = entries.map(e=>({i:e.i, avg:+e.avg.toFixed(2)}));
+  return `<div class="rating-line-chart" data-pts='${JSON.stringify(safe)}' data-total="${totalCount}"></div>`;
+}
+function mountRatingLines(){
+  document.querySelectorAll('.rating-line-chart').forEach(el=>{
+    let pts = [];
+    try{ pts = JSON.parse(el.dataset.pts||'[]'); }catch(e){ pts = []; }
+    const total = parseInt(el.dataset.total, 10) || 0;
+    if(pts.length===0 || total===0){ el.innerHTML = ''; return; }
+    const w = el.clientWidth, h = el.clientHeight;
+    if(!w || !h) return;
+    const padTop = 18, padBottom = 10;
+    const coords = pts.map(p=>{
+      const x = ((p.i+0.5)/total)*w;
+      const y = padTop + (1 - p.avg/5) * (h-padTop-padBottom);
+      return {x,y,avg:p.avg};
+    });
+    const lineSeg = coords.map(c=>`${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+    const circles = coords.map(c=>`<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="3" fill="var(--star)"/>`).join('');
+    const labels = coords.map(c=>`<div class="rating-line-label" style="left:${c.x.toFixed(1)}px; top:${c.y.toFixed(1)}px">${c.avg.toFixed(1)}</div>`).join('');
+    el.innerHTML = `<svg width="${w}" height="${h}" style="position:absolute; left:0; top:0; overflow:visible;">
+      <polyline points="${lineSeg}" fill="none" stroke="var(--star)" stroke-width="2"/>
+      ${circles}
+    </svg>${labels}`;
   });
-  const lineSeg = pts.map(p=>`${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
-  const dots = pts.map(p=>`<path d="M${p.x.toFixed(2)},${p.y.toFixed(2)} L${p.x.toFixed(2)},${p.y.toFixed(2)}" stroke="var(--star)" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`).join('');
-  const labels = pts.map(p=>`<div class="rating-line-label" style="left:${p.x.toFixed(2)}%; top:${p.y.toFixed(2)}%">⭐${p.avg.toFixed(1)}</div>`).join('');
-  return `<svg class="rating-line-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-    <polyline points="${lineSeg}" fill="none" stroke="var(--star)" stroke-width="2" vector-effect="non-scaling-stroke"/>
-    ${dots}
-  </svg>${labels}`;
 }
 function renderStats(){
   const completed = books.filter(b=>b.status==='completed' && b.completedDate);
@@ -1996,7 +2009,7 @@ function renderStats(){
       const ratings = yearRatings[y]||[];
       if(ratings.length) ratingPts.push({i, avg: ratings.reduce((a,b)=>a+b,0)/ratings.length});
     });
-    html += `<div class="section-h"><div class="h">연도별 완독 (권수 / 별점)</div></div><div class="bar-chart">${ratingLineOverlay(ratingPts, years.length)}`;
+    html += `<div class="section-h"><div class="h">연도별 완독 (권수 / 별점)</div></div>${ratingLineOverlay(ratingPts, years.length)}<div class="bar-chart">`;
     years.forEach(y=>{
       const pct = Math.max((yearCounts[y]/maxY)*100, 8);
       html += `<div class="bar-wrap">
@@ -2020,7 +2033,7 @@ function renderStats(){
     monthRatings.forEach((ratings,i)=>{
       if(ratings.length) ratingPtsM.push({i, avg: ratings.reduce((a,b)=>a+b,0)/ratings.length});
     });
-    html += `<div class="section-h"><div class="h">${statsYear}년 월별 완독 (권수 / 별점)</div></div><div class="bar-chart">${ratingLineOverlay(ratingPtsM, 12)}`;
+    html += `<div class="section-h"><div class="h">${statsYear}년 월별 완독 (권수 / 별점)</div></div>${ratingLineOverlay(ratingPtsM, 12)}<div class="bar-chart">`;
     monthCounts.forEach((c,i)=>{
       const pct = Math.max((c/maxMonth)*100, c>0?8:0);
       html += `<div class="bar-wrap">
@@ -2046,6 +2059,7 @@ function renderStats(){
 
   document.getElementById('statsView').innerHTML = html;
   fitStatBoxText();
+  mountRatingLines();
 }
 
 // 리뷰 모아보기(독서 에세이) - 완독한 책 중 리뷰를 남긴 것만 최신순으로 이어붙여서 보여줌
