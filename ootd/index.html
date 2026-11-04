@@ -1536,6 +1536,8 @@ $('tagList').addEventListener('click', e=>{
   else if(act==='cancel') renderTagList();
   else if(act==='gone'){
     const nn=isGone(t)?stripGone(t):GONE+t;
+    if(!confirm(isGone(t) ? `#${t}\n\n다시 있는 옷으로 바꿀까요?\n(모든 기록에서 #${nn}(으)로 바뀌어요)`
+                          : `#${t}\n\n지금은 없는 옷으로 표시할까요?\n(모든 기록에서 #${nn}(으)로 바뀌고, 옷장의 "없는 옷"으로 가요)`)) return;
     const n=renameTagsEverywhere(x=>x===t?nn:x); renderTagList();
     toast(isGone(t) ? `#${nn} 다시 있는 옷으로 바꿨어요` : `#${t} 없는 옷으로 표시했어요 (${n}일)`, 2500);
   }
