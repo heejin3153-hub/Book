@@ -159,6 +159,26 @@
   .closet-item .ph-brand{ height:100%; display:flex; align-items:center; justify-content:center; text-align:center; padding:8px; font-size:12px; font-weight:800; line-height:1.3; color:var(--text-muted); word-break:break-all; background:var(--accent-soft); overflow:hidden; }
   .closet-item.gone .im{ opacity:.45; filter:grayscale(1); }
   .closet-item .gone-badge{ display:inline-block; font-size:10px; font-weight:700; color:var(--text-muted); border:1px solid var(--border-2); border-radius:6px; padding:0 4px; margin-left:4px; vertical-align:1px; }
+  /* 태그 목록 */
+  .tl-row{ display:flex; align-items:center; gap:6px; padding:10px 2px; border-bottom:1px solid var(--border); }
+  .tl-row:last-child{ border-bottom:none; }
+  .tl-main{ flex:1; min-width:0; cursor:pointer; }
+  .tl-name{ font-size:13.5px; font-weight:700; word-break:break-all; line-height:1.35; }
+  .tl-name.gone{ color:var(--text-muted); }
+  .tl-sub{ font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .tl-btn{ flex-shrink:0; width:34px; height:34px; border-radius:9px; border:1px solid var(--border-2); background:var(--bg); color:var(--text); cursor:pointer; font-size:14px; }
+  .tl-edit{ flex:1; min-width:0; border:1.5px solid var(--accent); border-radius:9px; background:var(--bg); padding:8px 10px; font-size:16px; color:var(--text); font-family:inherit; outline:none; }
+  .tl-brand{ font-size:11px; font-weight:800; color:var(--accent-dark); letter-spacing:.02em; padding:14px 2px 4px; border-bottom:1px solid var(--border); }
+  /* 월별·계절별 */
+  .mt-block{ padding:12px 2px; border-bottom:1px solid var(--border); }
+  .mt-block:last-child{ border-bottom:none; }
+  .mt-h{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .mt-h b{ font-size:14px; }
+  .mt-h span{ font-size:11px; color:var(--text-muted); font-weight:600; }
+  .mt-tags{ display:flex; flex-wrap:wrap; gap:6px; }
+  .mt-tag{ border:none; background:var(--accent-soft); color:var(--accent-dark); border-radius:8px; padding:6px 9px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; text-align:left; word-break:break-all; }
+  .mt-tag .k{ opacity:.65; margin-left:4px; font-weight:700; }
+  .mt-tag.top{ background:var(--accent); color:#fff; }
   .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
   /* 모아보기 */
   .filter-chip{ background:var(--accent); color:#fff; }
@@ -231,6 +251,7 @@
     <button class="tab active" data-tab="cal">캘린더</button>
     <button class="tab" data-tab="closet">옷장</button>
     <button class="tab" data-tab="stats">통계</button>
+    <button class="tab" data-tab="tags">태그</button>
   </div>
 
   <!-- 캘린더 -->
@@ -279,6 +300,30 @@
     <p class="hint">옷을 누르면 그 옷을 입은 날 사진이 모두 모여요. 이름 수정은 거기서 ✏️ 버튼으로 할 수 있어요.<br>사진은 그 옷을 가장 최근에 입은 날의 사진이에요.</p>
   </section>
 
+  <!-- 태그 목록 (확인·수정) -->
+  <section id="tagsView" class="hidden">
+    <div class="panel">
+      <input class="search" id="tlSearch" type="search" placeholder="태그 검색">
+      <div class="filters">
+        <select class="sel" id="tlSort" aria-label="정렬">
+          <option value="name">이름순 (브랜드별)</option>
+          <option value="count">많이 쓴 순</option>
+          <option value="few">적게 쓴 순</option>
+          <option value="recent">최근에 쓴 순</option>
+        </select>
+        <select class="sel" id="tlOwn" aria-label="보유 여부">
+          <option value="all">전체</option>
+          <option value="own">지금 있는 옷</option>
+          <option value="gone">없는 옷</option>
+        </select>
+        <span class="count-label" id="tlCount"></span>
+      </div>
+      <button class="btn ghost" id="cleanBtn" style="width:100%;margin-bottom:6px">🧹 태그 정리 — SSFW, Top 같은 단어 한 번에 빼기</button>
+      <div id="tagList"></div>
+    </div>
+    <p class="hint">✏️ 이름을 고치면 그 태그가 달린 모든 기록에 반영돼요. 이미 있는 이름으로 바꾸면 하나로 합쳐져요.<br>오타 찾기는 "적게 쓴 순"으로 보면 편해요.</p>
+  </section>
+
   <!-- 통계 -->
   <section id="statsView" class="hidden">
     <div class="panel">
@@ -287,6 +332,7 @@
         <div class="stat-box"><div class="n" id="sTags">0</div><div class="l" id="sTagsL">옷 태그</div></div>
         <div class="stat-box"><div class="n" id="sAvg">0</div><div class="l">하루 평균 태그</div></div>
       </div>
+      <div class="seg" id="statMode" style="display:flex;margin-bottom:10px"><button data-m="rank" class="on" style="flex:1">순위</button><button data-m="month" style="flex:1">월별</button><button data-m="season" style="flex:1">계절별</button></div>
       <div class="filters">
         <select class="sel" id="periodSel" aria-label="기간"></select>
         <div class="seg" id="groupSeg"><button data-g="item" class="on">아이템별</button><button data-g="brand">브랜드별</button></div>
@@ -365,6 +411,24 @@
       <button class="btn ghost" id="goneTagBtn"></button>
       <button class="btn danger" id="deleteTagBtn">태그 삭제</button>
     </div>
+  </div>
+</div>
+
+<!-- 태그 정리 -->
+<div class="sheet-bg" id="cleanSheet">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h">
+      <div class="t">🧹 태그 정리</div>
+      <button class="icon-sq" data-close aria-label="닫기">✕</button>
+    </div>
+    <p class="saved" style="margin:0 0 10px;line-height:1.6">태그에서 뺄 단어를 고르세요. 브랜드(맨 앞)는 그대로 두고, <b>_로 나뉜 뒤쪽 단어</b>만 빼요.<br>예) COS_와이드카고팬츠_화이트_Bottom_SSFW → COS_와이드카고팬츠_화이트</p>
+    <div class="sec-label"><span>뺄 단어</span><span class="saved">자주 나오는 단어 · 숫자는 들어간 태그 수</span></div>
+    <div class="tags" id="cleanTokens"></div>
+    <div class="tag-input-wrap"><input class="tag-input" id="cleanAdd" placeholder="다른 단어 추가 (예: Acc)" autocomplete="off" autocapitalize="off" enterkeyhint="done"></div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:12px"><input type="checkbox" id="cleanAuto" checked> 앞으로 UpNote에서 가져올 때도 이 단어들을 자동으로 빼기</label>
+    <div class="sec-label"><span>미리보기</span><span class="saved" id="cleanSummary"></span></div>
+    <div id="cleanPreview" style="max-height:40vh;overflow-y:auto;font-size:12.5px;line-height:1.5"></div>
+    <button class="btn primary" id="cleanApply" style="width:100%;margin-top:14px">정리하기</button>
   </div>
 </div>
 
@@ -572,6 +636,7 @@ function refresh(){
   if(!$('tagSheet').classList.contains('open')){
     if(!$('statsView').classList.contains('hidden')) renderStats();
     if(!$('closetView').classList.contains('hidden')) renderCloset();
+    if(!$('tagsView').classList.contains('hidden') && !document.querySelector('.tl-edit')) renderTagList();
   }
 }
 
@@ -902,7 +967,15 @@ $('viewerDel').onclick=()=>{
 };
 
 /* ================= 태그 통계 ================= */
-function periodMatch(d, p){ return p==='all' || d.startsWith(p); }
+// 계절: 봄 3~5월 · 여름 6~8월 · 가을 9~11월 · 겨울 12~2월
+const SEASONS=[['spring','봄','3~5월',[3,4,5]],['summer','여름','6~8월',[6,7,8]],['fall','가을','9~11월',[9,10,11]],['winter','겨울','12~2월',[12,1,2]]];
+const seasonOf=d=>{ const m=+d.slice(5,7); return SEASONS.find(s=>s[3].includes(m))[0]; };
+// p: 'all' | '2024' | '2024-03' | 's:spring' | 's:spring:2024'
+function periodMatch(d, p){
+  if(p==='all') return true;
+  if(p.startsWith('s:')){ const [,ss,y]=p.split(':'); return seasonOf(d)===ss && (!y || d.startsWith(y)); }
+  return d.startsWith(p);
+}
 function fillPeriods(){
   const sel=$('periodSel'), prev=sel.value;
   const ds=Object.keys(entries).filter(d=>(entries[d].tags||[]).length).sort().reverse();
@@ -930,13 +1003,54 @@ function computeStats(){
   }
   return { list:Object.values(stats), days, tagSum };
 }
+let statMode='rank';
+function topOf(dates, n){
+  const c={};
+  for(const d of dates){ const tags=entries[d].tags||[]; for(const k of (statGroup==='brand' ? [...new Set(tags.map(brandOf))] : tags)) c[k]=(c[k]||0)+1; }
+  return Object.keys(c).sort((a,b)=>c[b]-c[a]||a.localeCompare(b,'ko')).slice(0,n).map(k=>[k,c[k]]);
+}
+function chipsHtml(top, period){
+  return top.map(([k,n],i)=>`<button class="mt-tag${i===0?' top':''}" data-n="${esc(k)}" data-p="${esc(period)}">${statGroup==='brand'?'':'#'}${esc(stripGone(k))}<span class="k">${n}</span></button>`).join('');
+}
+// 월별: 달마다 많이 입은 옷 TOP 5
+function renderMonthTop(){
+  const p=$('periodSel').value||'all';
+  const by={};
+  for(const d in entries){ if(!(entries[d].tags||[]).length || !periodMatch(d,p)) continue; (by[d.slice(0,7)] ||= []).push(d); }
+  const months=Object.keys(by).sort().reverse();
+  const box=$('rankList');
+  if(!months.length){ box.innerHTML='<div class="empty-msg">이 기간에 태그가 달린 기록이 없어요</div>'; return; }
+  box.innerHTML=months.map(m=>`<div class="mt-block"><div class="mt-h"><b>${periodLabel(m)}</b><span>${by[m].length}일 기록</span></div>
+    <div class="mt-tags">${chipsHtml(topOf(by[m],5), m)}</div></div>`).join('');
+}
+// 계절별: 봄·여름·가을·겨울마다 많이 입은 옷 TOP 10 (연도를 고르면 그 해만)
+function renderSeasonTop(){
+  const p=$('periodSel').value||'all', y=/^\d{4}$/.test(p)?p:'';
+  const box=$('rankList');
+  let html='';
+  for(const [key,name,range] of SEASONS){
+    const sp='s:'+key+(y?':'+y:'');
+    const dates=Object.keys(entries).filter(d=>(entries[d].tags||[]).length && periodMatch(d,sp));
+    html+=`<div class="mt-block"><div class="mt-h"><b>${y?y+'년 ':''}${name} <span style="font-weight:600">${range}</span></b><span>${dates.length}일 기록</span></div>
+      <div class="mt-tags">${dates.length ? chipsHtml(topOf(dates,10), sp) : '<span class="saved">기록 없음</span>'}</div></div>`;
+  }
+  box.innerHTML=html;
+}
 function renderStats(){
   fillPeriods();
   const { list, days, tagSum } = computeStats();
+  const isRank = statMode==='rank';
+  $('sortSel').classList.toggle('hidden', !isRank);
+  $('tagSearch').classList.toggle('hidden', !isRank);
+  // 계절별은 '전체 기간' 또는 연도만 의미가 있어서 월 선택지는 숨김
+  [...$('periodSel').options].forEach(o=>{ o.hidden = statMode==='season' && /-/.test(o.value); });
+  if(statMode==='season' && /-/.test($('periodSel').value)) $('periodSel').value=$('periodSel').value.slice(0,4);
   $('sDays').textContent=days;
   $('sTags').textContent=list.length;
   $('sTagsL').textContent = statGroup==='brand' ? '브랜드' : '옷 태그';
   $('sAvg').textContent = days ? (tagSum/days).toFixed(1) : '0';
+  if(statMode==='month') return renderMonthTop();
+  if(statMode==='season') return renderSeasonTop();
   const q=$('tagSearch').value.trim().toLowerCase().replace(/^#/,'');
   const sort=$('sortSel').value;
   let rows=list.filter(s=>!q || s.name.toLowerCase().includes(q.replace(/\s+/g,'_')) || s.name.toLowerCase().includes(q));
@@ -960,7 +1074,14 @@ function renderStats(){
       <div class="c">${s.count}회</div></div>`;
   }).join('');
 }
-$('rankList').addEventListener('click', e=>{ const r=e.target.closest('.rank-row'); if(r) openLook([{ kind:statGroup, name:r.dataset.n }], $('periodSel').value||'all'); });
+$('rankList').addEventListener('click', e=>{
+  const chip=e.target.closest('.mt-tag'); if(chip) return openLook([{ kind:statGroup, name:chip.dataset.n }], chip.dataset.p);
+  const r=e.target.closest('.rank-row'); if(r) openLook([{ kind:statGroup, name:r.dataset.n }], $('periodSel').value||'all');
+});
+$('statMode').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  statMode=b.dataset.m; [...$('statMode').children].forEach(x=>x.classList.toggle('on',x===b)); renderStats();
+});
 $('periodSel').onchange=renderStats; $('sortSel').onchange=renderStats; $('tagSearch').oninput=renderStats;
 $('groupSeg').addEventListener('click', e=>{
   const b=e.target.closest('button'); if(!b) return;
@@ -990,7 +1111,11 @@ function lazy(root, el, fn){
 let look={ filters:[], period:'all' }, lookIOs=[], lookPhotos=new Map();
 const fMatch=f=> f.kind==='brand' ? (t=>brandOf(t)===f.name) : (t=>t===f.name);
 const fLabel=f=> f.kind==='brand' ? `${f.name} (브랜드)` : '#'+f.name;
-function periodLabel(p){ if(p==='all') return '전체 기간'; const [y,m]=p.split('-'); return m?`${y}년 ${+m}월`:`${y}년`; }
+function periodLabel(p){
+  if(p==='all') return '전체 기간';
+  if(p.startsWith('s:')){ const [,ss,y]=p.split(':'); const S=SEASONS.find(x=>x[0]===ss); return (y?`${y}년 `:'')+S[1]; }
+  const [y,m]=p.split('-'); return m?`${y}년 ${+m}월`:`${y}년`;
+}
 function lookDates(){
   if(!look.filters.length) return [];
   return Object.keys(entries).filter(d=>periodMatch(d,look.period) && look.filters.every(f=>(entries[d].tags||[]).some(fMatch(f)))).sort().reverse();
@@ -1119,6 +1244,141 @@ $('lookInput').addEventListener('keydown', e=>{
     pickLook(exact || lookSug.find(x=>x.kind==='item') || { kind:'item', name:t });
   }
 });
+
+/* ================= 태그 목록 (확인·수정) ================= */
+function tagStats(){
+  const c={}, last={};
+  for(const d in entries) for(const t of entries[d].tags||[]){ c[t]=(c[t]||0)+1; if(!last[t]||d>last[t]) last[t]=d; }
+  return { c, last };
+}
+function renderTagList(){
+  const { c, last }=tagStats();
+  const q=normTag($('tlSearch').value).toLowerCase(), own=$('tlOwn').value, sort=$('tlSort').value;
+  const list=Object.keys(c).filter(t=>(!q || t.toLowerCase().includes(q)) && (own==='all' || (own==='gone')===isGone(t)));
+  list.sort({
+    name:(a,b)=>brandOf(a).localeCompare(brandOf(b),'ko') || stripGone(a).localeCompare(stripGone(b),'ko'),
+    count:(a,b)=>c[b]-c[a]||a.localeCompare(b,'ko'),
+    few:(a,b)=>c[a]-c[b]||a.localeCompare(b,'ko'),
+    recent:(a,b)=>last[b].localeCompare(last[a]),
+  }[sort]);
+  $('tlCount').textContent=`태그 ${list.length}개`;
+  const box=$('tagList');
+  if(!Object.keys(c).length){ box.innerHTML='<div class="empty-msg">아직 옷 태그가 없어요</div>'; return; }
+  if(!list.length){ box.innerHTML='<div class="empty-msg">검색 결과가 없어요</div>'; return; }
+  let html='', prevBrand=null;
+  for(const t of list){
+    if(sort==='name' && brandOf(t)!==prevBrand){ prevBrand=brandOf(t); html+=`<div class="tl-brand">${esc(prevBrand)}</div>`; }
+    html+=`<div class="tl-row" data-t="${esc(t)}">
+      <div class="tl-main" data-act="open"><div class="tl-name${isGone(t)?' gone':''}">#${esc(t)}</div>
+        <div class="tl-sub">${c[t]}회 · 마지막 ${fmtKo(last[t])}${isGone(t)?' · 없는 옷':''}</div></div>
+      <button class="tl-btn" data-act="edit" aria-label="이름 수정">✏️</button>
+      <button class="tl-btn" data-act="gone" aria-label="${isGone(t)?'다시 있는 옷으로':'없는 옷으로 표시'}">${isGone(t)?'↩︎':'🗃'}</button>
+      <button class="tl-btn" data-act="del" aria-label="태그 삭제">🗑</button>
+    </div>`;
+  }
+  box.innerHTML=html;
+}
+function startTagEdit(row){
+  const old=row.dataset.t;
+  row.innerHTML=`<input class="tl-edit" value="${esc(old)}" autocapitalize="off" autocomplete="off" enterkeyhint="done">
+    <button class="tl-btn" data-act="save" aria-label="저장">✓</button><button class="tl-btn" data-act="cancel" aria-label="취소">✕</button>`;
+  const inp=row.querySelector('input'); inp.focus(); inp.setSelectionRange(old.length, old.length);
+  inp.addEventListener('keydown', e=>{
+    if(e.isComposing) return;
+    if(e.key==='Enter'){ e.preventDefault(); saveTagEdit(row); }
+    if(e.key==='Escape') renderTagList();
+  });
+}
+function saveTagEdit(row){
+  const old=row.dataset.t, nv=normTag(row.querySelector('input').value);
+  if(!nv || nv===old){ renderTagList(); return; }
+  const { c }=tagStats();
+  if(c[nv] && !confirm(`#${nv} 태그가 이미 있어요 (${c[nv]}회).\n#${old}을(를) 여기에 합칠까요?`)) return;
+  const n=renameTagsEverywhere(t=>t===old?nv:t);
+  renderTagList();
+  toast(`${n}일의 기록에서 #${old} → #${nv}(으)로 바꿨어요`, 3000);
+}
+$('tagList').addEventListener('click', e=>{
+  const btn=e.target.closest('[data-act]'); if(!btn) return;
+  const row=btn.closest('.tl-row'), t=row.dataset.t, act=btn.dataset.act;
+  if(act==='open') openLook([{ kind:'item', name:t }]);
+  else if(act==='edit'){
+    if(document.querySelector('.tl-edit')) renderTagList();   // 다른 줄을 고치던 중이면 닫고
+    startTagEdit($('tagList').querySelector(`.tl-row[data-t="${CSS.escape(t)}"]`));
+  }
+  else if(act==='save') saveTagEdit(row);
+  else if(act==='cancel') renderTagList();
+  else if(act==='gone'){
+    const nn=isGone(t)?stripGone(t):GONE+t;
+    const n=renameTagsEverywhere(x=>x===t?nn:x); renderTagList();
+    toast(isGone(t) ? `#${nn} 다시 있는 옷으로 바꿨어요` : `#${t} 없는 옷으로 표시했어요 (${n}일)`, 2500);
+  }
+  else if(act==='del'){
+    if(!confirm(`모든 기록에서 #${t} 태그를 뺄까요?\n(사진과 일기는 그대로예요)`)) return;
+    const changed=[];
+    for(const d in entries){ const en=entryOf(d); if(!en.tags.includes(t)) continue; en.tags=en.tags.filter(x=>x!==t); changed.push(en); }
+    commitEntries(changed); renderTagList(); toast(`${changed.length}일의 기록에서 #${t}을(를) 뺐어요`);
+  }
+});
+$('tlSearch').oninput=renderTagList; $('tlSort').onchange=renderTagList; $('tlOwn').onchange=renderTagList;
+
+/* ================= 태그 정리: 시즌·종류 단어 일괄 빼기 ================= */
+// 기본으로 체크해 둘 단어 (시즌·옷 종류)
+const CLEAN_DEFAULT=['SS','FW','SSFW','FWSS','SF','Top','Tops','Bottom','Bottoms','Outer','Bag','Bags','Shoes','Shirts','Shirt','Sneakers','Knit','Dress','Acc','Accessory','Skirt','Pants','Jacket','Coat','Hat','Cap'];
+let cleanSel=new Set(), cleanExtra=[], stripTokens=[];
+function tokensOfTag(t){ return stripGone(t).split('_'); }
+function cleanTag(t, sel){
+  const pre=isGone(t)?GONE:'', parts=tokensOfTag(t);
+  const kept=[parts[0], ...parts.slice(1).filter(x=>!sel.has(x.toLowerCase()))];
+  return pre + kept.filter(Boolean).join('_');
+}
+function cleanCandidates(){
+  const { c }=tagStats(), cnt={};
+  for(const t in c) for(const w of new Set(tokensOfTag(t).slice(1))) if(/^[A-Za-z]+$/.test(w)) cnt[w]=(cnt[w]||0)+1;
+  for(const w of cleanExtra) cnt[w]=cnt[w]||0;
+  return Object.keys(cnt).filter(w=>cnt[w]>=2 || cleanExtra.includes(w) || CLEAN_DEFAULT.some(d=>d.toLowerCase()===w.toLowerCase()))
+    .sort((a,b)=>cnt[b]-cnt[a]).map(w=>[w,cnt[w]]);
+}
+function openClean(){
+  const cand=cleanCandidates();
+  cleanSel=new Set(cand.map(([w])=>w.toLowerCase()).filter(w=>CLEAN_DEFAULT.some(d=>d.toLowerCase()===w)));
+  renderClean(); openSheet('cleanSheet');
+}
+function renderClean(){
+  const cand=cleanCandidates();
+  $('cleanTokens').innerHTML=cand.length ? cand.map(([w,n])=>`<button class="tag${cleanSel.has(w.toLowerCase())?' filter-chip':''}" data-w="${esc(w)}" style="border:none;cursor:pointer">${cleanSel.has(w.toLowerCase())?'✓ ':''}${esc(w)} <span style="opacity:.6">${n}</span></button>`).join('') : '<span class="saved">뺄 만한 단어가 없어요</span>';
+  const { c }=tagStats(), changes=[], target={};
+  for(const t of Object.keys(c).sort((a,b)=>a.localeCompare(b,'ko'))){ const n=cleanTag(t, cleanSel); if(n!==t){ changes.push([t,n]); } (target[n] ||= []).push(t); }
+  const merges=Object.values(target).filter(l=>l.length>1).length;
+  $('cleanSummary').textContent = changes.length ? `${changes.length}개 바뀜`+(merges?` · ${merges}곳에서 같은 이름끼리 합쳐짐`:'') : '바뀌는 태그 없음';
+  $('cleanPreview').innerHTML = changes.map(([a,b])=>`<div style="padding:5px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-muted);text-decoration:line-through">#${esc(a)}</span><br>→ <b>#${esc(b)}</b>${target[b].length>1?' <span class="saved">(합쳐짐)</span>':''}</div>`).join('');
+  $('cleanApply').disabled=!changes.length; $('cleanApply').style.opacity=changes.length?1:.4;
+  $('cleanApply').textContent = changes.length ? `태그 ${changes.length}개 정리하기` : '정리하기';
+}
+$('cleanBtn').onclick=openClean;
+$('cleanTokens').addEventListener('click', e=>{
+  const b=e.target.closest('[data-w]'); if(!b) return;
+  const w=b.dataset.w.toLowerCase(); if(cleanSel.has(w)) cleanSel.delete(w); else cleanSel.add(w); renderClean();
+});
+$('cleanAdd').addEventListener('keydown', e=>{
+  if(e.isComposing || e.key!=='Enter') return; e.preventDefault();
+  const w=$('cleanAdd').value.trim().replace(/^_+|_+$/g,''); if(!w) return;
+  if(!cleanExtra.includes(w)) cleanExtra.push(w); cleanSel.add(w.toLowerCase()); $('cleanAdd').value=''; renderClean();
+});
+$('cleanApply').onclick=async ()=>{
+  const sel=new Set(cleanSel);
+  if(!confirm('미리보기대로 모든 기록의 태그를 바꿀까요?\n(같은 이름이 되는 태그는 하나로 합쳐져요)')) return;
+  const n=renameTagsEverywhere(t=>cleanTag(t, sel));
+  if($('cleanAuto').checked){
+    stripTokens=[...new Set([...stripTokens, ...sel])];
+    save(col('ootdMeta').doc('settings').set({ stripTokens }, { merge:true }));
+  }
+  closeSheet('cleanSheet'); renderTagList();
+  toast(`${n}일의 기록에서 태그를 정리했어요`, 3000);
+};
+async function loadSettings(){
+  try{ const snap=await col('ootdMeta').doc('settings').get(); stripTokens=(snap.exists && snap.data().stripTokens)||[]; }catch(e){ stripTokens=[]; }
+}
 
 /* ================= 옷장 ================= */
 let closetIOs=[];
@@ -1321,7 +1581,9 @@ function parseUpnote(html, fileName){
     if(m && validDate(m[1],m[2],m[3])) date=`${m[1]}-${m[2]}-${m[3]}`;
   }
   const tags=[...root.querySelectorAll('[data-upnote-tag]')]
-    .filter(a=>!head || !head.contains(a)).map(a=>normTag(tagOf(a))).filter(Boolean);
+    .filter(a=>!head || !head.contains(a)).map(a=>normTag(tagOf(a)))
+    .filter(t=>t && !/^\d+$/.test(t))   // #2024 #0116 같은 날짜용 숫자 태그는 옷 태그가 아님
+    .map(t=> stripTokens.length ? cleanTag(t, new Set(stripTokens)) : t);   // 태그 정리에서 고른 단어 자동으로 빼기
   const images=[...root.querySelectorAll('img')].map(i=>{ const s=i.getAttribute('src')||''; try{ return decodeURIComponent(s); }catch(e){ return s; } })
     .filter(s=>s && !/^(https?:|data:)/.test(s));
   const clone=root.cloneNode(true);
@@ -1332,6 +1594,7 @@ function parseUpnote(html, fileName){
   const text=noteText(clone).replace(/(?:🧥|👚|👖|👟|👜)\uFE0F?/gu,'')
     .split('\n').map(l=>l.trim())
     .filter(l=>l && !/^[\/+,·&|\-~]+$/.test(l))   // 태그 사이 구분 기호(/ + ,)만 남은 줄도 없앰
+    .filter(l=>!/^[월화수목금토일]요일$/.test(l))    // 제목 없이 본문에 쓴 날짜 줄에 남는 요일
     .join('\n');
   return { date, tags:[...new Set(tags)], text, images };
 }
@@ -1472,6 +1735,7 @@ function closeSheet(id){
   $(id).classList.remove('open');
   if(!$('statsView').classList.contains('hidden')) renderStats();
   if(!$('closetView').classList.contains('hidden')) renderCloset();
+  if(!$('tagsView').classList.contains('hidden')) renderTagList();
 }
 document.querySelectorAll('.sheet-bg').forEach(bg=>{
   bg.addEventListener('click', e=>{ if(e.target===bg || e.target.closest('[data-close]')) closeSheet(bg.id); });
@@ -1479,7 +1743,7 @@ document.querySelectorAll('.sheet-bg').forEach(bg=>{
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if($('viewer').classList.contains('open')) return closeViewer();
-  for(const id of ['tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
+  for(const id of ['cleanSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
 let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms); }
 
@@ -1490,9 +1754,10 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   $('calView').classList.toggle('hidden', t!=='cal');
   $('closetView').classList.toggle('hidden', t!=='closet');
   $('statsView').classList.toggle('hidden', t!=='stats');
+  $('tagsView').classList.toggle('hidden', t!=='tags');
   $('addBtn').classList.toggle('hidden', t!=='cal');
   window.scrollTo(0,0);
-  if(t==='stats') renderStats(); else if(t==='closet') renderCloset(); else renderCal();
+  if(t==='stats') renderStats(); else if(t==='closet') renderCloset(); else if(t==='tags') renderTagList(); else renderCal();
 });
 $('prevBtn').onclick=()=>{ if(--view.m<0){view.m=11;view.y--;} renderCal(); };
 $('nextBtn').onclick=()=>{ if(++view.m>11){view.m=0;view.y++;} renderCal(); };
@@ -1557,7 +1822,7 @@ function initFirebase(){
     months.clear(); dayPhotosCache.clear();
     user=u; entries={}; fullCache.clear();
     if(!u){ ['daySheet','tagSheet'].forEach(id=>$(id).classList.remove('open')); closeViewer(); showOnly('loginView'); return; }
-    showOnly('loadingView'); renderAccount(); startListening();
+    showOnly('loadingView'); renderAccount(); startListening(); loadSettings();
   });
 }
 initFirebase();
