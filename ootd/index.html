@@ -325,6 +325,7 @@
         <span class="count-label" id="tlCount"></span>
       </div>
       <button class="btn ghost" id="cleanBtn" style="width:100%;margin-bottom:6px">🧹 태그 정리 — SSFW, Top 같은 단어 한 번에 빼기</button>
+      <button class="btn ghost hidden" id="plainBtn" style="width:100%;margin-bottom:6px"></button>
       <div id="tagList"></div>
     </div>
     <p class="hint">✏️ 이름을 고치면 그 태그가 달린 모든 기록에 반영돼요. 이미 있는 이름으로 바꾸면 하나로 합쳐져요.<br>오타 찾기는 "적게 쓴 순"으로 보면 편해요.</p>
@@ -1322,7 +1323,26 @@ function tagStats(){
   for(const d in entries) for(const t of entries[d].tags||[]){ c[t]=(c[t]||0)+1; if(!last[t]||d>last[t]) last[t]=d; }
   return { c, last };
 }
+// _ 없는 태그 → 태그에서 빼고 그날 일기 맨 아래에 글자로 붙이기
+function plainTags(){ return Object.keys(tagStats().c).filter(t=>!t.includes('_')); }
+$('plainBtn').onclick=()=>{
+  const pt=new Set(plainTags()); if(!pt.size) return;
+  if(!confirm(`_ 없는 태그 ${pt.size}개를 태그에서 빼고, 그날 일기 맨 아래에 # 없이 글자로 남길까요?\n(${[...pt].slice(0,8).map(t=>'#'+t).join(' ')}${pt.size>8?' …':''})`)) return;
+  const changed=[];
+  for(const d in entries){
+    const e=entryOf(d), moved=e.tags.filter(t=>pt.has(t)); if(!moved.length) continue;
+    e.tags=e.tags.filter(t=>!pt.has(t));
+    const line=moved.join(' ');
+    e.text = e.text ? (e.text.split('\n').includes(line) ? e.text : e.text+'\n'+line) : line;
+    changed.push(e);
+  }
+  commitEntries(changed); renderTagList();
+  toast(`${changed.length}일의 기록에서 옮겼어요`, 3000);
+};
 function renderTagList(){
+  const ptn=plainTags().length;
+  $('plainBtn').classList.toggle('hidden', !ptn);
+  $('plainBtn').textContent=`📝 _ 없는 태그 ${ptn}개 → 일기 글로 옮기기`;
   const { c, last }=tagStats();
   const q=normTag($('tlSearch').value).toLowerCase(), own=$('tlOwn').value, sort=$('tlSort').value;
   const list=Object.keys(c).filter(t=>(!q || t.toLowerCase().includes(q)) && (own==='all' || (own==='gone')===isGone(t)));
@@ -1645,16 +1665,23 @@ function parseUpnote(html, fileName){
   }
   const tags=[...root.querySelectorAll('[data-upnote-tag]')]
     .filter(a=>!head || !head.contains(a)).map(a=>normTag(tagOf(a)))
-    .filter(t=>t && !/^\d+$/.test(t));   // #2024 #0116 같은 날짜용 숫자 태그는 옷 태그가 아님
+    .filter(t=>t && !/^\d+$/.test(t))   // #2024 #0116 같은 날짜용 숫자 태그는 옷 태그가 아님
+    .filter(t=>t.includes('_'));        // _ 없는 태그(#돈가스 등)는 태그가 아니라 일기 글로 남김 (아래)
   const images=[...root.querySelectorAll('img')].map(i=>{ const s=i.getAttribute('src')||''; try{ return decodeURIComponent(s); }catch(e){ return s; } })
     .filter(s=>s && !/^(https?:|data:)/.test(s));
   const clone=root.cloneNode(true);
   const cloneHead=clone.querySelector('h1,h2,h3,h4,h5,h6');   // 날짜가 적힌 제목 줄만 빼고 본문 글을 씀
   if(cloneHead) cloneHead.remove();
-  clone.querySelectorAll('[data-upnote-tag],img,style,script').forEach(n=>n.remove());
+  // _ 없는 태그는 그 자리에 # 없이 글자로 남기고, 나머지 태그 링크는 지움
+  clone.querySelectorAll('[data-upnote-tag]').forEach(a=>{
+    const t=normTag(tagOf(a));
+    if(t && !t.includes('_') && !/^\d+$/.test(t)) a.replaceWith(doc.createTextNode(' '+t+' '));
+    else a.remove();
+  });
+  clone.querySelectorAll('img,style,script').forEach(n=>n.remove());
   // 옷 줄 앞에 붙은 이모지(🧥👚👖👟👜)는 빼고, 이모지만 남은 줄은 없앰
   const text=noteText(clone).replace(/(?:🧥|👚|👖|👟|👜)\uFE0F?/gu,'')
-    .split('\n').map(l=>l.trim())
+    .split('\n').map(l=>l.replace(/[ \t]{2,}/g,' ').trim())
     .filter(l=>l && !/^[\/+,·&|\-~]+$/.test(l))   // 태그 사이 구분 기호(/ + ,)만 남은 줄도 없앰
     .filter(l=>!/^[월화수목금토일]요일$/.test(l))    // 제목 없이 본문에 쓴 날짜 줄에 남는 요일
     .join('\n');
