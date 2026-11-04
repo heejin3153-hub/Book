@@ -1415,18 +1415,22 @@ $('catAll').onclick=()=>{
 };
 $('catChips').addEventListener('click', e=>{
   const b=e.target.closest('[data-cat]'); if(!b || !tlSel || !tlSel.size) return;
-  let cat=b.dataset.cat;
+  let cat=b.dataset.cat, newCat=false;
   if(cat==='__custom'){
     const v=prompt('붙일 분류를 입력하세요 (예: Dress, Knit)'); if(v===null) return;
     cat=normTag(v).replace(/^_+|_+$/g,''); if(!cat) return;
     if(!CATS.some(x=>x.toLowerCase()===cat.toLowerCase())){
-      CATS.push(cat);
+      CATS.push(cat); newCat=true;
       save(col('ootdMeta').doc('settings').set({ cats: firebase.firestore.FieldValue.arrayUnion(cat) }, { merge:true }));
     }
   }
   const map=new Map([...tlSel].map(t=>[t, withCat(t, cat)]));
   const changes=[...map].filter(([a,b])=>a!==b);
-  if(!changes.length){ toast('이미 그렇게 되어 있어요'); return; }
+  if(!changes.length){
+    if(newCat){ renderTagList(); toast(`${cat}을(를) 분류로 등록했어요 — 이제 필터와 버튼에 나와요`, 3000); }
+    else toast('이미 그렇게 되어 있어요');
+    return;
+  }
   const sample=changes.slice(0,3).map(([a,b])=>`#${a}\n → #${b}`).join('\n');
   if(!confirm(`${changes.length}개 태그에 ${cat?'_'+cat+' 분류를 붙일까요?':'붙은 분류를 뺄까요?'}\n\n${sample}${changes.length>3?'\n…':''}`)) return;
   const n=renameTagsEverywhere(t=>map.get(t)||t);
