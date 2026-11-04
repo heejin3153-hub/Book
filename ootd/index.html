@@ -265,10 +265,10 @@
 <div class="wrap">
   <div class="header-row">
     <div>
-      <h1 class="title">OOTD 일기</h1>
-      <p class="subtitle">사진을 올리면 찍은 날짜에 맞춰 캘린더에 들어가요</p>
+      <h1 class="title" id="appTitle">OOTD 일기</h1>
+      <p class="subtitle" id="appSubtitle">사진을 올리면 찍은 날짜에 맞춰 캘린더에 들어가요</p>
     </div>
-    <button class="icon-sq" id="themeBtn" aria-label="테마 바꾸기">🌓</button>
+    <button class="icon-sq" id="menuBtn" aria-label="설정" style="font-size:18px;line-height:1">⋯</button>
   </div>
 
   <div class="tabs">
@@ -290,12 +290,7 @@
       <div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
       <div class="grid" id="grid"></div>
     </div>
-    <div class="tools">
-      <button class="chip-btn" id="exportBtn">⬇️ 백업 내보내기</button>
-      <button class="chip-btn" id="importBtn">⬆️ 백업 불러오기</button>
-    </div>
-    <div class="account" id="accountRow"></div>
-    <div class="sync" id="syncState"></div>
+
   </section>
 
   <!-- 옷장 -->
@@ -445,6 +440,39 @@
       <button class="btn ghost" id="goneTagBtn"></button>
       <button class="btn danger" id="deleteTagBtn">태그 삭제</button>
     </div>
+  </div>
+</div>
+
+<!-- 설정 (⋯) -->
+<div class="sheet-bg" id="menuSheet">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h">
+      <div><div class="t">설정</div><div class="saved" style="margin-top:2px">화면 문구, 테마, 데이터 백업을 관리해요</div></div>
+      <button class="icon-sq" data-close aria-label="닫기">✕</button>
+    </div>
+    <div class="sec-label"><span>제목</span></div>
+    <input class="tag-input" id="titleInput" placeholder="OOTD 일기" autocomplete="off">
+    <div class="sec-label"><span>부제목</span></div>
+    <input class="tag-input" id="subtitleInput" placeholder="사진을 올리면 찍은 날짜에 맞춰 캘린더에 들어가요" autocomplete="off">
+    <div class="btn-row" style="margin-top:10px;justify-content:flex-end">
+      <button class="btn ghost" id="titleReset">기본값으로</button>
+      <button class="btn primary" id="titleSave">저장하기</button>
+    </div>
+
+    <div class="sec-label" style="margin-top:22px"><span>화면 테마</span></div>
+    <div class="seg" id="themeSeg" style="display:flex">
+      <button data-v="light" style="flex:1">☀️ 기본</button><button data-v="system" style="flex:1">⚙️ 시스템 설정</button><button data-v="dark" style="flex:1">🌙 야간모드</button>
+    </div>
+
+    <div class="sec-label" style="margin-top:22px"><span>데이터 백업</span></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="exportBtn" style="flex:1">⬇️ 백업 내보내기</button>
+      <button class="btn ghost" id="importBtn" style="flex:1">⬆️ 백업 불러오기</button>
+    </div>
+
+    <div class="sec-label" style="margin-top:22px"><span>계정</span></div>
+    <div class="account" id="accountRow" style="justify-content:flex-start;margin-top:0"></div>
+    <div class="sync" id="syncState" style="text-align:left;margin-top:4px"></div>
   </div>
 </div>
 
@@ -1872,7 +1900,7 @@ document.addEventListener('keydown', e=>{
      && !e.target.closest('input,textarea')){ gotoDay(e.key==='ArrowLeft'?-1:1); return; }
   if(e.key!=='Escape') return;
   if($('viewer').classList.contains('open')) return closeViewer();
-  for(const id of ['tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
+  for(const id of ['menuSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
 let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms); }
 
@@ -1900,10 +1928,46 @@ $('dayFileInput').onchange=e=>{ const d=pendingDay; pendingDay=null; addFiles(e.
   g.addEventListener('touchend',e=>{ if(sx===null) return; const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy; sx=null;
     if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5) $(dx<0?'nextBtn':'prevBtn').click(); });
 })();
-$('themeBtn').onclick=()=>{
-  const next=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
-  document.documentElement.setAttribute('data-theme',next);
-  try{ localStorage.setItem('ootd-theme',next); }catch(e){}
+/* ---- 설정 (⋯): 제목·부제목, 테마 ---- */
+const DEFAULT_TITLE='OOTD 일기', DEFAULT_SUBTITLE='사진을 올리면 찍은 날짜에 맞춰 캘린더에 들어가요';
+function applyTitle(t, st){
+  $('appTitle').textContent = t || DEFAULT_TITLE;
+  $('appSubtitle').textContent = st || DEFAULT_SUBTITLE;
+  document.title = t || DEFAULT_TITLE;
+  try{ localStorage.setItem('ootd-title', JSON.stringify({ t:t||'', st:st||'' })); }catch(e){}
+}
+try{ const c=JSON.parse(localStorage.getItem('ootd-title')||'null'); if(c) applyTitle(c.t, c.st); }catch(e){}   // 열자마자 바로 보이게
+async function loadTitle(){
+  try{ const snap=await col('ootdMeta').doc('settings').get(); const d=snap.exists?snap.data():{}; applyTitle(d.title, d.subtitle); }catch(e){ console.error(e); }
+}
+function themeMode(){ try{ return localStorage.getItem('ootd-theme')||'system'; }catch(e){ return 'system'; } }
+function applyThemeMode(m){
+  const actual = m==='system' ? (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light') : m;
+  document.documentElement.setAttribute('data-theme', actual);
+  [...$('themeSeg').children].forEach(b=>b.classList.toggle('on', b.dataset.v===m));
+}
+$('themeSeg').addEventListener('click', e=>{
+  const b=e.target.closest('[data-v]'); if(!b) return;
+  try{ localStorage.setItem('ootd-theme', b.dataset.v); }catch(e){}
+  applyThemeMode(b.dataset.v);
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{ if(themeMode()==='system') applyThemeMode('system'); });
+$('menuBtn').onclick=()=>{
+  $('titleInput').value = $('appTitle').textContent===DEFAULT_TITLE ? '' : $('appTitle').textContent;
+  $('subtitleInput').value = $('appSubtitle').textContent===DEFAULT_SUBTITLE ? '' : $('appSubtitle').textContent;
+  applyThemeMode(themeMode()); setSync();
+  openSheet('menuSheet');
+};
+$('titleSave').onclick=()=>{
+  const t=$('titleInput').value.trim(), st=$('subtitleInput').value.trim();
+  applyTitle(t, st);
+  save(col('ootdMeta').doc('settings').set({ title:t, subtitle:st }, { merge:true }));
+  closeSheet('menuSheet'); toast('저장했어요');
+};
+$('titleReset').onclick=()=>{
+  applyTitle('', '');
+  save(col('ootdMeta').doc('settings').set({ title:'', subtitle:'' }, { merge:true }));
+  closeSheet('menuSheet'); toast('기본값으로 되돌렸어요');
 };
 window.addEventListener('online', ()=>setSync()); window.addEventListener('offline', ()=>setSync());
 
@@ -1952,7 +2016,7 @@ function initFirebase(){
     months.clear(); dayPhotosCache.clear();
     user=u; entries={}; fullCache.clear();
     if(!u){ ['daySheet','tagSheet'].forEach(id=>$(id).classList.remove('open')); closeViewer(); showOnly('loginView'); return; }
-    showOnly('loadingView'); renderAccount(); startListening(); loadCustomCats();
+    showOnly('loadingView'); renderAccount(); startListening(); loadCustomCats(); loadTitle();
   });
 }
 initFirebase();
