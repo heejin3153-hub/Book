@@ -20,6 +20,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#fafafa; --surface:#ffffff; --border:#ececec; --border-2:#e2e2e2;
@@ -156,9 +159,31 @@
 
   .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(90px + var(--safe-b)); background:var(--text); color:var(--bg); padding:10px 16px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .2s; z-index:90; max-width:calc(100% - 32px); text-align:center; }
   .toast.show{ opacity:1; }
+
+  /* 로그인 */
+  .login{ min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px 16px; text-align:center; }
+  .login .big{ font-size:44px; margin-bottom:10px; }
+  .login h1{ font-size:24px; font-weight:800; margin:0 0 8px; }
+  .login p{ color:var(--text-muted); font-size:13.5px; line-height:1.6; margin:0 0 26px; }
+  .google-btn{ display:inline-flex; align-items:center; gap:10px; background:var(--surface); color:var(--text); border:1.5px solid var(--border-2); border-radius:12px; padding:13px 22px; font-size:15px; font-weight:700; cursor:pointer; }
+  .google-btn svg{ width:18px; height:18px; }
+  .account{ display:flex; align-items:center; justify-content:center; gap:8px; margin-top:18px; font-size:12px; color:var(--text-muted); }
+  .account img{ width:22px; height:22px; border-radius:50%; }
+  .sync{ font-size:11px; color:var(--text-muted); text-align:center; margin-top:6px; }
 </style>
 </head>
 <body>
+<div class="login" id="loadingView"><p>불러오는 중…</p></div>
+
+<div class="login hidden" id="loginView">
+  <div class="big">👗</div>
+  <h1>OOTD 일기</h1>
+  <p>구글 계정으로 로그인하면<br>내 기록은 나만 볼 수 있고, 폰·PC 어디서든 이어서 쓸 수 있어요.</p>
+  <button class="google-btn" id="loginBtn"><svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>Google로 로그인</button>
+  <p class="hidden" id="loginErr" style="color:var(--danger);margin-top:16px"></p>
+</div>
+
+<div class="hidden" id="appView">
 <div class="wrap">
   <div class="header-row">
     <div>
@@ -189,7 +214,8 @@
       <button class="chip-btn" id="exportBtn">⬇️ 백업 내보내기</button>
       <button class="chip-btn" id="importBtn">⬆️ 백업 불러오기</button>
     </div>
-    <p class="hint">기록은 이 기기의 브라우저 안에만 저장돼요. 가끔 백업을 내보내 두세요.</p>
+    <div class="account" id="accountRow"></div>
+    <div class="sync" id="syncState"></div>
   </section>
 
   <!-- 통계 -->
@@ -218,6 +244,7 @@
 </div>
 
 <button class="fab" id="addBtn">＋ 사진 올리기</button>
+</div>
 <input type="file" id="fileInput" accept="image/*" multiple hidden>
 <input type="file" id="dayFileInput" accept="image/*" multiple hidden>
 <input type="file" id="importInput" accept="application/json,.json" hidden>
@@ -277,35 +304,28 @@
 <div class="toast" id="toast"></div>
 
 <script>
-/* ================= 저장소 (IndexedDB) =================
-   photos : { id, date, full(Blob), thumb(Blob), source, addedAt }
-   entries: { date, tags:[...], text }                          */
-const DB_NAME='ootd-diary';
-let dbp=null;
-function openDB(){
-  if(dbp) return dbp;
-  dbp = new Promise((res,rej)=>{
-    const r = indexedDB.open(DB_NAME, 1);
-    r.onupgradeneeded = ()=>{
-      r.result.createObjectStore('photos', { keyPath:'id' });
-      r.result.createObjectStore('entries', { keyPath:'date' });
-    };
-    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
-  });
-  return dbp;
+/* ================= Firebase (독서기록과 같은 프로젝트) =================
+   users/{uid}/ootdPhotos/{id}  : { id, date, thumb(작은 JPEG dataURL), source, addedAt }
+   users/{uid}/ootdFull/{id}    : { data(큰 JPEG dataURL) }  ← 크게 볼 때만 불러옴
+   users/{uid}/ootdEntries/{날짜}: { date, tags:[...], text }
+   firebaseConfig는 비밀키가 아님 - 실제 보안은 Firestore 규칙(본인 uid만 접근)이 담당 */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDO1Kpx3OTLzw58C7EEbrou-7rWWHghwq0",
+  authDomain: "book-8e4be.firebaseapp.com",
+  projectId: "book-8e4be",
+  storageBucket: "book-8e4be.firebasestorage.app",
+  messagingSenderId: "1005262003227",
+  appId: "1:1005262003227:web:5df34ffbe4f72d279c2cbe"
+};
+let fbAuth=null, fdb=null, user=null, unsubs=[];
+const col = n => fdb.collection('users').doc(user.uid).collection(n);
+const C_PHOTO='ootdPhotos', C_FULL='ootdFull', C_ENTRY='ootdEntries';
+
+function save(promise){
+  setSync('저장 중…');
+  return promise.then(()=>setSync('')).catch(e=>{ console.error(e); setSync(''); toast('저장 실패: '+(e.code||e.message), 4000); });
 }
-async function run(store, mode, fn){
-  const db = await openDB();
-  return new Promise((res,rej)=>{
-    const t = db.transaction(store, mode); const s = t.objectStore(store);
-    let out; const r = fn(s);
-    if(r && 'onsuccess' in r) r.onsuccess=()=>{ out=r.result; };
-    t.oncomplete=()=>res(out); t.onerror=()=>rej(t.error);
-  });
-}
-const getAll = st=> run(st,'readonly', s=>s.getAll());
-const put = (st,v)=> run(st,'readwrite', s=>s.put(v));
-const del = (st,k)=> run(st,'readwrite', s=>s.delete(k));
+function setSync(t){ const el=$('syncState'); if(el) el.textContent = t || (navigator.onLine ? '✓ 클라우드에 저장됨' : '오프라인 - 연결되면 자동 저장돼요'); }
 
 /* ================= EXIF 촬영일 =================
    JPEG/HEIC 공통: 파일 앞부분에서 "Exif\0\0" 다음 TIFF 헤더를 찾아
@@ -343,7 +363,7 @@ async function readExifDate(file){
   }catch(e){ return null; }
 }
 
-/* ================= 이미지 축소 ================= */
+/* ================= 이미지 축소 (Firestore 문서 1MB 제한 안에 들어가게) ================= */
 function loadImage(blob){
   return new Promise((res,rej)=>{
     const u=URL.createObjectURL(blob), im=new Image();
@@ -356,7 +376,13 @@ function shrink(im, max, q){
   const sc=Math.min(1, max/Math.max(im.naturalWidth, im.naturalHeight));
   const c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*sc); c.height=Math.round(im.naturalHeight*sc);
   c.getContext('2d').drawImage(im,0,0,c.width,c.height);
-  return new Promise(r=>c.toBlob(r,'image/jpeg',q));
+  return c.toDataURL('image/jpeg', q);
+}
+function shrinkFull(im){
+  for(const [max,q] of [[1440,0.82],[1200,0.75],[1000,0.7],[800,0.65]]){
+    const d=shrink(im,max,q); if(d.length<900000) return d;
+  }
+  return shrink(im,640,0.6);
 }
 
 /* ================= 상태 / 유틸 ================= */
@@ -364,18 +390,17 @@ let photos=[], entries={};
 let view=(()=>{ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
 let curDay=null, curTag=null, viewerPhoto=null, pendingDay=null;
 let statGroup='item';
+const fullCache=new Map();
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,'0');
 const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const newId=()=> (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2));
 function fmtKo(key, withYear=true){
   const [y,m,d]=key.split('-').map(Number);
   const w='일월화수목금토'[new Date(y,m-1,d).getDay()];
   return withYear ? `${y}년 ${m}월 ${d}일 (${w})` : `${m}/${d} (${w})`;
 }
-const urls=new Map();
-function urlOf(p,kind){ const k=p.id+kind; if(!urls.has(k)) urls.set(k, URL.createObjectURL(p[kind])); return urls.get(k); }
-function dropUrl(id){ for(const k of ['full','thumb']){ const u=urls.get(id+k); if(u){ URL.revokeObjectURL(u); urls.delete(id+k); } } }
 function photosByDate(){
   const m={}; for(const p of photos) (m[p.date] ||= []).push(p);
   for(const k in m) m[k].sort((a,b)=>a.addedAt-b.addedAt);
@@ -383,13 +408,14 @@ function photosByDate(){
 }
 function normTag(s){ return s.trim().replace(/^#+/,'').trim().replace(/\s+/g,'_'); }
 function brandOf(t){ const i=t.indexOf('_'); return i>0 ? t.slice(0,i) : t; }
-function hasContent(e){ return e && (e.tags.length || e.text.trim()); }
-function recordedDates(){
-  const s=new Set(photos.map(p=>p.date));
-  for(const d in entries) if(hasContent(entries[d])) s.add(d);
-  return s;
+function hasContent(e){ return e && ((e.tags||[]).length || (e.text||'').trim()); }
+
+// 실시간 데이터가 바뀔 때마다 지금 보이는 화면만 다시 그림
+function refresh(){
+  renderCal();
+  if($('daySheet').classList.contains('open') && curDay){ renderDayPhotos(); renderDayTags(); }
+  if(!$('statsView').classList.contains('hidden') && !$('tagSheet').classList.contains('open')) renderStats();
 }
-async function reload(){ photos=await getAll('photos'); entries={}; for(const e of await getAll('entries')) entries[e.date]=e; }
 
 /* ================= 캘린더 ================= */
 function renderCal(){
@@ -403,7 +429,7 @@ function renderCal(){
     cell.className='day'+(dow===0?' sun':'')+(dow===6?' sat':'')+(key===today?' today':'')+(list.length?' has':'');
     if(list.length||hasContent(e)) rec++;
     if(list.length){
-      const im=document.createElement('img'); im.src=urlOf(list[0],'thumb'); im.alt=''; im.loading='lazy'; cell.appendChild(im);
+      const im=document.createElement('img'); im.src=list[0].thumb; im.alt=''; im.loading='lazy'; cell.appendChild(im);
       if(list.length>1){ const c=document.createElement('span'); c.className='cnt'; c.textContent=list.length; cell.appendChild(c); }
     } else if(hasContent(e)){ const dot=document.createElement('span'); dot.className='note-dot'; cell.appendChild(dot); }
     const dn=document.createElement('span'); dn.className='dn'; dn.textContent=d; cell.appendChild(dn);
@@ -419,25 +445,27 @@ async function addFiles(files, forced){
   files=[...files].filter(f=>f.type.startsWith('image/')||/\.(heic|heif)$/i.test(f.name));
   if(!files.length) return;
   toast(`사진 ${files.length}장 처리 중…`, 60000);
-  let ok=0, noExif=0, failed=0; const dates=new Set();
+  let ok=0, noExif=0, failed=0; const dates=new Set(), jobs=[];
   for(const f of files){
     try{
       const ex=forced?null:await readExifDate(f);
       const date=forced||ex||ymd(new Date(f.lastModified||Date.now()));
       if(!forced&&!ex) noExif++;
       const im=await loadImage(f);
-      const [full,thumb]=await Promise.all([shrink(im,1440,0.85), shrink(im,360,0.8)]);
-      await put('photos',{ id:(crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random()), date, full, thumb,
-        source: forced?'manual':(ex?'exif':'file'), addedAt:Date.now() });
+      const id=newId(), full=shrinkFull(im), thumb=shrink(im,360,0.75);
+      fullCache.set(id, full);
+      const b=fdb.batch();
+      b.set(col(C_PHOTO).doc(id), { id, date, thumb, source: forced?'manual':(ex?'exif':'file'), addedAt:Date.now() });
+      b.set(col(C_FULL).doc(id), { data: full });
+      jobs.push(save(b.commit()));
       ok++; dates.add(date);
     }catch(e){ failed++; }
   }
-  await reload();
   let msg=`${ok}장 추가했어요`;
   if(noExif) msg+=` · ${noExif}장은 촬영일 정보가 없어 파일 날짜로 넣었어요`;
   if(failed) msg+=` · ${failed}장은 열 수 없었어요 (HEIC는 JPG로 바꿔 올려주세요)`;
   toast(msg, 4500);
-  if(curDay){ renderCal(); openDay(curDay); return; }
+  if(curDay) return;
   const sorted=[...dates].sort();
   if(sorted.length){ const [yy,mm]=sorted[sorted.length-1].split('-').map(Number); view={y:yy,m:mm-1}; }
   renderCal();
@@ -445,10 +473,10 @@ async function addFiles(files, forced){
 }
 
 /* ================= 하루 기록 시트 ================= */
-function entryOf(d){ return entries[d] || { date:d, tags:[], text:'' }; }
-async function saveEntry(e){
-  if(hasContent(e)){ entries[e.date]=e; await put('entries', e); }
-  else { delete entries[e.date]; await del('entries', e.date); }
+function entryOf(d){ const e=entries[d]; return e ? { date:d, tags:[...(e.tags||[])], text:e.text||'' } : { date:d, tags:[], text:'' }; }
+function saveEntry(e){
+  if(hasContent(e)){ entries[e.date]=e; save(col(C_ENTRY).doc(e.date).set(e)); }
+  else if(entries[e.date]){ delete entries[e.date]; save(col(C_ENTRY).doc(e.date).delete()); }
   $('savedMark').textContent='저장됨 ✓';
   renderCal();
 }
@@ -459,13 +487,13 @@ function openDay(d){
   $('diary').value=entryOf(d).text;
   $('savedMark').textContent='';
   $('tagInput').value=''; hideSuggest();
-  open('daySheet');
+  openSheet('daySheet');
 }
 function renderDayPhotos(){
   const box=$('dayPhotos'); box.innerHTML='';
   for(const p of (photosByDate()[curDay]||[])){
     const b=document.createElement('button'); b.className='ph';
-    const im=document.createElement('img'); im.src=urlOf(p,'thumb'); im.alt=''; b.appendChild(im);
+    const im=document.createElement('img'); im.src=p.thumb; im.alt=''; b.appendChild(im);
     b.onclick=()=>openViewer(p); box.appendChild(b);
   }
   const add=document.createElement('button'); add.className='ph add'; add.textContent='＋'; add.setAttribute('aria-label','사진 추가');
@@ -478,20 +506,20 @@ function renderDayTags(){
   if(!e.tags.length){ box.innerHTML='<span class="saved">아직 태그가 없어요</span>'; return; }
   e.tags.forEach((t,i)=>{
     const s=document.createElement('span'); s.className='tag'; s.innerHTML=`#${esc(t)}<button aria-label="태그 빼기">✕</button>`;
-    s.querySelector('button').onclick=()=>{ e.tags.splice(i,1); saveEntry(e); renderDayTags(); };
+    s.querySelector('button').onclick=()=>{ const en=entryOf(curDay); en.text=$('diary').value; en.tags.splice(i,1); saveEntry(en); renderDayTags(); };
     box.appendChild(s);
   });
 }
 function addTags(raw){
   const parts = raw.includes('#') ? raw.split('#') : raw.split(/[,\n]/);
-  const e=entryOf(curDay); let added=0;
+  const e=entryOf(curDay); e.text=$('diary').value; let added=0;
   for(const p of parts){ const t=normTag(p); if(t && !e.tags.includes(t)){ e.tags.push(t); added++; } }
   if(added){ saveEntry(e); renderDayTags(); }
 }
 
 // 태그 자동완성 (자주 쓴 순)
 function tagCounts(){
-  const c={}; for(const d in entries) for(const t of entries[d].tags) c[t]=(c[t]||0)+1; return c;
+  const c={}; for(const d in entries) for(const t of entries[d].tags||[]) c[t]=(c[t]||0)+1; return c;
 }
 let sugIdx=-1, sugItems=[];
 function updateSuggest(){
@@ -515,10 +543,10 @@ $('suggest').addEventListener('click', e=>{
 });
 $('tagInput').addEventListener('input', updateSuggest);
 $('tagInput').addEventListener('focus', updateSuggest);
-$('tagInput').addEventListener('blur', ()=>setTimeout(hideSuggest,150));
+$('tagInput').addEventListener('blur', ()=>setTimeout(()=>{ if(document.activeElement!==$('tagInput')) hideSuggest(); },150));
 $('tagInput').addEventListener('keydown', e=>{
-  const box=$('suggest'), open=!box.classList.contains('hidden');
-  if(open && (e.key==='ArrowDown'||e.key==='ArrowUp')){
+  const box=$('suggest'), isOpen=!box.classList.contains('hidden');
+  if(isOpen && (e.key==='ArrowDown'||e.key==='ArrowUp')){
     e.preventDefault(); sugIdx=(sugIdx+(e.key==='ArrowDown'?1:-1)+sugItems.length)%sugItems.length;
     [...box.children].forEach((b,i)=>b.classList.toggle('act',i===sugIdx));
     box.children[sugIdx].scrollIntoView({block:'nearest'}); return;
@@ -526,12 +554,12 @@ $('tagInput').addEventListener('keydown', e=>{
   if(e.key==='Enter' || e.key===','){
     if(e.isComposing) return;
     e.preventDefault();
-    const v = (open && sugIdx>=0) ? sugItems[sugIdx] : $('tagInput').value;
+    const v = (isOpen && sugIdx>=0) ? sugItems[sugIdx] : $('tagInput').value;
     if(normTag(v)) addTags(v);
     $('tagInput').value=''; updateSuggest();
   }
   if(e.key==='Backspace' && !$('tagInput').value){
-    const en=entryOf(curDay); if(en.tags.length){ en.tags.pop(); saveEntry(en); renderDayTags(); }
+    const en=entryOf(curDay); if(en.tags.length){ en.text=$('diary').value; en.tags.pop(); saveEntry(en); renderDayTags(); }
   }
 });
 $('tagInput').addEventListener('paste', e=>{
@@ -542,7 +570,7 @@ let diaryTimer;
 $('diary').addEventListener('input', ()=>{
   $('savedMark').textContent='';
   clearTimeout(diaryTimer);
-  diaryTimer=setTimeout(()=>{ const e=entryOf(curDay); e.text=$('diary').value; saveEntry(e); }, 500);
+  diaryTimer=setTimeout(flushDiary, 800);
 });
 function flushDiary(){
   if(!curDay) return;
@@ -550,42 +578,55 @@ function flushDiary(){
   const e=entryOf(curDay);
   if(e.text!==$('diary').value){ e.text=$('diary').value; saveEntry(e); }
 }
-$('delDayBtn').onclick=async ()=>{
+$('delDayBtn').onclick=()=>{
   const list=photosByDate()[curDay]||[];
   if(!confirm(`${fmtKo(curDay)}의 사진 ${list.length}장, 태그, 일기를 모두 삭제할까요?`)) return;
   clearTimeout(diaryTimer); $('diary').value='';
-  for(const p of list){ await del('photos',p.id); dropUrl(p.id); }
-  delete entries[curDay]; await del('entries',curDay);
-  await reload(); close('daySheet'); renderCal(); toast('삭제했어요');
+  const b=fdb.batch();
+  for(const p of list){ b.delete(col(C_PHOTO).doc(p.id)); b.delete(col(C_FULL).doc(p.id)); }
+  b.delete(col(C_ENTRY).doc(curDay));
+  photos=photos.filter(p=>p.date!==curDay); delete entries[curDay];
+  save(b.commit());
+  closeSheet('daySheet'); renderCal(); toast('삭제했어요');
 };
 
 /* ================= 사진 크게 보기 ================= */
-function openViewer(p){
+async function openViewer(p){
   viewerPhoto=p;
-  $('viewerImg').src=urlOf(p,'full');
+  $('viewerImg').src=fullCache.get(p.id) || p.thumb;
   $('viewerDate').value=p.date;
   $('viewerSrc').textContent={exif:'📷 사진 촬영일로 등록됨', file:'📁 촬영일 정보가 없어 파일 날짜로 등록됨', manual:'✏️ 직접 고른 날짜'}[p.source]||'';
   $('viewer').classList.add('open');
+  if(!fullCache.has(p.id)){
+    try{
+      const snap=await col(C_FULL).doc(p.id).get();
+      if(snap.exists){ fullCache.set(p.id, snap.data().data); if(viewerPhoto&&viewerPhoto.id===p.id) $('viewerImg').src=snap.data().data; }
+    }catch(e){ console.error(e); }
+  }
 }
 function closeViewer(){ $('viewer').classList.remove('open'); viewerPhoto=null; }
 $('viewerClose').onclick=closeViewer;
-$('viewerMove').onclick=async ()=>{
+$('viewerMove').onclick=()=>{
   const d=$('viewerDate').value; if(!d||d===viewerPhoto.date) return;
-  await put('photos',{...viewerPhoto, date:d, source:'manual'});
-  await reload(); closeViewer(); renderCal(); renderDayPhotos();
+  save(col(C_PHOTO).doc(viewerPhoto.id).update({ date:d, source:'manual' }));
+  viewerPhoto.date=d; viewerPhoto.source='manual';
+  closeViewer(); renderCal(); renderDayPhotos();
   toast(`${fmtKo(d)}로 옮겼어요 (태그·일기는 그대로예요)`, 3000);
 };
-$('viewerDel').onclick=async ()=>{
+$('viewerDel').onclick=()=>{
   if(!confirm('이 사진을 삭제할까요?')) return;
-  await del('photos',viewerPhoto.id); dropUrl(viewerPhoto.id);
-  await reload(); closeViewer(); renderCal(); renderDayPhotos(); toast('삭제했어요');
+  const id=viewerPhoto.id, b=fdb.batch();
+  b.delete(col(C_PHOTO).doc(id)); b.delete(col(C_FULL).doc(id));
+  save(b.commit());
+  photos=photos.filter(p=>p.id!==id); fullCache.delete(id);
+  closeViewer(); renderCal(); renderDayPhotos(); toast('삭제했어요');
 };
 
 /* ================= 태그 통계 ================= */
 function periodMatch(d, p){ return p==='all' || d.startsWith(p); }
 function fillPeriods(){
   const sel=$('periodSel'), prev=sel.value;
-  const ds=Object.keys(entries).filter(d=>entries[d].tags.length).sort().reverse();
+  const ds=Object.keys(entries).filter(d=>(entries[d].tags||[]).length).sort().reverse();
   const years=[...new Set(ds.map(d=>d.slice(0,4)))];
   const months=[...new Set(ds.map(d=>d.slice(0,7)))];
   let h='<option value="all">전체 기간</option>';
@@ -599,7 +640,7 @@ function computeStats(){
   const stats={}; let days=0, tagSum=0;
   for(const d in entries){
     if(!periodMatch(d,p)) continue;
-    const tags=entries[d].tags; if(!tags.length) continue;
+    const tags=entries[d].tags||[]; if(!tags.length) continue;
     days++; tagSum+=tags.length;
     const keys = statGroup==='brand' ? [...new Set(tags.map(brandOf))] : tags;
     for(const k of keys){
@@ -608,7 +649,7 @@ function computeStats(){
       if(statGroup==='brand') tags.filter(t=>brandOf(t)===k).forEach(t=>s.items.add(t));
     }
   }
-  return { list:Object.values(stats), days, tagSum, period:p };
+  return { list:Object.values(stats), days, tagSum };
 }
 function renderStats(){
   fillPeriods();
@@ -651,7 +692,7 @@ function openTag(name, kind){
   curTag={name, kind};
   const p=$('periodSel').value||'all';
   const match = kind==='brand' ? (t=>brandOf(t)===name) : (t=>t===name);
-  const dates=Object.keys(entries).filter(d=>periodMatch(d,p) && entries[d].tags.some(match)).sort().reverse();
+  const dates=Object.keys(entries).filter(d=>periodMatch(d,p) && (entries[d].tags||[]).some(match)).sort().reverse();
   $('tagTitle').textContent = kind==='brand' ? name : '#'+name;
   const periodTxt = p==='all' ? '전체 기간' : $('periodSel').selectedOptions[0].textContent;
   $('tagInfo').innerHTML = `<span>${esc(periodTxt)} <b>${dates.length}회</b> 착용</span>` + (dates.length?`<span>처음 <b>${fmtKo(dates[dates.length-1],false)}</b></span><span>마지막 <b>${fmtKo(dates[0],false)}</b></span>`:'');
@@ -668,44 +709,58 @@ function openTag(name, kind){
   for(const d of dates){
     const b=document.createElement('button'); b.className='worn';
     const ph=(pm[d]||[])[0];
-    b.innerHTML=`<div class="im">${ph?`<img src="${urlOf(ph,'thumb')}" alt="" loading="lazy">`:''}</div><div class="d">${fmtKo(d)}</div>`;
-    b.onclick=()=>{ close('tagSheet'); openDay(d); };
+    b.innerHTML=`<div class="im">${ph?`<img src="${ph.thumb}" alt="" loading="lazy">`:''}</div><div class="d">${fmtKo(d)}</div>`;
+    b.onclick=()=>{ closeSheet('tagSheet'); openDay(d); };
     w.appendChild(b);
   }
-  open('tagSheet');
+  openSheet('tagSheet');
 }
-$('renameTagBtn').onclick=async ()=>{
+// 여러 날짜의 태그를 한 번에 바꿀 때는 batch(최대 500개씩)로 저장
+async function commitEntries(list){
+  for(let i=0;i<list.length;i+=450){
+    const b=fdb.batch();
+    for(const e of list.slice(i,i+450)){
+      const ref=col(C_ENTRY).doc(e.date);
+      if(hasContent(e)){ entries[e.date]=e; b.set(ref,e); } else { delete entries[e.date]; b.delete(ref); }
+    }
+    save(b.commit());
+  }
+}
+$('renameTagBtn').onclick=()=>{
   const old=curTag.name;
   const nv=prompt('새 태그 이름 (같은 이름의 태그가 있으면 합쳐져요)', old);
   if(nv===null) return; const t=normTag(nv); if(!t||t===old) return;
-  let n=0;
+  const changed=[];
   for(const d in entries){
-    const e=entries[d], i=e.tags.indexOf(old); if(i<0) continue;
+    const e=entryOf(d), i=e.tags.indexOf(old); if(i<0) continue;
     e.tags.splice(i,1); if(!e.tags.includes(t)) e.tags.splice(i,0,t);
-    await put('entries',e); n++;
+    changed.push(e);
   }
-  close('tagSheet'); renderStats(); toast(`${n}개 기록의 태그를 #${t}(으)로 바꿨어요`, 3000);
+  commitEntries(changed);
+  closeSheet('tagSheet'); toast(`${changed.length}개 기록의 태그를 #${t}(으)로 바꿨어요`, 3000);
 };
-$('deleteTagBtn').onclick=async ()=>{
+$('deleteTagBtn').onclick=()=>{
   const old=curTag.name;
   if(!confirm(`모든 기록에서 #${old} 태그를 뺄까요? (사진과 일기는 그대로예요)`)) return;
-  for(const d of Object.keys(entries)){
-    const e=entries[d]; if(!e.tags.includes(old)) continue;
-    e.tags=e.tags.filter(x=>x!==old); await saveEntry(e);
-  }
-  close('tagSheet'); renderStats(); toast('태그를 지웠어요');
+  const changed=[];
+  for(const d in entries){ const e=entryOf(d); if(!e.tags.includes(old)) continue; e.tags=e.tags.filter(x=>x!==old); changed.push(e); }
+  commitEntries(changed);
+  closeSheet('tagSheet'); toast('태그를 지웠어요');
 };
 
-/* ================= 백업 ================= */
-const toDataURL=b=>new Promise(r=>{ const f=new FileReader(); f.onload=()=>r(f.result); f.readAsDataURL(b); });
+/* ================= 백업 (JSON 파일) ================= */
 $('exportBtn').onclick=async ()=>{
   if(!photos.length && !Object.keys(entries).length){ toast('저장된 기록이 없어요'); return; }
-  toast('백업 파일 만드는 중…', 60000);
-  const ps=[]; for(const p of photos) ps.push({...p, full:await toDataURL(p.full), thumb:await toDataURL(p.thumb)});
-  const blob=new Blob([JSON.stringify({app:'ootd-diary', version:1, photos:ps, entries:Object.values(entries)})],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`ootd-backup-${ymd(new Date())}.json`;
-  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
-  toast(`사진 ${photos.length}장, 기록 ${Object.keys(entries).length}일을 백업했어요`, 3000);
+  toast('백업 파일 만드는 중…', 120000);
+  try{
+    const fullSnap=await col(C_FULL).get();
+    const fulls={}; fullSnap.forEach(d=>fulls[d.id]=d.data().data);
+    const ps=photos.map(p=>({...p, full: fulls[p.id]||null}));
+    const blob=new Blob([JSON.stringify({app:'ootd-diary', version:2, photos:ps, entries:Object.values(entries)})],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`ootd-backup-${ymd(new Date())}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    toast(`사진 ${photos.length}장, 기록 ${Object.keys(entries).length}일을 백업했어요`, 3000);
+  }catch(e){ console.error(e); toast('백업 중 오류가 났어요'); }
 };
 $('importBtn').onclick=()=>$('importInput').click();
 $('importInput').onchange=async e=>{
@@ -713,35 +768,36 @@ $('importInput').onchange=async e=>{
   try{
     const data=JSON.parse(await f.text());
     if(data.app!=='ootd-diary') throw 0;
-    toast('불러오는 중…', 60000);
-    const have=new Set(photos.map(p=>p.id)); let np=0, ne=0;
+    const have=new Set(photos.map(p=>p.id)); let np=0;
     for(const p of data.photos||[]){
-      if(have.has(p.id)) continue;
-      await put('photos',{...p, full:await (await fetch(p.full)).blob(), thumb:await (await fetch(p.thumb)).blob()}); np++;
+      if(have.has(p.id) || !p.thumb) continue;
+      const { full, ...meta } = p;
+      const b=fdb.batch(); b.set(col(C_PHOTO).doc(p.id), meta); if(full) b.set(col(C_FULL).doc(p.id), { data: full });
+      save(b.commit()); np++;
     }
-    for(const en of data.entries||[]){
+    const merged=(data.entries||[]).map(en=>{
       const cur=entries[en.date];
-      const merged= cur ? { date:en.date, tags:[...new Set([...cur.tags,...en.tags])], text: cur.text.trim()? cur.text : en.text } : en;
-      await put('entries',merged); ne++;
-    }
-    await reload(); renderCal(); toast(`사진 ${np}장, 기록 ${ne}일을 불러왔어요`, 3000);
+      return cur ? { date:en.date, tags:[...new Set([...(cur.tags||[]),...(en.tags||[])])], text:(cur.text||'').trim()? cur.text : (en.text||'') } : en;
+    });
+    commitEntries(merged);
+    toast(`사진 ${np}장, 기록 ${merged.length}일을 불러왔어요`, 3000);
   }catch(err){ toast('백업 파일을 읽을 수 없어요'); }
 };
 
 /* ================= 공통 UI ================= */
-function open(id){ $(id).classList.add('open'); }
-function close(id){
+function openSheet(id){ $(id).classList.add('open'); }
+function closeSheet(id){
   if(id==='daySheet'){ flushDiary(); curDay=null; hideSuggest(); }
   $(id).classList.remove('open');
   if(!$('statsView').classList.contains('hidden')) renderStats();
 }
 document.querySelectorAll('.sheet-bg').forEach(bg=>{
-  bg.addEventListener('click', e=>{ if(e.target===bg || e.target.closest('[data-close]')) close(bg.id); });
+  bg.addEventListener('click', e=>{ if(e.target===bg || e.target.closest('[data-close]')) closeSheet(bg.id); });
 });
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if($('viewer').classList.contains('open')) return closeViewer();
-  for(const id of ['tagSheet','daySheet']) if($(id).classList.contains('open')) return close(id);
+  for(const id of ['tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
 let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms); }
 
@@ -768,11 +824,56 @@ $('themeBtn').onclick=()=>{
   document.documentElement.setAttribute('data-theme',next);
   try{ localStorage.setItem('ootd-theme',next); }catch(e){}
 };
+window.addEventListener('online', ()=>setSync()); window.addEventListener('offline', ()=>setSync());
 
-(async()=>{
-  try{ await reload(); }catch(e){ toast('이 브라우저에서는 저장 기능을 쓸 수 없어요', 4000); }
-  renderCal();
-})();
+/* ================= 로그인 ================= */
+function showOnly(id){ for(const v of ['loadingView','loginView','appView']) $(v).classList.toggle('hidden', v!==id); }
+function loginError(msg){ const el=$('loginErr'); el.textContent=msg; el.classList.remove('hidden'); }
+$('loginBtn').onclick=()=>{
+  if(!fbAuth){ loginError('로그인 기능을 불러오는 중이에요. 잠시 후 다시 눌러주세요.'); return; }
+  const provider=new firebase.auth.GoogleAuthProvider();
+  fbAuth.signInWithPopup(provider).catch(err=>{
+    if(err.code==='auth/popup-blocked' || err.code==='auth/cancelled-popup-request' || err.code==='auth/operation-not-supported-in-this-environment'){
+      fbAuth.signInWithRedirect(provider).catch(e2=>loginError('로그인 오류: '+e2.code));
+      return;
+    }
+    if(err.code==='auth/popup-closed-by-user') return;
+    if(err.code==='auth/unauthorized-domain') return loginError('이 주소가 Firebase에 등록되지 않았어요. (Authentication → 설정 → 승인된 도메인에 추가 필요)');
+    loginError('로그인 오류: '+err.code);
+  });
+};
+function renderAccount(){
+  $('accountRow').innerHTML = `${user.photoURL?`<img src="${esc(user.photoURL)}" alt="">`:''}<span>${esc(user.email||'')}</span><button class="link-btn" id="logoutBtn">로그아웃</button>`;
+  $('logoutBtn').onclick=()=>{ if(confirm('로그아웃할까요?')) fbAuth.signOut(); };
+  setSync();
+}
+function startListening(){
+  let gotP=false, gotE=false;
+  const ready=()=>{ if(gotP&&gotE){ showOnly('appView'); refresh(); } };
+  unsubs.push(col(C_PHOTO).onSnapshot(s=>{ photos=s.docs.map(d=>d.data()); gotP=true; ready(); },
+    e=>{ console.error(e); toast('사진을 불러오지 못했어요: '+e.code, 5000); gotP=true; ready(); }));
+  unsubs.push(col(C_ENTRY).onSnapshot(s=>{ const m={}; s.forEach(d=>m[d.id]=d.data()); entries=m; gotE=true; ready(); },
+    e=>{ console.error(e); toast('기록을 불러오지 못했어요: '+e.code, 5000); gotE=true; ready(); }));
+}
+let initTries=0;
+function initFirebase(){
+  if(typeof firebase==='undefined'){
+    if(++initTries<=15) return setTimeout(initFirebase, 400);
+    showOnly('loginView'); loginError('로그인 기능을 불러오지 못했어요. 네트워크나 콘텐츠 차단 기능을 확인하고 새로고침해주세요.');
+    return;
+  }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  fbAuth=firebase.auth(); fdb=firebase.firestore();
+  fdb.enablePersistence({ synchronizeTabs:true }).catch(()=>{});   // 한 번 본 데이터는 기기에 캐시 → 빠르고 오프라인에서도 보임
+  fbAuth.getRedirectResult().catch(e=>{ if(e && e.code) loginError('로그인 오류: '+e.code); });
+  fbAuth.onAuthStateChanged(u=>{
+    unsubs.forEach(f=>f()); unsubs=[];
+    user=u; photos=[]; entries={}; fullCache.clear();
+    if(!u){ ['daySheet','tagSheet'].forEach(id=>$(id).classList.remove('open')); closeViewer(); showOnly('loginView'); return; }
+    showOnly('loadingView'); renderAccount(); startListening();
+  });
+}
+initFirebase();
 </script>
 </body>
 </html>
