@@ -434,11 +434,50 @@ function shrink(im, max, q){
   c.getContext('2d').drawImage(im,0,0,c.width,c.height);
   return c.toDataURL('image/jpeg', q);
 }
+// 캔버스에 다시 그려서 저장하므로 위치(GPS)·기기 정보 같은 EXIF 메타데이터는 저장되지 않음
+const THUMB=[320,0.7];
 function shrinkFull(im){
-  for(const [max,q] of [[1440,0.82],[1200,0.75],[1000,0.7],[800,0.65]]){
-    const d=shrink(im,max,q); if(d.length<900000) return d;
+  for(const [max,q] of [[1080,0.75],[960,0.7],[800,0.65]]){
+    const d=shrink(im,max,q); if(d.length<600000) return d;
   }
   return shrink(im,640,0.6);
+}
+
+/* ---- 같은 사진 알아보기 ----
+   사진을 9x8 흑백으로 줄인 밝기 패턴(dHash) + 평균 색으로 '지문'을 만들어,
+   같은 날짜에 지문이 거의 같은 사진이 있으면 중복으로 보고 건너뜀
+   (원본·압축본·다른 앱에서 내보낸 같은 사진도 걸러짐) */
+function photoSig(im){
+  const c=document.createElement('canvas'); c.width=9; c.height=8;
+  const x=c.getContext('2d', { willReadFrequently:true }); x.drawImage(im,0,0,9,8);
+  const d=x.getImageData(0,0,9,8).data;
+  let bits='', r=0, g=0, b=0;
+  for(let y=0;y<8;y++) for(let i=0;i<9;i++){
+    const a=(y*9+i)*4; r+=d[a]; g+=d[a+1]; b+=d[a+2];
+    if(i<8){ const gr=v=>d[v]*.3+d[v+1]*.59+d[v+2]*.11; bits+= gr(a)>gr(a+4)?'1':'0'; }
+  }
+  const hx=n=>Math.round(n/72).toString(16).padStart(2,'0');
+  return BigInt('0b'+bits).toString(16).padStart(16,'0')+hx(r)+hx(g)+hx(b);
+}
+function sameSig(a,b){
+  if(!a||!b) return false;
+  let x=BigInt('0x'+a.slice(0,16))^BigInt('0x'+b.slice(0,16)), n=0;
+  while(x){ n+=Number(x&1n); x>>=1n; }
+  const col=i=>parseInt(a.slice(16+i*2,18+i*2),16)-parseInt(b.slice(16+i*2,18+i*2),16);
+  return n<=6 && Math.abs(col(0))+Math.abs(col(1))+Math.abs(col(2))<=36;
+}
+const sigCache=new Map();
+async function sigOf(p){
+  if(p.sig) return p.sig;
+  if(sigCache.has(p.id)) return sigCache.get(p.id);
+  try{ const im=await loadImage(await (await fetch(p.thumb)).blob()); const s=photoSig(im); sigCache.set(p.id,s); return s; }
+  catch(e){ return null; }
+}
+// 그 날짜에 이미 같은 사진이 있는지 (pending: 이번에 같이 올리는 중인 사진들)
+async function isDuplicate(date, sig, pending, exceptId){
+  const list=[...await photosForDay(date), ...pending.filter(x=>x.date===date)];
+  for(const p of list){ if(p.id!==exceptId && sameSig(sig, await sigOf(p))) return true; }
+  return false;
 }
 
 /* ================= 상태 / 유틸 ================= */
@@ -536,23 +575,28 @@ async function addFiles(files, forced){
   files=[...files].filter(f=>f.type.startsWith('image/')||/\.(heic|heif)$/i.test(f.name));
   if(!files.length) return;
   toast(`사진 ${files.length}장 처리 중…`, 60000);
-  let ok=0, noExif=0, failed=0; const dates=new Set(), jobs=[];
+  let ok=0, noExif=0, failed=0, dup=0; const dates=new Set(), pending=[];
   for(const f of files){
     try{
       const ex=forced?null:await readExifDate(f);
       const date=forced||ex||ymd(new Date(f.lastModified||Date.now()));
-      if(!forced&&!ex) noExif++;
       const im=await loadImage(f);
-      const id=newId(), full=shrinkFull(im), thumb=shrink(im,360,0.75);
-      fullCache.set(id, full);
+      const sig=photoSig(im);
+      if(await isDuplicate(date, sig, pending)){ dup++; continue; }
+      if(!forced&&!ex) noExif++;
+      const id=newId(), full=shrinkFull(im), thumb=shrink(im,...THUMB);
+      const meta={ id, date, thumb, sig, source: forced?'manual':(ex?'exif':'file'), addedAt:Date.now() };
+      fullCache.set(id, full); pending.push(meta);
       const b=fdb.batch();
-      b.set(col(C_PHOTO).doc(id), { id, date, thumb, source: forced?'manual':(ex?'exif':'file'), addedAt:Date.now() });
+      b.set(col(C_PHOTO).doc(id), meta);
       b.set(col(C_FULL).doc(id), { data: full });
-      jobs.push(save(b.commit()));
+      save(b.commit());
       ok++; dates.add(date);
-    }catch(e){ failed++; }
+    }catch(e){ console.error(e); failed++; }
   }
-  let msg=`${ok}장 추가했어요`;
+  for(const d of dates) dayPhotosCache.delete(d);
+  let msg = ok ? `${ok}장 추가했어요` : '새로 추가한 사진이 없어요';
+  if(dup) msg+=` · 이미 있는 사진 ${dup}장은 건너뛰었어요`;
   if(noExif) msg+=` · ${noExif}장은 촬영일 정보가 없어 파일 날짜로 넣었어요`;
   if(failed) msg+=` · ${failed}장은 열 수 없었어요 (HEIC는 JPG로 바꿔 올려주세요)`;
   toast(msg, 4500);
@@ -1133,6 +1177,7 @@ async function importUpnote(files){
   try{
     for(const f of files){
       if(/\.zip$/i.test(f.name) || f.type==='application/zip'){
+        if(f.size>500*1024*1024 && !confirm(`zip 파일이 ${Math.round(f.size/1024/1024)}MB로 커서 폰에서는 멈출 수 있어요.\n연도별 등으로 나눠서 여러 번 가져오는 걸 추천해요.\n그래도 계속할까요?`)){ toast('',1); return; }
         const JSZip=await loadJSZip();
         const zip=await JSZip.loadAsync(f);
         for(const entry of Object.values(zip.files)){
@@ -1194,23 +1239,29 @@ async function importUpnote(files){
   commitEntries(merged);
 
   // 2) 사진 (한 장씩 줄여서 저장)
-  let done=0, failed=0;
+  let done=0, failed=0, dup=0; const pending=[];
   for(const j of found){
-    toast(`사진 가져오는 중… ${done+failed+1} / ${found.length}`, 600000);
+    toast(`사진 가져오는 중… ${done+failed+dup+1} / ${found.length}`, 600000);
     try{
+      const id=hashId(j.date+'/'+j.name);
+      if((await photosForDay(j.date)).some(p=>p.id===id)){ dup++; continue; }   // 예전에 가져온 사진
       const im=await loadImage(await j.get());
-      const id=hashId(j.date+'/'+j.name), full=shrinkFull(im), thumb=shrink(im,360,0.75);
-      fullCache.set(id, full);
+      const sig=photoSig(im);
+      if(await isDuplicate(j.date, sig, pending, id)){ dup++; continue; }        // 같은 사진이 이미 있음
+      const full=shrinkFull(im), thumb=shrink(im,...THUMB);
+      const meta={ id, date:j.date, thumb, sig, source:'upnote', addedAt:Date.now(), name:j.name };
+      fullCache.set(id, full); pending.push(meta);
       const b=fdb.batch();
-      b.set(col(C_PHOTO).doc(id), { id, date:j.date, thumb, source:'upnote', addedAt:Date.now(), name:j.name });
+      b.set(col(C_PHOTO).doc(id), meta);
       b.set(col(C_FULL).doc(id), { data:full });
       await save(b.commit());
+      dayPhotosCache.delete(j.date);
       done++;
     }catch(err){ console.error(err); failed++; }
   }
   const last=days[days.length-1].date.split('-').map(Number);
   view={ y:last[0], m:last[1]-1 }; renderCal();
-  toast(`가져오기 끝! 기록 ${days.length}일, 사진 ${done}장`+(failed?` (사진 ${failed}장 실패)`:'')+(missing?` · 못 찾은 사진 ${missing}장`:''), 6000);
+  toast(`가져오기 끝! 기록 ${days.length}일, 사진 ${done}장`+(dup?` · 이미 있는 사진 ${dup}장 건너뜀`:'')+(failed?` (사진 ${failed}장 실패)`:'')+(missing?` · 못 찾은 사진 ${missing}장`:''), 6000);
 }
 
 /* ================= 공통 UI ================= */
