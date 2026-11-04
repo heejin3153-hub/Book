@@ -1382,13 +1382,21 @@ async function loadCustomCats(){
 }
 let tlSel=null, tlVisible=[];
 const catSet=()=>new Set(CATS.map(x=>x.toLowerCase()));
-function catOf(t){ const parts=stripGone(t).split('_'); const last=parts[parts.length-1]; return parts.length>1 && catSet().has(last.toLowerCase()) ? last : ''; }
+const SEASON_WORDS=new Set(['ss','fw','ssfw','fwss','sf']);   // 시즌 표시 (분류 아님)
+// 맨 끝의 시즌 단어(SS, FW, SSFW…)를 떼어낸 나머지
+function coreParts(t){
+  const parts=stripGone(t).split('_'); let end=parts.length;
+  while(end>1 && SEASON_WORDS.has(parts[end-1].toLowerCase())) end--;
+  return { parts, end };
+}
+// 분류: 시즌 단어를 뺀 맨 끝 단어가 분류 목록에 있으면 그 분류 (예: COS_팬츠_Bottom_SSFW → Bottom)
+function catOf(t){ const { parts, end }=coreParts(t); const w=parts[end-1]; return end>1 && catSet().has(w.toLowerCase()) ? w : ''; }
 function withCat(t, cat){
   const pre=isGone(t)?GONE:'';
-  let parts=stripGone(t).split('_');
-  parts=[parts[0], ...parts.slice(1).filter(x=>!catSet().has(x.toLowerCase()))];   // 기존 분류는 빼고
-  if(cat) parts.push(cat);
-  return pre+parts.join('_');
+  const { parts, end }=coreParts(t);
+  const core=[parts[0], ...parts.slice(1,end).filter(x=>!catSet().has(x.toLowerCase()))];   // 기존 분류는 빼고
+  if(cat) core.push(cat);
+  return pre+[...core, ...parts.slice(end)].join('_');   // 시즌 단어는 맨 끝에 그대로
 }
 function setTlSel(on){
   tlSel = on ? new Set() : null;
@@ -1442,7 +1450,15 @@ function tagStats(){
   for(const d in entries) for(const t of entries[d].tags||[]){ c[t]=(c[t]||0)+1; if(!last[t]||d>last[t]) last[t]=d; }
   return { c, last };
 }
+// 태그 끝에 똑같은 영어 단어(_Knit, _Dress …)가 2개 이상 붙어 있으면 그 단어도 분류로 봄
+// (직접 입력한 분류가 저장되지 않았어도 자동으로 인식되게)
+function detectCats(c){
+  const cnt={};
+  for(const t in c){ const { parts, end }=coreParts(t); if(end<2) continue; const w=parts[end-1]; if(/^[A-Za-z]{2,}$/.test(w)) cnt[w]=(cnt[w]||0)+1; }
+  for(const w in cnt) if(cnt[w]>=2 && !SEASON_WORDS.has(w.toLowerCase()) && !CATS.some(x=>x.toLowerCase()===w.toLowerCase())) CATS.push(w);
+}
 function renderTagList(){
+  detectCats(tagStats().c);
   const { c, last }=tagStats();
   const q=normTag($('tlSearch').value).toLowerCase(), own=$('tlOwn').value, sort=$('tlSort').value;
   // 분류 필터: 전체 / 분류 없음 / Top / Outer …
