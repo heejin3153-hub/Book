@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="OOTD">
+<script>
+  (function(){
+    try{
+      var mode = localStorage.getItem('ootd-theme') || 'system';
+      var actual = mode;
+      if(mode==='system') actual = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', actual);
+    }catch(e){}
+  })();
+</script>
+<title>OOTD 일기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fafafa; --surface:#ffffff; --border:#ececec; --border-2:#e2e2e2;
+    --text:#18181b; --text-muted:#8a8a92;
+    --accent:#5b5bd6; --accent-soft:#eeeeff; --accent-dark:#4747b8;
+    --danger:#e05252; --sun:#e05252; --sat:#4f7fd6;
+    --radius:16px; --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  html[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#111114; --surface:#1c1c21; --border:#2a2a30; --border-2:#35353d;
+    --text:#eeeef0; --text-muted:#9494a0;
+    --accent:#8080e8; --accent-soft:#26264a; --accent-dark:#a0a0f0;
+    --danger:#f27272; --sun:#f27272; --sat:#7fa6f0;
+  }
+  html[data-theme="light"]{ color-scheme: light; }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{ background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    min-height:100vh; min-height:100dvh; padding-bottom:calc(110px + var(--safe-b)); -webkit-font-smoothing:antialiased; touch-action:manipulation; }
+  .wrap{ max-width:600px; margin:0 auto; padding:28px 16px 0; }
+  button{ font-family:inherit; }
+
+  .header-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  h1.title{ font-size:23px; margin:0 0 4px; font-weight:800; letter-spacing:-0.02em; }
+  .subtitle{ color:var(--text-muted); font-size:13px; margin:0 0 18px; font-weight:500; }
+  .icon-sq{ background:var(--surface); border:1px solid var(--border); color:var(--text-muted); width:36px; height:36px; border-radius:10px; font-size:16px; cursor:pointer; flex-shrink:0; }
+
+  .tabs{ display:flex; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:16px; position:sticky; top:10px; z-index:10; }
+  .tab{ flex:1; background:none; border:none; color:var(--text-muted); font-size:13px; font-weight:600; padding:10px 8px; cursor:pointer; border-radius:9px; }
+  .tab.active{ color:var(--text); background:var(--bg); }
+
+  .panel{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 12px; }
+  .hidden{ display:none !important; }
+
+  /* 캘린더 */
+  .month-nav{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; padding:0 4px; }
+  .month-nav .m{ font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .nav-btn{ background:var(--bg); border:1.5px solid var(--border-2); color:var(--text); width:36px; height:36px; border-radius:10px; font-size:16px; cursor:pointer; }
+  .month-meta{ text-align:center; color:var(--text-muted); font-size:12px; font-weight:600; margin-bottom:14px; }
+  .month-meta b{ color:var(--accent-dark); }
+  .link-btn{ background:none; border:none; color:var(--accent); font-size:12px; font-weight:700; cursor:pointer; padding:2px 6px; }
+  .weekdays, .grid{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:4px; }
+  .weekdays div{ text-align:center; font-size:11px; font-weight:700; color:var(--text-muted); padding-bottom:6px; }
+  .weekdays div:first-child{ color:var(--sun); }
+  .weekdays div:last-child{ color:var(--sat); }
+  .day{ position:relative; aspect-ratio:3/4; border-radius:9px; background:var(--bg); border:1px solid var(--border); overflow:hidden; cursor:pointer; padding:0; font:inherit; color:inherit; }
+  .day.empty{ background:transparent; border-color:transparent; cursor:default; }
+  .day img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+  .day .dn{ position:absolute; top:4px; left:5px; font-size:11px; font-weight:700; z-index:1; font-variant-numeric:tabular-nums; }
+  .day.sun .dn{ color:var(--sun); }
+  .day.sat .dn{ color:var(--sat); }
+  .day.has .dn{ color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.55); }
+  .day.today{ border:2px solid var(--accent); }
+  .day .cnt{ position:absolute; right:4px; bottom:4px; z-index:1; background:rgba(0,0,0,0.55); color:#fff; font-size:10px; font-weight:700; border-radius:8px; padding:1px 5px; }
+  .day .note-dot{ position:absolute; left:50%; bottom:8px; transform:translateX(-50%); width:6px; height:6px; border-radius:50%; background:var(--accent); }
+  .day.hl{ outline:3px solid var(--accent); outline-offset:-3px; }
+
+  /* 태그 */
+  .tag{ display:inline-flex; align-items:center; gap:4px; background:var(--accent-soft); color:var(--accent-dark); border-radius:8px; padding:6px 9px; font-size:13px; font-weight:600; max-width:100%; word-break:break-all; }
+  .tag button{ background:none; border:none; color:inherit; opacity:.6; cursor:pointer; padding:0 0 0 2px; font-size:13px; line-height:1; }
+  .tags{ display:flex; flex-wrap:wrap; gap:6px; }
+
+  /* 통계 */
+  .stat-head{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }
+  .stat-box{ background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px 6px; text-align:center; }
+  .stat-box .n{ font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .stat-box .l{ font-size:11px; color:var(--text-muted); font-weight:600; margin-top:4px; }
+  .filters{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .filters::-webkit-scrollbar{ display:none; }
+  .filters > *{ flex-shrink:0; }
+  .sel{ appearance:none; -webkit-appearance:none; background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a8a92' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center; border:1.5px solid var(--border-2); border-radius:20px; padding:7px 24px 7px 11px; font-size:12px; font-weight:700; color:var(--text); font-family:inherit; }
+  .seg{ display:inline-flex; background:var(--bg); border:1.5px solid var(--border-2); border-radius:20px; padding:2px; }
+  .seg button{ background:none; border:none; border-radius:16px; padding:5px 11px; font-size:12px; font-weight:700; color:var(--text-muted); cursor:pointer; }
+  .seg button.on{ background:var(--accent); color:#fff; }
+  .search{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:10px 12px; font-size:16px; color:var(--text); font-family:inherit; outline:none; margin-bottom:12px; }
+  .rank-row{ display:grid; grid-template-columns:26px 1fr auto; align-items:center; gap:8px; padding:9px 4px; border-bottom:1px solid var(--border); cursor:pointer; }
+  .rank-row:last-child{ border-bottom:none; }
+  .rank-row .r{ font-size:12px; font-weight:700; color:var(--text-muted); text-align:right; font-variant-numeric:tabular-nums; }
+  .rank-row .nm{ font-size:13.5px; font-weight:600; word-break:break-all; }
+  .rank-row .bar{ height:5px; border-radius:3px; background:var(--accent); margin-top:5px; opacity:.75; }
+  .rank-row .sub{ font-size:11px; color:var(--text-muted); margin-top:3px; }
+  .rank-row .c{ font-size:13px; font-weight:800; color:var(--accent-dark); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .empty-msg{ text-align:center; color:var(--text-muted); font-size:13px; padding:30px 10px; line-height:1.6; }
+
+  .fab{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(22px + var(--safe-b)); background:var(--accent); color:#fff; border:none; border-radius:30px; padding:15px 26px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 6px 20px rgba(91,91,214,0.35); z-index:20; white-space:nowrap; }
+  .tools{ display:flex; justify-content:center; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .chip-btn{ background:var(--surface); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:20px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; }
+  .hint{ margin-top:12px; color:var(--text-muted); font-size:12px; line-height:1.6; text-align:center; }
+
+  /* 시트(모달) */
+  .sheet-bg{ position:fixed; inset:0; background:rgba(0,0,0,0.5); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+  .sheet-bg.open{ display:flex; }
+  .sheet{ background:var(--surface); width:100%; max-width:600px; max-height:92vh; max-height:92dvh; overflow-y:auto; border-radius:20px 20px 0 0; padding:18px 16px calc(24px + var(--safe-b)); }
+  .sheet-h{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px; }
+  .sheet-h .t{ font-size:17px; font-weight:800; word-break:break-all; }
+  .sec-label{ font-size:11px; letter-spacing:0.03em; color:var(--text-muted); font-weight:700; margin:16px 0 8px; display:flex; justify-content:space-between; align-items:center; }
+  .photos{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px; }
+  .photos .ph{ position:relative; aspect-ratio:3/4; border-radius:10px; overflow:hidden; background:var(--bg); border:none; padding:0; cursor:pointer; }
+  .photos .ph img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .photos .add{ border:1.5px dashed var(--border-2); color:var(--text-muted); font-size:24px; display:flex; align-items:center; justify-content:center; }
+  .tag-input-wrap{ position:relative; margin-top:8px; }
+  .tag-input{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:10px 12px; font-size:16px; color:var(--text); font-family:inherit; outline:none; }
+  .tag-input:focus{ border-color:var(--accent); }
+  .suggest{ position:absolute; left:0; right:0; top:calc(100% + 4px); background:var(--surface); border:1px solid var(--border-2); border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.15); max-height:240px; overflow-y:auto; z-index:5; }
+  .suggest button{ display:flex; justify-content:space-between; gap:8px; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid var(--border); padding:11px 12px; font-size:14px; color:var(--text); cursor:pointer; }
+  .suggest button:last-child{ border-bottom:none; }
+  .suggest button.act, .suggest button:hover{ background:var(--accent-soft); }
+  .suggest .k{ color:var(--text-muted); font-size:12px; flex-shrink:0; }
+  .diary{ width:100%; min-height:110px; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; line-height:1.6; color:var(--text); font-family:inherit; outline:none; resize:vertical; }
+  .diary:focus{ border-color:var(--accent); }
+  .saved{ font-size:11px; color:var(--text-muted); font-weight:600; }
+  .btn{ border:none; border-radius:10px; padding:10px 14px; font-size:13px; font-weight:700; cursor:pointer; }
+  .btn.primary{ background:var(--accent); color:#fff; }
+  .btn.ghost{ background:var(--bg); border:1.5px solid var(--border-2); color:var(--text); }
+  .btn.danger{ background:none; color:var(--danger); border:1.5px solid var(--border-2); }
+  .btn-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .worn-list{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px; }
+  .worn{ border:none; padding:0; background:none; cursor:pointer; color:var(--text); text-align:left; }
+  .worn .im{ aspect-ratio:3/4; border-radius:10px; overflow:hidden; background:var(--bg); border:1px solid var(--border); }
+  .worn img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .worn .d{ font-size:11px; font-weight:700; margin-top:4px; color:var(--text-muted); }
+  .kv{ display:flex; gap:14px; flex-wrap:wrap; font-size:13px; color:var(--text-muted); }
+  .kv b{ color:var(--text); }
+
+  /* 사진 크게 보기 */
+  .viewer{ position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:70; display:none; flex-direction:column; }
+  .viewer.open{ display:flex; }
+  .viewer img{ flex:1; min-height:0; width:100%; object-fit:contain; }
+  .viewer .bar{ display:flex; gap:8px; align-items:center; padding:12px 16px calc(14px + var(--safe-b)); flex-wrap:wrap; justify-content:center; }
+  .viewer input[type=date]{ border:1.5px solid #444; border-radius:10px; background:#222; color:#fff; padding:9px 10px; font-size:16px; font-family:inherit; color-scheme:dark; }
+  .viewer .src{ width:100%; text-align:center; color:#aaa; font-size:12px; }
+  .viewer .x{ position:absolute; top:calc(14px + env(safe-area-inset-top,0px)); right:14px; background:rgba(255,255,255,.15); color:#fff; border:none; width:38px; height:38px; border-radius:50%; font-size:18px; cursor:pointer; }
+
+  .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(90px + var(--safe-b)); background:var(--text); color:var(--bg); padding:10px 16px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .2s; z-index:90; max-width:calc(100% - 32px); text-align:center; }
+  .toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header-row">
+    <div>
+      <h1 class="title">OOTD 일기</h1>
+      <p class="subtitle">사진을 올리면 찍은 날짜에 맞춰 캘린더에 들어가요</p>
+    </div>
+    <button class="icon-sq" id="themeBtn" aria-label="테마 바꾸기">🌓</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="cal">캘린더</button>
+    <button class="tab" data-tab="stats">옷 태그 통계</button>
+  </div>
+
+  <!-- 캘린더 -->
+  <section id="calView">
+    <div class="panel">
+      <div class="month-nav">
+        <button class="nav-btn" id="prevBtn" aria-label="이전 달">‹</button>
+        <div class="m" id="monthLabel"></div>
+        <button class="nav-btn" id="nextBtn" aria-label="다음 달">›</button>
+      </div>
+      <div class="month-meta"><span id="monthMeta"></span> <button class="link-btn" id="todayBtn">오늘</button></div>
+      <div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="tools">
+      <button class="chip-btn" id="exportBtn">⬇️ 백업 내보내기</button>
+      <button class="chip-btn" id="importBtn">⬆️ 백업 불러오기</button>
+    </div>
+    <p class="hint">기록은 이 기기의 브라우저 안에만 저장돼요. 가끔 백업을 내보내 두세요.</p>
+  </section>
+
+  <!-- 통계 -->
+  <section id="statsView" class="hidden">
+    <div class="panel">
+      <div class="stat-head">
+        <div class="stat-box"><div class="n" id="sDays">0</div><div class="l">기록한 날</div></div>
+        <div class="stat-box"><div class="n" id="sTags">0</div><div class="l" id="sTagsL">옷 태그</div></div>
+        <div class="stat-box"><div class="n" id="sAvg">0</div><div class="l">하루 평균 태그</div></div>
+      </div>
+      <div class="filters">
+        <select class="sel" id="periodSel" aria-label="기간"></select>
+        <div class="seg" id="groupSeg"><button data-g="item" class="on">아이템별</button><button data-g="brand">브랜드별</button></div>
+        <select class="sel" id="sortSel" aria-label="정렬">
+          <option value="count">많이 입은 순</option>
+          <option value="recent">최근에 입은 순</option>
+          <option value="stale">오래 안 입은 순</option>
+          <option value="name">이름순</option>
+        </select>
+      </div>
+      <input class="search" id="tagSearch" type="search" placeholder="태그 검색 (예: Barbour, 부츠)">
+      <div id="rankList"></div>
+    </div>
+    <p class="hint">브랜드별은 태그의 첫 번째 _ 앞부분을 브랜드로 묶어요.<br>예) #Barbour_왁스자켓 → Barbour</p>
+  </section>
+</div>
+
+<button class="fab" id="addBtn">＋ 사진 올리기</button>
+<input type="file" id="fileInput" accept="image/*" multiple hidden>
+<input type="file" id="dayFileInput" accept="image/*" multiple hidden>
+<input type="file" id="importInput" accept="application/json,.json" hidden>
+
+<!-- 하루 기록 -->
+<div class="sheet-bg" id="daySheet">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h">
+      <div class="t" id="dayTitle"></div>
+      <button class="icon-sq" data-close aria-label="닫기">✕</button>
+    </div>
+    <div class="photos" id="dayPhotos"></div>
+    <div class="sec-label"><span>옷 태그</span><span class="saved" id="savedMark"></span></div>
+    <div class="tags" id="dayTags"></div>
+    <div class="tag-input-wrap">
+      <input class="tag-input" id="tagInput" placeholder="#태그 입력 후 엔터 (예: Prada_부츠)" autocomplete="off" autocapitalize="off" enterkeyhint="done">
+      <div class="suggest hidden" id="suggest"></div>
+    </div>
+    <div class="sec-label"><span>일기</span></div>
+    <textarea class="diary" id="diary" placeholder="오늘은 어땠나요?"></textarea>
+    <div class="btn-row" style="margin-top:14px; justify-content:space-between">
+      <button class="btn danger" id="delDayBtn">이 날 기록 삭제</button>
+      <button class="btn primary" data-close>완료</button>
+    </div>
+  </div>
+</div>
+
+<!-- 태그 상세 -->
+<div class="sheet-bg" id="tagSheet">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h">
+      <div class="t" id="tagTitle"></div>
+      <button class="icon-sq" data-close aria-label="닫기">✕</button>
+    </div>
+    <div class="kv" id="tagInfo"></div>
+    <div class="tags" id="tagBrandItems" style="margin-top:12px"></div>
+    <div class="sec-label"><span>입은 날</span></div>
+    <div class="worn-list" id="tagWorn"></div>
+    <div class="btn-row" style="margin-top:16px" id="tagActions">
+      <button class="btn ghost" id="renameTagBtn">태그 이름 바꾸기</button>
+      <button class="btn danger" id="deleteTagBtn">태그 삭제</button>
+    </div>
+  </div>
+</div>
+
+<div class="viewer" id="viewer">
+  <button class="x" id="viewerClose" aria-label="닫기">✕</button>
+  <img id="viewerImg" alt="">
+  <div class="bar">
+    <input type="date" id="viewerDate">
+    <button class="btn ghost" id="viewerMove">이 날짜로 옮기기</button>
+    <button class="btn danger" id="viewerDel" style="color:#ff8a8a;border-color:#444">삭제</button>
+    <div class="src" id="viewerSrc"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 저장소 (IndexedDB) =================
+   photos : { id, date, full(Blob), thumb(Blob), source, addedAt }
+   entries: { date, tags:[...], text }                          */
+const DB_NAME='ootd-diary';
+let dbp=null;
+function openDB(){
+  if(dbp) return dbp;
+  dbp = new Promise((res,rej)=>{
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = ()=>{
+      r.result.createObjectStore('photos', { keyPath:'id' });
+      r.result.createObjectStore('entries', { keyPath:'date' });
+    };
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+  });
+  return dbp;
+}
+async function run(store, mode, fn){
+  const db = await openDB();
+  return new Promise((res,rej)=>{
+    const t = db.transaction(store, mode); const s = t.objectStore(store);
+    let out; const r = fn(s);
+    if(r && 'onsuccess' in r) r.onsuccess=()=>{ out=r.result; };
+    t.oncomplete=()=>res(out); t.onerror=()=>rej(t.error);
+  });
+}
+const getAll = st=> run(st,'readonly', s=>s.getAll());
+const put = (st,v)=> run(st,'readwrite', s=>s.put(v));
+const del = (st,k)=> run(st,'readwrite', s=>s.delete(k));
+
+/* ================= EXIF 촬영일 =================
+   JPEG/HEIC 공통: 파일 앞부분에서 "Exif\0\0" 다음 TIFF 헤더를 찾아
+   DateTimeOriginal → DateTimeDigitized → DateTime 순으로 읽음        */
+async function readExifDate(file){
+  try{
+    const buf = await file.slice(0, 512*1024).arrayBuffer();
+    const u8 = new Uint8Array(buf); let tiff=-1;
+    for(let i=0;i<u8.length-10;i++){
+      if(u8[i]===0x45&&u8[i+1]===0x78&&u8[i+2]===0x69&&u8[i+3]===0x66&&u8[i+4]===0&&u8[i+5]===0){
+        const a=u8[i+6],b=u8[i+7];
+        if((a===0x49&&b===0x49)||(a===0x4D&&b===0x4D)){ tiff=i+6; break; }
+      }
+    }
+    if(tiff<0) return null;
+    const dv=new DataView(buf), le=u8[tiff]===0x49;
+    const u16=o=>dv.getUint16(tiff+o,le), u32=o=>dv.getUint32(tiff+o,le);
+    const str=(o,n)=>{ let s=''; for(let k=0;k<n;k++){ const c=u8[tiff+o+k]; if(!c) break; s+=String.fromCharCode(c);} return s; };
+    const ifd=o=>{
+      const out={}; if(tiff+o+2>u8.length) return out;
+      const n=u16(o);
+      for(let k=0;k<n;k++){
+        const e=o+2+k*12; if(tiff+e+12>u8.length) break;
+        const tag=u16(e), type=u16(e+2), cnt=u32(e+4);
+        if(type===2) out[tag]=str(cnt>4?u32(e+8):e+8, cnt);
+        else if(type===4||type===13) out[tag]=u32(e+8);
+      }
+      return out;
+    };
+    const i0=ifd(u32(4)); const ex=i0[0x8769]?ifd(i0[0x8769]):{};
+    const raw=ex[0x9003]||ex[0x9004]||i0[0x0132];
+    const m=raw&&raw.match(/^(\d{4})[:\-](\d{2})[:\-](\d{2})/);
+    if(!m||m[1]==='0000') return null;
+    return `${m[1]}-${m[2]}-${m[3]}`;
+  }catch(e){ return null; }
+}
+
+/* ================= 이미지 축소 ================= */
+function loadImage(blob){
+  return new Promise((res,rej)=>{
+    const u=URL.createObjectURL(blob), im=new Image();
+    im.onload=()=>{ URL.revokeObjectURL(u); res(im); };
+    im.onerror=()=>{ URL.revokeObjectURL(u); rej(new Error('decode')); };
+    im.src=u;
+  });
+}
+function shrink(im, max, q){
+  const sc=Math.min(1, max/Math.max(im.naturalWidth, im.naturalHeight));
+  const c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*sc); c.height=Math.round(im.naturalHeight*sc);
+  c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+  return new Promise(r=>c.toBlob(r,'image/jpeg',q));
+}
+
+/* ================= 상태 / 유틸 ================= */
+let photos=[], entries={};
+let view=(()=>{ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
+let curDay=null, curTag=null, viewerPhoto=null, pendingDay=null;
+let statGroup='item';
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function fmtKo(key, withYear=true){
+  const [y,m,d]=key.split('-').map(Number);
+  const w='일월화수목금토'[new Date(y,m-1,d).getDay()];
+  return withYear ? `${y}년 ${m}월 ${d}일 (${w})` : `${m}/${d} (${w})`;
+}
+const urls=new Map();
+function urlOf(p,kind){ const k=p.id+kind; if(!urls.has(k)) urls.set(k, URL.createObjectURL(p[kind])); return urls.get(k); }
+function dropUrl(id){ for(const k of ['full','thumb']){ const u=urls.get(id+k); if(u){ URL.revokeObjectURL(u); urls.delete(id+k); } } }
+function photosByDate(){
+  const m={}; for(const p of photos) (m[p.date] ||= []).push(p);
+  for(const k in m) m[k].sort((a,b)=>a.addedAt-b.addedAt);
+  return m;
+}
+function normTag(s){ return s.trim().replace(/^#+/,'').trim().replace(/\s+/g,'_'); }
+function brandOf(t){ const i=t.indexOf('_'); return i>0 ? t.slice(0,i) : t; }
+function hasContent(e){ return e && (e.tags.length || e.text.trim()); }
+function recordedDates(){
+  const s=new Set(photos.map(p=>p.date));
+  for(const d in entries) if(hasContent(entries[d])) s.add(d);
+  return s;
+}
+async function reload(){ photos=await getAll('photos'); entries={}; for(const e of await getAll('entries')) entries[e.date]=e; }
+
+/* ================= 캘린더 ================= */
+function renderCal(){
+  const {y,m}=view; $('monthLabel').textContent=`${y}년 ${m+1}월`;
+  const pm=photosByDate(), first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate(), today=ymd(new Date());
+  const g=$('grid'); g.innerHTML=''; let rec=0;
+  for(let i=0;i<first;i++){ const e=document.createElement('div'); e.className='day empty'; g.appendChild(e); }
+  for(let d=1; d<=days; d++){
+    const key=`${y}-${pad(m+1)}-${pad(d)}`, list=pm[key]||[], e=entries[key], dow=(first+d-1)%7;
+    const cell=document.createElement('button');
+    cell.className='day'+(dow===0?' sun':'')+(dow===6?' sat':'')+(key===today?' today':'')+(list.length?' has':'');
+    if(list.length||hasContent(e)) rec++;
+    if(list.length){
+      const im=document.createElement('img'); im.src=urlOf(list[0],'thumb'); im.alt=''; im.loading='lazy'; cell.appendChild(im);
+      if(list.length>1){ const c=document.createElement('span'); c.className='cnt'; c.textContent=list.length; cell.appendChild(c); }
+    } else if(hasContent(e)){ const dot=document.createElement('span'); dot.className='note-dot'; cell.appendChild(dot); }
+    const dn=document.createElement('span'); dn.className='dn'; dn.textContent=d; cell.appendChild(dn);
+    cell.setAttribute('aria-label', `${m+1}월 ${d}일${list.length?`, 사진 ${list.length}장`:''}`);
+    cell.onclick=()=>openDay(key);
+    g.appendChild(cell);
+  }
+  $('monthMeta').innerHTML=`이번 달 <b>${rec}</b>일 기록`;
+}
+
+/* ================= 사진 추가 ================= */
+async function addFiles(files, forced){
+  files=[...files].filter(f=>f.type.startsWith('image/')||/\.(heic|heif)$/i.test(f.name));
+  if(!files.length) return;
+  toast(`사진 ${files.length}장 처리 중…`, 60000);
+  let ok=0, noExif=0, failed=0; const dates=new Set();
+  for(const f of files){
+    try{
+      const ex=forced?null:await readExifDate(f);
+      const date=forced||ex||ymd(new Date(f.lastModified||Date.now()));
+      if(!forced&&!ex) noExif++;
+      const im=await loadImage(f);
+      const [full,thumb]=await Promise.all([shrink(im,1440,0.85), shrink(im,360,0.8)]);
+      await put('photos',{ id:(crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random()), date, full, thumb,
+        source: forced?'manual':(ex?'exif':'file'), addedAt:Date.now() });
+      ok++; dates.add(date);
+    }catch(e){ failed++; }
+  }
+  await reload();
+  let msg=`${ok}장 추가했어요`;
+  if(noExif) msg+=` · ${noExif}장은 촬영일 정보가 없어 파일 날짜로 넣었어요`;
+  if(failed) msg+=` · ${failed}장은 열 수 없었어요 (HEIC는 JPG로 바꿔 올려주세요)`;
+  toast(msg, 4500);
+  if(curDay){ renderCal(); openDay(curDay); return; }
+  const sorted=[...dates].sort();
+  if(sorted.length){ const [yy,mm]=sorted[sorted.length-1].split('-').map(Number); view={y:yy,m:mm-1}; }
+  renderCal();
+  if(dates.size===1) openDay(sorted[0]);   // 하루치만 올렸으면 바로 태그 입력 화면으로
+}
+
+/* ================= 하루 기록 시트 ================= */
+function entryOf(d){ return entries[d] || { date:d, tags:[], text:'' }; }
+async function saveEntry(e){
+  if(hasContent(e)){ entries[e.date]=e; await put('entries', e); }
+  else { delete entries[e.date]; await del('entries', e.date); }
+  $('savedMark').textContent='저장됨 ✓';
+  renderCal();
+}
+function openDay(d){
+  curDay=d;
+  $('dayTitle').textContent=fmtKo(d);
+  renderDayPhotos(); renderDayTags();
+  $('diary').value=entryOf(d).text;
+  $('savedMark').textContent='';
+  $('tagInput').value=''; hideSuggest();
+  open('daySheet');
+}
+function renderDayPhotos(){
+  const box=$('dayPhotos'); box.innerHTML='';
+  for(const p of (photosByDate()[curDay]||[])){
+    const b=document.createElement('button'); b.className='ph';
+    const im=document.createElement('img'); im.src=urlOf(p,'thumb'); im.alt=''; b.appendChild(im);
+    b.onclick=()=>openViewer(p); box.appendChild(b);
+  }
+  const add=document.createElement('button'); add.className='ph add'; add.textContent='＋'; add.setAttribute('aria-label','사진 추가');
+  add.onclick=()=>{ pendingDay=curDay; $('dayFileInput').click(); };
+  box.appendChild(add);
+}
+function renderDayTags(){
+  const box=$('dayTags'); box.innerHTML='';
+  const e=entryOf(curDay);
+  if(!e.tags.length){ box.innerHTML='<span class="saved">아직 태그가 없어요</span>'; return; }
+  e.tags.forEach((t,i)=>{
+    const s=document.createElement('span'); s.className='tag'; s.innerHTML=`#${esc(t)}<button aria-label="태그 빼기">✕</button>`;
+    s.querySelector('button').onclick=()=>{ e.tags.splice(i,1); saveEntry(e); renderDayTags(); };
+    box.appendChild(s);
+  });
+}
+function addTags(raw){
+  const parts = raw.includes('#') ? raw.split('#') : raw.split(/[,\n]/);
+  const e=entryOf(curDay); let added=0;
+  for(const p of parts){ const t=normTag(p); if(t && !e.tags.includes(t)){ e.tags.push(t); added++; } }
+  if(added){ saveEntry(e); renderDayTags(); }
+}
+
+// 태그 자동완성 (자주 쓴 순)
+function tagCounts(){
+  const c={}; for(const d in entries) for(const t of entries[d].tags) c[t]=(c[t]||0)+1; return c;
+}
+let sugIdx=-1, sugItems=[];
+function updateSuggest(){
+  const q=normTag($('tagInput').value).toLowerCase();
+  const cur=new Set(entryOf(curDay).tags);
+  const c=tagCounts();
+  sugItems=Object.keys(c).filter(t=>!cur.has(t) && (!q || t.toLowerCase().includes(q)))
+    .sort((a,b)=>{ const as=a.toLowerCase().startsWith(q), bs=b.toLowerCase().startsWith(q); return (bs-as)||(c[b]-c[a])||a.localeCompare(b); })
+    .slice(0,30);
+  const box=$('suggest');
+  if(!sugItems.length || document.activeElement!==$('tagInput')){ hideSuggest(); return; }
+  sugIdx=-1;
+  box.innerHTML=sugItems.map((t,i)=>`<button type="button" data-i="${i}"><span>#${esc(t)}</span><span class="k">${c[t]}회</span></button>`).join('');
+  box.classList.remove('hidden');
+}
+function hideSuggest(){ $('suggest').classList.add('hidden'); sugIdx=-1; }
+$('suggest').addEventListener('mousedown', e=>e.preventDefault());   // 클릭 시 입력창 포커스 유지
+$('suggest').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  addTags(sugItems[+b.dataset.i]); $('tagInput').value=''; updateSuggest(); $('tagInput').focus();
+});
+$('tagInput').addEventListener('input', updateSuggest);
+$('tagInput').addEventListener('focus', updateSuggest);
+$('tagInput').addEventListener('blur', ()=>setTimeout(hideSuggest,150));
+$('tagInput').addEventListener('keydown', e=>{
+  const box=$('suggest'), open=!box.classList.contains('hidden');
+  if(open && (e.key==='ArrowDown'||e.key==='ArrowUp')){
+    e.preventDefault(); sugIdx=(sugIdx+(e.key==='ArrowDown'?1:-1)+sugItems.length)%sugItems.length;
+    [...box.children].forEach((b,i)=>b.classList.toggle('act',i===sugIdx));
+    box.children[sugIdx].scrollIntoView({block:'nearest'}); return;
+  }
+  if(e.key==='Enter' || e.key===','){
+    if(e.isComposing) return;
+    e.preventDefault();
+    const v = (open && sugIdx>=0) ? sugItems[sugIdx] : $('tagInput').value;
+    if(normTag(v)) addTags(v);
+    $('tagInput').value=''; updateSuggest();
+  }
+  if(e.key==='Backspace' && !$('tagInput').value){
+    const en=entryOf(curDay); if(en.tags.length){ en.tags.pop(); saveEntry(en); renderDayTags(); }
+  }
+});
+$('tagInput').addEventListener('paste', e=>{
+  const t=(e.clipboardData||window.clipboardData).getData('text');
+  if(t && (t.match(/#/g)||[]).length>1){ e.preventDefault(); addTags(t); updateSuggest(); }
+});
+let diaryTimer;
+$('diary').addEventListener('input', ()=>{
+  $('savedMark').textContent='';
+  clearTimeout(diaryTimer);
+  diaryTimer=setTimeout(()=>{ const e=entryOf(curDay); e.text=$('diary').value; saveEntry(e); }, 500);
+});
+function flushDiary(){
+  if(!curDay) return;
+  clearTimeout(diaryTimer);
+  const e=entryOf(curDay);
+  if(e.text!==$('diary').value){ e.text=$('diary').value; saveEntry(e); }
+}
+$('delDayBtn').onclick=async ()=>{
+  const list=photosByDate()[curDay]||[];
+  if(!confirm(`${fmtKo(curDay)}의 사진 ${list.length}장, 태그, 일기를 모두 삭제할까요?`)) return;
+  clearTimeout(diaryTimer); $('diary').value='';
+  for(const p of list){ await del('photos',p.id); dropUrl(p.id); }
+  delete entries[curDay]; await del('entries',curDay);
+  await reload(); close('daySheet'); renderCal(); toast('삭제했어요');
+};
+
+/* ================= 사진 크게 보기 ================= */
+function openViewer(p){
+  viewerPhoto=p;
+  $('viewerImg').src=urlOf(p,'full');
+  $('viewerDate').value=p.date;
+  $('viewerSrc').textContent={exif:'📷 사진 촬영일로 등록됨', file:'📁 촬영일 정보가 없어 파일 날짜로 등록됨', manual:'✏️ 직접 고른 날짜'}[p.source]||'';
+  $('viewer').classList.add('open');
+}
+function closeViewer(){ $('viewer').classList.remove('open'); viewerPhoto=null; }
+$('viewerClose').onclick=closeViewer;
+$('viewerMove').onclick=async ()=>{
+  const d=$('viewerDate').value; if(!d||d===viewerPhoto.date) return;
+  await put('photos',{...viewerPhoto, date:d, source:'manual'});
+  await reload(); closeViewer(); renderCal(); renderDayPhotos();
+  toast(`${fmtKo(d)}로 옮겼어요 (태그·일기는 그대로예요)`, 3000);
+};
+$('viewerDel').onclick=async ()=>{
+  if(!confirm('이 사진을 삭제할까요?')) return;
+  await del('photos',viewerPhoto.id); dropUrl(viewerPhoto.id);
+  await reload(); closeViewer(); renderCal(); renderDayPhotos(); toast('삭제했어요');
+};
+
+/* ================= 태그 통계 ================= */
+function periodMatch(d, p){ return p==='all' || d.startsWith(p); }
+function fillPeriods(){
+  const sel=$('periodSel'), prev=sel.value;
+  const ds=Object.keys(entries).filter(d=>entries[d].tags.length).sort().reverse();
+  const years=[...new Set(ds.map(d=>d.slice(0,4)))];
+  const months=[...new Set(ds.map(d=>d.slice(0,7)))];
+  let h='<option value="all">전체 기간</option>';
+  for(const y of years) h+=`<option value="${y}">${y}년</option>`;
+  for(const m of months){ const [y,mm]=m.split('-'); h+=`<option value="${m}">${y}년 ${+mm}월</option>`; }
+  sel.innerHTML=h;
+  sel.value=[...sel.options].some(o=>o.value===prev)?prev:'all';
+}
+function computeStats(){
+  const p=$('periodSel').value||'all';
+  const stats={}; let days=0, tagSum=0;
+  for(const d in entries){
+    if(!periodMatch(d,p)) continue;
+    const tags=entries[d].tags; if(!tags.length) continue;
+    days++; tagSum+=tags.length;
+    const keys = statGroup==='brand' ? [...new Set(tags.map(brandOf))] : tags;
+    for(const k of keys){
+      const s = stats[k] ||= { name:k, count:0, last:'', items:new Set() };
+      s.count++; if(d>s.last) s.last=d;
+      if(statGroup==='brand') tags.filter(t=>brandOf(t)===k).forEach(t=>s.items.add(t));
+    }
+  }
+  return { list:Object.values(stats), days, tagSum, period:p };
+}
+function renderStats(){
+  fillPeriods();
+  const { list, days, tagSum } = computeStats();
+  $('sDays').textContent=days;
+  $('sTags').textContent=list.length;
+  $('sTagsL').textContent = statGroup==='brand' ? '브랜드' : '옷 태그';
+  $('sAvg').textContent = days ? (tagSum/days).toFixed(1) : '0';
+  const q=$('tagSearch').value.trim().toLowerCase().replace(/^#/,'');
+  const sort=$('sortSel').value;
+  let rows=list.filter(s=>!q || s.name.toLowerCase().includes(q.replace(/\s+/g,'_')) || s.name.toLowerCase().includes(q));
+  rows.sort({
+    count:(a,b)=>b.count-a.count||b.last.localeCompare(a.last),
+    recent:(a,b)=>b.last.localeCompare(a.last)||b.count-a.count,
+    stale:(a,b)=>a.last.localeCompare(b.last)||b.count-a.count,
+    name:(a,b)=>a.name.localeCompare(b.name,'ko'),
+  }[sort]);
+  const max=Math.max(1,...list.map(s=>s.count));
+  const box=$('rankList');
+  if(!list.length){ box.innerHTML='<div class="empty-msg">아직 태그가 달린 기록이 없어요.<br>캘린더에서 날짜를 눌러 옷 태그를 달아보세요.</div>'; return; }
+  if(!rows.length){ box.innerHTML='<div class="empty-msg">검색 결과가 없어요</div>'; return; }
+  const today=new Date(ymd(new Date()));
+  box.innerHTML=rows.map((s,i)=>{
+    const ago=Math.round((today-new Date(s.last))/86400000);
+    const agoTxt= ago<0?fmtKo(s.last,false):ago===0?'오늘':ago===1?'어제':`${ago}일 전`;
+    const sub = statGroup==='brand' ? `아이템 ${s.items.size}개 · 마지막 ${agoTxt}` : `마지막 ${agoTxt} (${fmtKo(s.last,false)})`;
+    return `<div class="rank-row" data-n="${esc(s.name)}"><div class="r">${i+1}</div>
+      <div><div class="nm">${statGroup==='brand'?'':'#'}${esc(s.name)}</div><div class="bar" style="width:${Math.max(4,s.count/max*100)}%"></div><div class="sub">${sub}</div></div>
+      <div class="c">${s.count}회</div></div>`;
+  }).join('');
+}
+$('rankList').addEventListener('click', e=>{ const r=e.target.closest('.rank-row'); if(r) openTag(r.dataset.n, statGroup); });
+$('periodSel').onchange=renderStats; $('sortSel').onchange=renderStats; $('tagSearch').oninput=renderStats;
+$('groupSeg').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  statGroup=b.dataset.g; [...$('groupSeg').children].forEach(x=>x.classList.toggle('on',x===b)); renderStats();
+});
+
+function openTag(name, kind){
+  curTag={name, kind};
+  const p=$('periodSel').value||'all';
+  const match = kind==='brand' ? (t=>brandOf(t)===name) : (t=>t===name);
+  const dates=Object.keys(entries).filter(d=>periodMatch(d,p) && entries[d].tags.some(match)).sort().reverse();
+  $('tagTitle').textContent = kind==='brand' ? name : '#'+name;
+  const periodTxt = p==='all' ? '전체 기간' : $('periodSel').selectedOptions[0].textContent;
+  $('tagInfo').innerHTML = `<span>${esc(periodTxt)} <b>${dates.length}회</b> 착용</span>` + (dates.length?`<span>처음 <b>${fmtKo(dates[dates.length-1],false)}</b></span><span>마지막 <b>${fmtKo(dates[0],false)}</b></span>`:'');
+  const bi=$('tagBrandItems'); bi.innerHTML='';
+  if(kind==='brand'){
+    const c={}; for(const d of dates) for(const t of entries[d].tags) if(match(t)) c[t]=(c[t]||0)+1;
+    for(const t of Object.keys(c).sort((a,b)=>c[b]-c[a])){
+      const s=document.createElement('button'); s.className='tag'; s.style.border='none'; s.style.cursor='pointer';
+      s.textContent=`#${t} · ${c[t]}`; s.onclick=()=>openTag(t,'item'); bi.appendChild(s);
+    }
+  }
+  $('tagActions').classList.toggle('hidden', kind==='brand');
+  const pm=photosByDate(), w=$('tagWorn'); w.innerHTML='';
+  for(const d of dates){
+    const b=document.createElement('button'); b.className='worn';
+    const ph=(pm[d]||[])[0];
+    b.innerHTML=`<div class="im">${ph?`<img src="${urlOf(ph,'thumb')}" alt="" loading="lazy">`:''}</div><div class="d">${fmtKo(d)}</div>`;
+    b.onclick=()=>{ close('tagSheet'); openDay(d); };
+    w.appendChild(b);
+  }
+  open('tagSheet');
+}
+$('renameTagBtn').onclick=async ()=>{
+  const old=curTag.name;
+  const nv=prompt('새 태그 이름 (같은 이름의 태그가 있으면 합쳐져요)', old);
+  if(nv===null) return; const t=normTag(nv); if(!t||t===old) return;
+  let n=0;
+  for(const d in entries){
+    const e=entries[d], i=e.tags.indexOf(old); if(i<0) continue;
+    e.tags.splice(i,1); if(!e.tags.includes(t)) e.tags.splice(i,0,t);
+    await put('entries',e); n++;
+  }
+  close('tagSheet'); renderStats(); toast(`${n}개 기록의 태그를 #${t}(으)로 바꿨어요`, 3000);
+};
+$('deleteTagBtn').onclick=async ()=>{
+  const old=curTag.name;
+  if(!confirm(`모든 기록에서 #${old} 태그를 뺄까요? (사진과 일기는 그대로예요)`)) return;
+  for(const d of Object.keys(entries)){
+    const e=entries[d]; if(!e.tags.includes(old)) continue;
+    e.tags=e.tags.filter(x=>x!==old); await saveEntry(e);
+  }
+  close('tagSheet'); renderStats(); toast('태그를 지웠어요');
+};
+
+/* ================= 백업 ================= */
+const toDataURL=b=>new Promise(r=>{ const f=new FileReader(); f.onload=()=>r(f.result); f.readAsDataURL(b); });
+$('exportBtn').onclick=async ()=>{
+  if(!photos.length && !Object.keys(entries).length){ toast('저장된 기록이 없어요'); return; }
+  toast('백업 파일 만드는 중…', 60000);
+  const ps=[]; for(const p of photos) ps.push({...p, full:await toDataURL(p.full), thumb:await toDataURL(p.thumb)});
+  const blob=new Blob([JSON.stringify({app:'ootd-diary', version:1, photos:ps, entries:Object.values(entries)})],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`ootd-backup-${ymd(new Date())}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  toast(`사진 ${photos.length}장, 기록 ${Object.keys(entries).length}일을 백업했어요`, 3000);
+};
+$('importBtn').onclick=()=>$('importInput').click();
+$('importInput').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(data.app!=='ootd-diary') throw 0;
+    toast('불러오는 중…', 60000);
+    const have=new Set(photos.map(p=>p.id)); let np=0, ne=0;
+    for(const p of data.photos||[]){
+      if(have.has(p.id)) continue;
+      await put('photos',{...p, full:await (await fetch(p.full)).blob(), thumb:await (await fetch(p.thumb)).blob()}); np++;
+    }
+    for(const en of data.entries||[]){
+      const cur=entries[en.date];
+      const merged= cur ? { date:en.date, tags:[...new Set([...cur.tags,...en.tags])], text: cur.text.trim()? cur.text : en.text } : en;
+      await put('entries',merged); ne++;
+    }
+    await reload(); renderCal(); toast(`사진 ${np}장, 기록 ${ne}일을 불러왔어요`, 3000);
+  }catch(err){ toast('백업 파일을 읽을 수 없어요'); }
+};
+
+/* ================= 공통 UI ================= */
+function open(id){ $(id).classList.add('open'); }
+function close(id){
+  if(id==='daySheet'){ flushDiary(); curDay=null; hideSuggest(); }
+  $(id).classList.remove('open');
+  if(!$('statsView').classList.contains('hidden')) renderStats();
+}
+document.querySelectorAll('.sheet-bg').forEach(bg=>{
+  bg.addEventListener('click', e=>{ if(e.target===bg || e.target.closest('[data-close]')) close(bg.id); });
+});
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Escape') return;
+  if($('viewer').classList.contains('open')) return closeViewer();
+  for(const id of ['tagSheet','daySheet']) if($(id).classList.contains('open')) return close(id);
+});
+let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms); }
+
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
+  const s=b.dataset.tab==='stats';
+  $('calView').classList.toggle('hidden',s); $('statsView').classList.toggle('hidden',!s);
+  $('addBtn').classList.toggle('hidden',s);
+  if(s) renderStats(); else renderCal();
+});
+$('prevBtn').onclick=()=>{ if(--view.m<0){view.m=11;view.y--;} renderCal(); };
+$('nextBtn').onclick=()=>{ if(++view.m>11){view.m=0;view.y++;} renderCal(); };
+$('todayBtn').onclick=()=>{ const d=new Date(); view={y:d.getFullYear(),m:d.getMonth()}; renderCal(); };
+$('addBtn').onclick=()=>$('fileInput').click();
+$('fileInput').onchange=e=>{ addFiles(e.target.files); e.target.value=''; };
+$('dayFileInput').onchange=e=>{ const d=pendingDay; pendingDay=null; addFiles(e.target.files, d); e.target.value=''; };
+(()=>{ let sx=null, sy=0; const g=$('grid');
+  g.addEventListener('touchstart',e=>{ sx=e.touches[0].clientX; sy=e.touches[0].clientY; },{passive:true});
+  g.addEventListener('touchend',e=>{ if(sx===null) return; const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy; sx=null;
+    if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5) $(dx<0?'nextBtn':'prevBtn').click(); });
+})();
+$('themeBtn').onclick=()=>{
+  const next=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  try{ localStorage.setItem('ootd-theme',next); }catch(e){}
+};
+
+(async()=>{
+  try{ await reload(); }catch(e){ toast('이 브라우저에서는 저장 기능을 쓸 수 없어요', 4000); }
+  renderCal();
+})();
+</script>
+</body>
+</html>
