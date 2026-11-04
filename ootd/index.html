@@ -1372,7 +1372,14 @@ $('lookInput').addEventListener('keydown', e=>{
 /* ================= 태그 목록 (확인·수정) ================= */
 /* ---- 고른 태그에 분류(Top·Outer·Bottom·Shoes·Bag·ACC) 붙이기 ----
    태그 맨 뒤에 _분류 를 붙임. 이미 다른 분류가 붙어 있으면 새 분류로 바꿈 */
-const CATS=['Top','Outer','Bottom','Shoes','Bag','ACC'];
+const CATS=['Top','Outer','Bottom','Shoes','Bag','ACC'];   // 기본 분류 + 직접 입력한 분류(계정에 저장돼서 계속 유지)
+async function loadCustomCats(){
+  try{
+    const snap=await col('ootdMeta').doc('settings').get();
+    for(const c of (snap.exists && snap.data().cats) || []) if(!CATS.some(x=>x.toLowerCase()===c.toLowerCase())) CATS.push(c);
+    if(!$('tagsView').classList.contains('hidden')) renderTagList();
+  }catch(e){ console.error(e); }
+}
 let tlSel=null, tlVisible=[];
 const catSet=()=>new Set(CATS.map(x=>x.toLowerCase()));
 function catOf(t){ const parts=stripGone(t).split('_'); const last=parts[parts.length-1]; return parts.length>1 && catSet().has(last.toLowerCase()) ? last : ''; }
@@ -1412,7 +1419,10 @@ $('catChips').addEventListener('click', e=>{
   if(cat==='__custom'){
     const v=prompt('붙일 분류를 입력하세요 (예: Dress, Knit)'); if(v===null) return;
     cat=normTag(v).replace(/^_+|_+$/g,''); if(!cat) return;
-    if(!CATS.some(x=>x.toLowerCase()===cat.toLowerCase())) CATS.push(cat);
+    if(!CATS.some(x=>x.toLowerCase()===cat.toLowerCase())){
+      CATS.push(cat);
+      save(col('ootdMeta').doc('settings').set({ cats: firebase.firestore.FieldValue.arrayUnion(cat) }, { merge:true }));
+    }
   }
   const map=new Map([...tlSel].map(t=>[t, withCat(t, cat)]));
   const changes=[...map].filter(([a,b])=>a!==b);
@@ -1952,7 +1962,6 @@ $('wipeAllBtn').onclick=async ()=>{
     const photoIds=(await col(C_PHOTO).get()).docs.map(d=>d.id);
     const entryIds=(await col(C_ENTRY).get()).docs.map(d=>d.id);
     const ops=[...photoIds.flatMap(id=>[col(C_PHOTO).doc(id), col(C_FULL).doc(id)]), ...entryIds.map(id=>col(C_ENTRY).doc(id))];
-    ops.push(col('ootdMeta').doc('settings'));   // 예전 버전에서 저장된 설정 문서도 정리
     for(let i=0;i<ops.length;i+=450){ const b=fdb.batch(); ops.slice(i,i+450).forEach(r=>b.delete(r)); await save(b.commit()); }
     for(const st of months.values()) st.list=[];
     entries={}; dayPhotosCache.clear(); fullCache.clear(); sigCache.clear();
@@ -2057,7 +2066,7 @@ function initFirebase(){
     months.clear(); dayPhotosCache.clear();
     user=u; entries={}; fullCache.clear();
     if(!u){ ['daySheet','tagSheet'].forEach(id=>$(id).classList.remove('open')); closeViewer(); showOnly('loginView'); return; }
-    showOnly('loadingView'); renderAccount(); startListening();
+    showOnly('loadingView'); renderAccount(); startListening(); loadCustomCats();
   });
 }
 initFirebase();
