@@ -112,7 +112,7 @@
 
   /* 사진 선택 삭제 */
   .day.sel::after, .photos .ph.sel::after{ content:'✓'; position:absolute; inset:0; z-index:2; display:flex; align-items:center; justify-content:center; background:rgba(91,91,214,.45); color:#fff; font-size:22px; font-weight:800; border-radius:inherit; }
-  .grid.selecting .day:not(.has):not(.empty){ opacity:.35; }
+  .grid.selecting .day.blank{ opacity:.35; }
   .selbar{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(18px + var(--safe-b)); z-index:21; display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border-2); border-radius:30px; padding:8px 8px 8px 16px; box-shadow:0 6px 20px rgba(0,0,0,.18); white-space:nowrap; max-width:calc(100% - 24px); }
   .selbar .info{ font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
   .selbar .btn{ border-radius:20px; }
@@ -297,7 +297,7 @@
 <div class="selbar hidden" id="selBar">
   <span class="info" id="selInfo"></span>
   <button class="btn ghost" id="selCancel">취소</button>
-  <button class="btn danger" id="selDelete" style="background:var(--danger);color:#fff;border:none">사진 삭제</button>
+  <button class="btn danger" id="selDelete" style="background:var(--danger);color:#fff;border:none">기록 삭제</button>
 </div>
 </div>
 <input type="file" id="fileInput" accept="image/*" multiple hidden>
@@ -578,9 +578,10 @@ function renderCal(){
     const dn=document.createElement('span'); dn.className='dn'; dn.textContent=d; cell.appendChild(dn);
     cell.setAttribute('aria-label', `${m+1}월 ${d}일${list.length?`, 사진 ${list.length}장`:''}`);
     if(selDays.has(key)) cell.classList.add('sel');
+    if(!list.length && !hasContent(e)) cell.classList.add('blank');
     cell.onclick=()=>{
       if(!selMode) return openDay(key);
-      if(!list.length) return;
+      if(!list.length && !hasContent(e)) return;
       if(selDays.has(key)) selDays.delete(key); else selDays.set(key, list.map(p=>p.id));
       renderCal();
     };
@@ -591,8 +592,9 @@ function renderCal(){
   updateSelBar();
 }
 
-/* ================= 사진 골라서 삭제 =================
-   사진만 지우고 그날의 옷 태그·일기는 남김 */
+/* ================= 골라서 삭제 =================
+   캘린더: 고른 날짜의 기록 전체(사진·옷 태그·일기) 삭제
+   날짜 화면: 고른 사진만 삭제 (옷 태그·일기는 남김) */
 let selMode=false; const selDays=new Map();   // 날짜 → 사진 id 목록
 function setSelMode(on){
   selMode=on; selDays.clear();
@@ -604,7 +606,7 @@ function setSelMode(on){
 function updateSelBar(){
   if(!selMode) return;
   const n=[...selDays.values()].reduce((a,l)=>a+l.length,0);
-  $('selInfo').textContent = selDays.size ? `${selDays.size}일 · 사진 ${n}장` : '지울 날짜를 눌러 고르세요';
+  $('selInfo').textContent = selDays.size ? `${selDays.size}일 선택 · 사진 ${n}장` : '지울 날짜를 눌러 고르세요';
   $('selDelete').disabled = !selDays.size;
   $('selDelete').style.opacity = selDays.size ? 1 : .4;
 }
@@ -621,11 +623,12 @@ async function deletePhotos(ids){
 $('selBtn').onclick=()=>setSelMode(!selMode);
 $('selCancel').onclick=()=>setSelMode(false);
 $('selDelete').onclick=async ()=>{
-  const ids=[...selDays.values()].flat();
-  if(!ids.length) return;
-  if(!confirm(`${selDays.size}일의 사진 ${ids.length}장을 삭제할까요?\n옷 태그와 일기는 그대로 남아요.`)) return;
+  if(!selDays.size) return;
+  const dates=[...selDays.keys()], ids=[...selDays.values()].flat();
+  if(!confirm(`${dates.length}일의 기록을 모두 삭제할까요?\n사진 ${ids.length}장, 옷 태그, 일기가 함께 지워지고 되돌릴 수 없어요.`)) return;
   await deletePhotos(ids);
-  setSelMode(false); toast(`사진 ${ids.length}장을 삭제했어요`);
+  commitEntries(dates.map(d=>({ date:d, tags:[], text:'' })));   // 내용이 비면 기록 문서가 삭제됨
+  setSelMode(false); toast(`${dates.length}일의 기록을 삭제했어요`);
 };
 
 // 날짜 화면에서 몇 장만 골라 지우기
