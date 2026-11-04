@@ -203,6 +203,17 @@
   #daySheet .sheet.slide-r{ animation:slideR .22s ease; }
   @keyframes slideL{ from{ transform:translateX(40px); opacity:.3; } to{ transform:none; opacity:1; } }
   @keyframes slideR{ from{ transform:translateX(-40px); opacity:.3; } to{ transform:none; opacity:1; } }
+  /* 일기 검색 */
+  .sr-row{ display:flex; gap:10px; padding:11px 2px; border-bottom:1px solid var(--border); cursor:pointer; }
+  .sr-row:last-child{ border-bottom:none; }
+  .sr-th{ width:46px; height:61px; border-radius:8px; overflow:hidden; background:var(--bg); border:1px solid var(--border); flex-shrink:0; }
+  .sr-th img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .sr-body{ flex:1; min-width:0; }
+  .sr-date{ font-size:12px; font-weight:800; color:var(--accent-dark); margin-bottom:3px; }
+  .sr-text{ font-size:13.5px; line-height:1.55; color:var(--text); word-break:break-all; }
+  .sr-tags{ font-size:11.5px; color:var(--text-muted); margin-top:4px; word-break:break-all; }
+  mark{ background:#ffe066; color:#18181b; border-radius:3px; padding:0 1px; }
+  html[data-theme="dark"] mark{ background:#f2c94c; }
   .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
   /* 모아보기 */
   .filter-chip{ background:var(--accent); color:#fff; }
@@ -268,7 +279,10 @@
       <h1 class="title" id="appTitle">OOTD 일기</h1>
       <p class="subtitle" id="appSubtitle">사진을 올리면 찍은 날짜에 맞춰 캘린더에 들어가요</p>
     </div>
-    <button class="icon-sq" id="menuBtn" aria-label="설정" style="font-size:18px;line-height:1">⋯</button>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button class="icon-sq" id="searchBtn" aria-label="일기 검색" style="font-size:15px">🔍</button>
+      <button class="icon-sq" id="menuBtn" aria-label="설정" style="font-size:18px;line-height:1">⋯</button>
+    </div>
   </div>
 
   <div class="tabs">
@@ -440,6 +454,19 @@
       <button class="btn ghost" id="goneTagBtn"></button>
       <button class="btn danger" id="deleteTagBtn">태그 삭제</button>
     </div>
+  </div>
+</div>
+
+<!-- 일기 검색 -->
+<div class="sheet-bg" id="searchSheet">
+  <div class="sheet" role="dialog" aria-modal="true" style="min-height:70vh">
+    <div class="sheet-h">
+      <div class="t">일기 검색</div>
+      <button class="icon-sq" data-close aria-label="닫기">✕</button>
+    </div>
+    <input class="search" id="diarySearch" type="search" placeholder="일기 내용·옷 태그로 검색 (예: 커피, 코트)" autocomplete="off" enterkeyhint="search" style="margin-bottom:6px">
+    <div class="saved" id="srCount" style="margin:0 2px 8px"></div>
+    <div id="srList"></div>
   </div>
 </div>
 
@@ -1903,7 +1930,7 @@ document.addEventListener('keydown', e=>{
      && !e.target.closest('input,textarea')){ gotoDay(e.key==='ArrowLeft'?-1:1); return; }
   if(e.key!=='Escape') return;
   if($('viewer').classList.contains('open')) return closeViewer();
-  for(const id of ['menuSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
+  for(const id of ['searchSheet','menuSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
 let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms); }
 
@@ -1955,6 +1982,65 @@ $('themeSeg').addEventListener('click', e=>{
   applyThemeMode(b.dataset.v);
 });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{ if(themeMode()==='system') applyThemeMode('system'); });
+/* ================= 일기 검색 =================
+   일기 본문과 옷 태그에서 찾음. 띄어 쓴 단어는 모두 들어 있어야 함(순서 상관없음).
+   결과: 최신순, 검색어 주변 본문 일부 + 검색어 형광펜 */
+function srWords(q){ return String(q||'').toLowerCase().replace(/#/g,' ').split(/\s+/).filter(Boolean); }
+function highlight(text, words){
+  if(!words.length) return esc(text);
+  const lower=text.toLowerCase(), marks=[];
+  for(const w of words){ let i=0; while((i=lower.indexOf(w,i))!==-1){ marks.push([i,i+w.length]); i+=w.length; } }
+  marks.sort((a,b)=>a[0]-b[0]);
+  let out='', pos=0;
+  for(const [a,b] of marks){ if(a<pos) continue; out+=esc(text.slice(pos,a))+'<mark>'+esc(text.slice(a,b))+'</mark>'; pos=b; }
+  return out+esc(text.slice(pos));
+}
+// 본문에서 첫 번째 검색어 주변만 잘라서 보여줌
+function snippet(text, words, len=90){
+  const flat=text.replace(/\s*\n\s*/g,' · ');
+  if(!words.length) return flat.slice(0,len);
+  const lower=flat.toLowerCase();
+  let at=Math.min(...words.map(w=>{ const i=lower.indexOf(w); return i<0?Infinity:i; }));
+  if(!isFinite(at)) return flat.slice(0,len)+(flat.length>len?'…':'');
+  let start=Math.max(0, at-30);
+  if(start>0){ const sp=flat.indexOf(' ', start); if(sp>-1 && sp<at) start=sp+1; }   // 단어 중간에서 잘리지 않게
+  const end=Math.min(flat.length, start+len);
+  return (start>0?'…':'')+flat.slice(start,end)+(end<flat.length?'…':'');
+}
+let srTimer;
+function renderSearch(){
+  const words=srWords($('diarySearch').value), box=$('srList');
+  if(!words.length){ $('srCount').textContent=''; box.innerHTML='<div class="empty-msg">찾고 싶은 단어를 입력하세요<br>여러 단어를 띄어 쓰면 모두 들어간 날만 찾아요</div>'; return; }
+  const hits=Object.keys(entries).sort().reverse().filter(d=>{
+    const e=entries[d], hay=((e.text||'')+' '+(e.tags||[]).join(' ')).toLowerCase(), flat=hay.replace(/_/g,'');
+    return words.every(w=>hay.includes(w) || flat.includes(w));
+  });
+  $('srCount').textContent = hits.length ? `${hits.length}일의 일기에서 찾았어요` : '';
+  if(!hits.length){ box.innerHTML='<div class="empty-msg">검색 결과가 없어요</div>'; return; }
+  const pm=photosByDate();
+  box.innerHTML=hits.slice(0,300).map(d=>{
+    const e=entries[d], text=e.text||'';
+    const inText=words.some(w=>text.toLowerCase().includes(w));
+    const tagHits=(e.tags||[]).filter(t=>words.some(w=>t.toLowerCase().includes(w)||t.toLowerCase().replace(/_/g,'').includes(w)));
+    const th=(pm[d]||[])[0];
+    return `<div class="sr-row" data-d="${d}">
+      <div class="sr-th" data-d="${d}">${th?`<img src="${th.thumb}" alt="">`:''}</div>
+      <div class="sr-body"><div class="sr-date">${fmtKo(d)}</div>
+        <div class="sr-text">${text ? highlight(snippet(text, inText?words:[]), words) : '<span class="saved">일기 없음</span>'}</div>
+        ${tagHits.length?`<div class="sr-tags">${tagHits.map(t=>'#'+highlight(t, words)).join(' ')}</div>`:''}
+      </div></div>`;
+  }).join('') + (hits.length>300?'<div class="empty-msg">최근 300개까지만 보여요. 단어를 더 넣어 좁혀보세요</div>':'');
+  // 보고 있지 않은 달의 대표 사진은 화면에 보일 때 불러옴
+  box.querySelectorAll('.sr-th:empty').forEach(el=>lazy($('searchSheet').querySelector('.sheet'), el, async x=>{ const t=await thumbForDay(x.dataset.d); if(t) x.innerHTML=`<img src="${t}" alt="">`; }));
+}
+$('searchBtn').onclick=()=>{ renderSearch(); openSheet('searchSheet'); setTimeout(()=>$('diarySearch').focus(), 50); };
+$('diarySearch').addEventListener('input', ()=>{ clearTimeout(srTimer); srTimer=setTimeout(renderSearch, 150); });
+$('srList').addEventListener('click', e=>{
+  const r=e.target.closest('.sr-row'); if(!r) return;
+  const d=r.dataset.d, [yy,mm]=d.split('-').map(Number); view={ y:yy, m:mm-1 };
+  closeSheet('searchSheet'); renderCal(); openDay(d);
+});
+
 $('menuBtn').onclick=()=>{
   $('titleInput').value = $('appTitle').textContent===DEFAULT_TITLE ? '' : $('appTitle').textContent;
   $('subtitleInput').value = $('appSubtitle').textContent===DEFAULT_SUBTITLE ? '' : $('appSubtitle').textContent;
