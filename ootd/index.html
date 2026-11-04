@@ -1230,7 +1230,7 @@ function parseUpnote(html, fileName){
     if(yi>=0 && md && validDate(ht[yi], md.slice(0,2), md.slice(2))) date=`${ht[yi]}-${md.slice(0,2)}-${md.slice(2)}`;
   }
   if(!date){
-    const m=(fileName||'').match(/((?:19|20)\d{2})[_\-. ]?(\d{2})[_\-. ]?(\d{2})/);
+    const m=(fileName||'').match(/((?:19|20)\d{2})\D{0,3}(\d{2})\D?(\d{2})/);   // 2026_0808, #2024 #0921 등
     if(m && validDate(m[1],m[2],m[3])) date=`${m[1]}-${m[2]}-${m[3]}`;
   }
   const tags=[...root.querySelectorAll('[data-upnote-tag]')]
@@ -1251,6 +1251,7 @@ function hashId(str){
 async function importUpnote(files){
   toast('UpNote 파일 읽는 중…', 120000);
   const notes=[];                 // { html, name, dir }
+  let links=0;                    // 내용 없이 다른 파일을 가리키기만 하는 바로가기
   const imgs=new Map();           // 경로 또는 파일이름 → () => Promise<Blob>
   const addImg=(path, get)=>{ imgs.set(path, get); if(!imgs.has(baseName(path))) imgs.set(baseName(path), get); };
   const mimeOf=n=>/\.png$/i.test(n)?'image/png':/\.gif$/i.test(n)?'image/gif':/\.webp$/i.test(n)?'image/webp':/\.hei[cf]$/i.test(n)?'image/heic':'image/jpeg';
@@ -1259,24 +1260,32 @@ async function importUpnote(files){
       if(/\.zip$/i.test(f.name) || f.type==='application/zip'){
         if(f.size>500*1024*1024 && !confirm(`zip 파일이 ${Math.round(f.size/1024/1024)}MB로 커서 폰에서는 멈출 수 있어요.\n연도별 등으로 나눠서 여러 번 가져오는 걸 추천해요.\n그래도 계속할까요?`)){ toast('',1); return; }
         const JSZip=await loadJSZip();
-        const zip=await JSZip.loadAsync(f);
+        // 맥에서 만든 zip은 한글 파일 이름이 깨져 보일 수 있어서 UTF-8로 읽음
+        const zip=await JSZip.loadAsync(f, { decodeFileName: bytes=>new TextDecoder('utf-8').decode(bytes).normalize('NFC') });
         for(const entry of Object.values(zip.files)){
           if(entry.dir || /(^|\/)(__MACOSX|\.)/.test(entry.name)) continue;
           if(/\.html?$/i.test(entry.name)){
             const i=entry.name.lastIndexOf('/');
-            notes.push({ html:await entry.async('string'), name:baseName(entry.name), dir:i>=0?entry.name.slice(0,i):'' });
+            const html=await entry.async('string');
+            if(!/<(html|body|div|h\d|p)\b/i.test(html)){ links++; continue; }   // 바로가기(링크) 파일은 건너뜀
+            notes.push({ html, name:baseName(entry.name), dir:i>=0?entry.name.slice(0,i):'' });
           } else if(/\.(jpe?g|png|gif|webp|hei[cf])$/i.test(entry.name)){
             addImg(entry.name, async()=>new Blob([await entry.async('arraybuffer')],{ type:mimeOf(entry.name) }));
           }
         }
       } else if(/\.html?$/i.test(f.name) || f.type==='text/html'){
-        notes.push({ html:await f.text(), name:f.name, dir:'' });
+        const html=await f.text();
+        if(!/<(html|body|div|h\d|p)\b/i.test(html)){ links++; continue; }
+        notes.push({ html, name:f.name, dir:'' });
       } else if(f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|hei[cf])$/i.test(f.name)){
         addImg(f.name, async()=>f);
       }
     }
   }catch(err){ console.error(err); toast('파일을 읽지 못했어요: '+err.message, 5000); return; }
-  if(!notes.length){ toast('UpNote HTML 노트를 찾지 못했어요', 4000); return; }
+  if(!notes.length){
+    toast(links ? `노트 내용이 없어요. 바로가기 파일 ${links}개만 들어 있어요 — 내보낸 폴더 전체(맨 위 폴더)를 압축해서 올려주세요` : 'UpNote HTML 노트를 찾지 못했어요', 8000);
+    return;
+  }
 
   // 날짜별로 합치기 (같은 날 노트가 여러 개면 태그·글·사진을 합침)
   const byDate=new Map(); let noDate=0;
