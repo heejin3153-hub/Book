@@ -265,7 +265,7 @@
       </div>
       <div class="closet" id="closetGrid"></div>
     </div>
-    <p class="hint">옷을 누르면 그 옷을 입은 날 사진이 모두 모여요.<br>사진은 그 옷을 가장 최근에 입은 날의 사진이에요.</p>
+    <p class="hint">옷을 누르면 그 옷을 입은 날 사진이 모두 모여요. 이름 수정은 거기서 ✏️ 버튼으로 할 수 있어요.<br>사진은 그 옷을 가장 최근에 입은 날의 사진이에요.</p>
   </section>
 
   <!-- 통계 -->
@@ -296,6 +296,7 @@
 <button class="fab" id="addBtn">＋ 사진 올리기</button>
 <div class="selbar hidden" id="selBar">
   <span class="info" id="selInfo"></span>
+  <button class="btn ghost" id="selAll">전체</button>
   <button class="btn ghost" id="selCancel">취소</button>
   <button class="btn danger" id="selDelete" style="background:var(--danger);color:#fff;border:none">기록 삭제</button>
 </div>
@@ -314,7 +315,7 @@
     </div>
     <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
     <div class="photos" id="dayPhotos"></div>
-    <div class="sec-label"><span>옷 태그</span><span class="saved" id="savedMark"></span></div>
+    <div class="sec-label"><span>옷 태그 <span style="font-weight:500">· 누르면 이름 수정(모든 기록에 반영), ✕는 이 날에서만 빼기</span></span><span class="saved" id="savedMark"></span></div>
     <div class="tags" id="dayTags"></div>
     <div class="tag-input-wrap">
       <input class="tag-input" id="tagInput" placeholder="#태그 입력 후 엔터 (예: Prada_부츠)" autocomplete="off" autocapitalize="off" enterkeyhint="done">
@@ -607,6 +608,8 @@ function updateSelBar(){
   if(!selMode) return;
   const n=[...selDays.values()].reduce((a,l)=>a+l.length,0);
   $('selInfo').textContent = selDays.size ? `${selDays.size}일 선택 · 사진 ${n}장` : '지울 날짜를 눌러 고르세요';
+  const md=monthRecordDays();
+  $('selAll').textContent = md.length && md.every(([k])=>selDays.has(k)) ? '전체 해제' : '이번 달 전체';
   $('selDelete').disabled = !selDays.size;
   $('selDelete').style.opacity = selDays.size ? 1 : .4;
 }
@@ -622,6 +625,21 @@ async function deletePhotos(ids){
 }
 $('selBtn').onclick=()=>setSelMode(!selMode);
 $('selCancel').onclick=()=>setSelMode(false);
+// 이번 달에 기록이 있는 날 전체 선택 / 해제
+function monthRecordDays(){
+  const {y,m}=view, pm=photosByDate(), out=[];
+  for(let d=1; d<=new Date(y,m+1,0).getDate(); d++){
+    const k=`${y}-${pad(m+1)}-${pad(d)}`;
+    if((pm[k]||[]).length || hasContent(entries[k])) out.push([k, (pm[k]||[]).map(p=>p.id)]);
+  }
+  return out;
+}
+$('selAll').onclick=()=>{
+  const days=monthRecordDays();
+  const allOn=days.length && days.every(([k])=>selDays.has(k));
+  for(const [k,ids] of days){ if(allOn) selDays.delete(k); else selDays.set(k, ids); }
+  renderCal();
+};
 $('selDelete').onclick=async ()=>{
   if(!selDays.size) return;
   const dates=[...selDays.keys()], ids=[...selDays.values()].flat();
@@ -723,8 +741,9 @@ function renderDayTags(){
   const e=entryOf(curDay);
   if(!e.tags.length){ box.innerHTML='<span class="saved">아직 태그가 없어요</span>'; return; }
   e.tags.forEach((t,i)=>{
-    const s=document.createElement('span'); s.className='tag'; s.innerHTML=`#${esc(t)}<button aria-label="태그 빼기">✕</button>`;
+    const s=document.createElement('span'); s.className='tag'; s.innerHTML=`<span class="tname" style="cursor:pointer">#${esc(t)}</span><button aria-label="이 날에서 태그 빼기">✕</button>`;
     s.querySelector('button').onclick=()=>{ const en=entryOf(curDay); en.text=$('diary').value; en.tags.splice(i,1); saveEntry(en); renderDayTags(); };
+    s.querySelector('.tname').onclick=()=>{ flushDiary(); if(promptRenameTag(t)) renderDayTags(); };
     box.appendChild(s);
   });
 }
@@ -1030,8 +1049,13 @@ function renderLook(){
     }));
   }
   // 태그 하나만 골랐을 때만 이름 바꾸기/삭제
-  const one = look.filters.length===1 && look.filters[0].kind==='item';
+  const one = look.filters.length===1;
   $('tagActions').classList.toggle('hidden', !one);
+  if(one){
+    const isB=look.filters[0].kind==='brand';
+    $('renameTagBtn').textContent = isB ? '✏️ 브랜드 이름 바꾸기' : '✏️ 태그 이름 바꾸기';
+    $('deleteTagBtn').textContent = isB ? '브랜드 태그 모두 빼기' : '태그 삭제';
+  }
 }
 function lookViewerList(){
   const out=[]; for(const d of lookDates()) out.push(...(lookPhotos.get(d)||[])); return out;
@@ -1117,26 +1141,52 @@ async function commitEntries(list){
     save(b.commit());
   }
 }
-$('renameTagBtn').onclick=()=>{
-  const old=look.filters[0].name;
-  const nv=prompt('새 태그 이름 (같은 이름의 태그가 있으면 합쳐져요)', old);
-  if(nv===null) return; const t=normTag(nv); if(!t||t===old) return;
+/* ---- 태그 이름 바꾸기: 모든 기록에 한 번에 반영 ----
+   mapFn(태그) → 새 태그(바꿀 게 아니면 그대로). 바뀐 이름이 이미 있으면 하나로 합쳐짐 */
+function renameTagsEverywhere(mapFn){
   const changed=[];
   for(const d in entries){
-    const e=entryOf(d), i=e.tags.indexOf(old); if(i<0) continue;
-    e.tags.splice(i,1); if(!e.tags.includes(t)) e.tags.splice(i,0,t);
-    changed.push(e);
+    const e=entryOf(d); let hit=false; const out=[];
+    for(const t of e.tags){ const n=mapFn(t); if(n!==t) hit=true; if(!out.includes(n)) out.push(n); }
+    if(hit){ e.tags=out; changed.push(e); }
   }
   commitEntries(changed);
-  closeSheet('tagSheet'); toast(`${changed.length}개 기록의 태그를 #${t}(으)로 바꿨어요`, 3000);
+  return changed.length;
+}
+// 태그 하나 이름 바꾸기 (예: Avinue_n_son_블랙티셔츠 → AvenueNSon_블랙티셔츠)
+function promptRenameTag(old){
+  const nv=prompt(`#${old}\n\n새 이름을 입력하세요. 이 태그가 달린 모든 기록에 반영돼요.\n(이미 있는 태그 이름이면 하나로 합쳐져요)`, old);
+  if(nv===null) return null;
+  const t=normTag(nv); if(!t || t===old) return null;
+  const n=renameTagsEverywhere(x=>x===old?t:x);
+  toast(`${n}일의 기록에서 #${old} → #${t}(으)로 바꿨어요`, 3500);
+  return t;
+}
+// 브랜드 이름 바꾸기 (예: Avinue_n_son → AvenueNSon, 그 브랜드의 모든 옷 태그 앞부분이 바뀜)
+function promptRenameBrand(old){
+  const nv=prompt(`브랜드 "${old}"\n\n새 브랜드 이름을 입력하세요. 이 브랜드의 모든 옷 태그에 반영돼요.`, old);
+  if(nv===null) return null;
+  const b=normTag(nv); if(!b || b===old) return null;
+  const n=renameTagsEverywhere(t=> brandOf(t)===old ? b+t.slice(old.length) : t);
+  toast(`${n}일의 기록에서 브랜드를 ${old} → ${b}(으)로 바꿨어요`, 3500);
+  return b;
+}
+$('renameTagBtn').onclick=()=>{
+  const f=look.filters[0]; if(!f) return;
+  const nn = f.kind==='brand' ? promptRenameBrand(f.name) : promptRenameTag(f.name);
+  if(nn){ f.name=nn; renderLook(); }
 };
 $('deleteTagBtn').onclick=()=>{
-  const old=look.filters[0].name;
-  if(!confirm(`모든 기록에서 #${old} 태그를 뺄까요? (사진과 일기는 그대로예요)`)) return;
+  const f=look.filters[0]; if(!f) return;
+  const isB=f.kind==='brand';
+  if(!confirm(isB ? `모든 기록에서 ${f.name} 브랜드의 옷 태그를 전부 뺄까요?\n(사진과 일기는 그대로예요)` : `모든 기록에서 #${f.name} 태그를 뺄까요?\n(사진과 일기는 그대로예요)`)) return;
   const changed=[];
-  for(const d in entries){ const e=entryOf(d); if(!e.tags.includes(old)) continue; e.tags=e.tags.filter(x=>x!==old); changed.push(e); }
+  for(const d in entries){
+    const e=entryOf(d), keep=e.tags.filter(t=> isB ? brandOf(t)!==f.name : t!==f.name);
+    if(keep.length!==e.tags.length){ e.tags=keep; changed.push(e); }
+  }
   commitEntries(changed);
-  closeSheet('tagSheet'); toast('태그를 지웠어요');
+  closeSheet('tagSheet'); toast(`${changed.length}일의 기록에서 태그를 뺐어요`);
 };
 
 /* ================= 백업 (JSON 파일) ================= */
@@ -1315,7 +1365,8 @@ async function importUpnote(files){
     `UpNote에서 가져올 내용\n\n`+
     `· 기록 ${days.length}일 (${range})\n`+
     `· 옷 태그 ${allTags.size}종류\n`+
-    `· 사진 ${found.length}장`+(missing?` (파일을 못 찾은 사진 ${missing}장)`:'')+`\n`+
+    (found.length ? `· 사진 ${found.length}장`+(missing?` (파일을 못 찾은 사진 ${missing}장)`:'')+`\n`
+                  : `· 사진은 빼고 옷 태그·일기만 가져와요\n`)+
     (noDate?`· 날짜를 못 찾은 노트 ${noDate}개는 건너뛰어요\n`:'')+
     `\n이미 있는 날짜는 태그·일기를 합쳐요. 가져올까요?`);
   if(!ok) return;
@@ -1353,7 +1404,7 @@ async function importUpnote(files){
   }
   const last=days[days.length-1].date.split('-').map(Number);
   view={ y:last[0], m:last[1]-1 }; renderCal();
-  toast(`가져오기 끝! 기록 ${days.length}일, 사진 ${done}장`+(dup?` · 이미 있는 사진 ${dup}장 건너뜀`:'')+(failed?` (사진 ${failed}장 실패)`:'')+(missing?` · 못 찾은 사진 ${missing}장`:''), 6000);
+  toast(`가져오기 끝! 기록 ${days.length}일, 사진 ${done}장`+(dup?` · 이미 있는 사진 ${dup}장 건너뜀`:'')+(failed?` (사진 ${failed}장 실패)`:'')+(missing&&found.length?` · 못 찾은 사진 ${missing}장`:''), 6000);
 }
 
 /* ================= 공통 UI ================= */
