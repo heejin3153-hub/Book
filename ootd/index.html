@@ -140,7 +140,7 @@
   .suggest button:last-child{ border-bottom:none; }
   .suggest button.act, .suggest button:hover{ background:var(--accent-soft); }
   .suggest .k{ color:var(--text-muted); font-size:12px; flex-shrink:0; }
-  .diary{ width:100%; min-height:110px; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); padding:12px; font-size:16px; line-height:1.6; color:var(--text); font-family:inherit; outline:none; resize:vertical; }
+  .diary{ width:100%; min-height:max(260px, 38vh); border:1.5px solid var(--border-2); border-radius:12px; background:var(--bg); padding:14px; font-size:16px; line-height:1.7; color:var(--text); font-family:inherit; outline:none; resize:none; overflow:hidden; }
   .diary:focus{ border-color:var(--accent); }
   .saved{ font-size:11px; color:var(--text-muted); font-weight:600; }
   .btn{ border:none; border-radius:10px; padding:10px 14px; font-size:13px; font-weight:700; cursor:pointer; }
@@ -799,6 +799,7 @@ function openDay(d){
   $('dayTitle').textContent=fmtKo(d);
   renderDayPhotos(); renderDayTags();
   $('diary').value=entryOf(d).text;
+  requestAnimationFrame(fitDiary);
   $('savedMark').textContent='';
   $('tagInput').value=''; hideSuggest();
   openSheet('daySheet');
@@ -933,6 +934,9 @@ $('tagInput').addEventListener('paste', e=>{
   if(t && (t.match(/#/g)||[]).length>1){ e.preventDefault(); addTags(t); updateSuggest(); }
 });
 let diaryTimer;
+// 일기 칸이 글 길이에 맞춰 늘어나게 (스크롤 없이 전체가 보임)
+function fitDiary(){ const t=$('diary'); t.style.height='auto'; t.style.height=t.scrollHeight+2+'px'; }
+$('diary').addEventListener('input', fitDiary);
 $('diary').addEventListener('input', ()=>{
   $('savedMark').textContent='';
   clearTimeout(diaryTimer);
