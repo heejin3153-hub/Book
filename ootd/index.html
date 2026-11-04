@@ -548,7 +548,7 @@ function shrink(im, max, q){
   return c.toDataURL('image/jpeg', q);
 }
 // 캔버스에 다시 그려서 저장하므로 위치(GPS)·기기 정보 같은 EXIF 메타데이터는 저장되지 않음
-const THUMB=[320,0.7];
+const THUMB=[480,0.78];   // 캘린더·옷장용 작은 사진 (날짜 화면에서는 큰 사진으로 바꿔 보여줌)
 function shrinkFull(im){
   // 긴 변 2048px (아이패드 전체화면에서도 선명). Firestore 문서 1MB 제한을 넘으면 한 단계씩 줄임
   for(const [max,q] of [[2048,0.8],[2048,0.72],[1800,0.72],[1600,0.7],[1280,0.7]]){
@@ -885,8 +885,9 @@ function renderDayPhotos(){
   if(dayOrd){
     list.forEach((p,i)=>{
       const b=document.createElement('div'); b.className='ph ord';
-      b.innerHTML=`<img src="${p.thumb}" alt=""><span class="ord-no">${i===0?'⭐ 대표':i+1}</span>
+      b.innerHTML=`<img alt=""><span class="ord-no">${i===0?'⭐ 대표':i+1}</span>
         <div class="ord-bar"><button aria-label="앞으로" ${i===0?'disabled':''}>‹</button><button aria-label="뒤로" ${i===list.length-1?'disabled':''}>›</button></div>`;
+      sharpen(b.querySelector('img'), p);
       const [l,r]=b.querySelectorAll('.ord-bar button');
       l.onclick=()=>movePhoto(list, i, i-1); r.onclick=()=>movePhoto(list, i, i+1);
       box.appendChild(b);
@@ -898,7 +899,7 @@ function renderDayPhotos(){
   $('photoDelBtn').textContent = daySel && daySel.size ? `${daySel.size}장 삭제  ` : '지울 사진을 고르세요  ';
   for(const p of list){
     const b=document.createElement('button'); b.className='ph'+(daySel&&daySel.has(p.id)?' sel':'');
-    const im=document.createElement('img'); im.src=p.thumb; im.alt=''; b.appendChild(im);
+    const im=document.createElement('img'); im.alt=''; sharpen(im, p); b.appendChild(im);
     b.onclick=()=>{
       if(!daySel) return openViewer(p, list);
       if(daySel.has(p.id)) daySel.delete(p.id); else daySel.add(p.id);
@@ -1041,6 +1042,20 @@ function openViewer(p, list){
 function stepViewer(n){
   const i=viewerIdx+n; if(i<0 || i>=viewerList.length) return;
   viewerIdx=i; showViewerPhoto();
+}
+// 큰 사진 가져오기 (한 번 받은 건 기억해 둠)
+const fullLoading=new Map();
+function getFull(id){
+  if(fullCache.has(id)) return Promise.resolve(fullCache.get(id));
+  if(!fullLoading.has(id)) fullLoading.set(id, col(C_FULL).doc(id).get().then(snap=>{
+    const d=snap.exists ? snap.data().data : null; if(d) fullCache.set(id, d); fullLoading.delete(id); return d;
+  }).catch(e=>{ console.error(e); fullLoading.delete(id); return null; }));
+  return fullLoading.get(id);
+}
+// 썸네일을 먼저 보여주고, 큰 사진이 오면 선명한 걸로 바꿔 끼움
+function sharpen(img, p){
+  img.src = fullCache.get(p.id) || p.thumb;
+  if(!fullCache.has(p.id)) getFull(p.id).then(d=>{ if(d && img.isConnected) img.src=d; });
 }
 async function showViewerPhoto(){
   const p=viewerList[viewerIdx]; viewerPhoto=p;
