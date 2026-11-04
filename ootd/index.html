@@ -425,7 +425,6 @@
     <div class="sec-label"><span>뺄 단어</span><span class="saved">자주 나오는 단어 · 숫자는 들어간 태그 수</span></div>
     <div class="tags" id="cleanTokens"></div>
     <div class="tag-input-wrap"><input class="tag-input" id="cleanAdd" placeholder="다른 단어 추가 (예: Acc)" autocomplete="off" autocapitalize="off" enterkeyhint="done"></div>
-    <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:12px"><input type="checkbox" id="cleanAuto" checked> 앞으로 UpNote에서 가져올 때도 이 단어들을 자동으로 빼기</label>
     <div class="sec-label"><span>미리보기</span><span class="saved" id="cleanSummary"></span></div>
     <div id="cleanPreview" style="max-height:40vh;overflow-y:auto;font-size:12.5px;line-height:1.5"></div>
     <button class="btn primary" id="cleanApply" style="width:100%;margin-top:14px">정리하기</button>
@@ -1325,7 +1324,7 @@ $('tlSearch').oninput=renderTagList; $('tlSort').onchange=renderTagList; $('tlOw
 /* ================= 태그 정리: 시즌·종류 단어 일괄 빼기 ================= */
 // 기본으로 체크해 둘 단어 (시즌·옷 종류)
 const CLEAN_DEFAULT=['SS','FW','SSFW','FWSS','SF','Top','Tops','Bottom','Bottoms','Outer','Bag','Bags','Shoes','Shirts','Shirt','Sneakers','Knit','Dress','Acc','Accessory','Skirt','Pants','Jacket','Coat','Hat','Cap'];
-let cleanSel=new Set(), cleanExtra=[], stripTokens=[];
+let cleanSel=new Set(), cleanExtra=[];
 function tokensOfTag(t){ return stripGone(t).split('_'); }
 function cleanTag(t, sel){
   const pre=isGone(t)?GONE:'', parts=tokensOfTag(t);
@@ -1369,17 +1368,9 @@ $('cleanApply').onclick=async ()=>{
   const sel=new Set(cleanSel);
   if(!confirm('미리보기대로 모든 기록의 태그를 바꿀까요?\n(같은 이름이 되는 태그는 하나로 합쳐져요)')) return;
   const n=renameTagsEverywhere(t=>cleanTag(t, sel));
-  if($('cleanAuto').checked){
-    stripTokens=[...new Set([...stripTokens, ...sel])];
-    save(col('ootdMeta').doc('settings').set({ stripTokens }, { merge:true }));
-  }
   closeSheet('cleanSheet'); renderTagList();
   toast(`${n}일의 기록에서 태그를 정리했어요`, 3000);
 };
-async function loadSettings(){
-  try{ const snap=await col('ootdMeta').doc('settings').get(); stripTokens=(snap.exists && snap.data().stripTokens)||[]; }catch(e){ stripTokens=[]; }
-}
-
 /* ================= 옷장 ================= */
 let closetIOs=[];
 function renderCloset(){
@@ -1582,8 +1573,7 @@ function parseUpnote(html, fileName){
   }
   const tags=[...root.querySelectorAll('[data-upnote-tag]')]
     .filter(a=>!head || !head.contains(a)).map(a=>normTag(tagOf(a)))
-    .filter(t=>t && !/^\d+$/.test(t))   // #2024 #0116 같은 날짜용 숫자 태그는 옷 태그가 아님
-    .map(t=> stripTokens.length ? cleanTag(t, new Set(stripTokens)) : t);   // 태그 정리에서 고른 단어 자동으로 빼기
+    .filter(t=>t && !/^\d+$/.test(t));   // #2024 #0116 같은 날짜용 숫자 태그는 옷 태그가 아님
   const images=[...root.querySelectorAll('img')].map(i=>{ const s=i.getAttribute('src')||''; try{ return decodeURIComponent(s); }catch(e){ return s; } })
     .filter(s=>s && !/^(https?:|data:)/.test(s));
   const clone=root.cloneNode(true);
@@ -1719,6 +1709,7 @@ $('wipeAllBtn').onclick=async ()=>{
     const photoIds=(await col(C_PHOTO).get()).docs.map(d=>d.id);
     const entryIds=(await col(C_ENTRY).get()).docs.map(d=>d.id);
     const ops=[...photoIds.flatMap(id=>[col(C_PHOTO).doc(id), col(C_FULL).doc(id)]), ...entryIds.map(id=>col(C_ENTRY).doc(id))];
+    ops.push(col('ootdMeta').doc('settings'));   // 예전 버전에서 저장된 설정 문서도 정리
     for(let i=0;i<ops.length;i+=450){ const b=fdb.batch(); ops.slice(i,i+450).forEach(r=>b.delete(r)); await save(b.commit()); }
     for(const st of months.values()) st.list=[];
     entries={}; dayPhotosCache.clear(); fullCache.clear(); sigCache.clear();
@@ -1822,7 +1813,7 @@ function initFirebase(){
     months.clear(); dayPhotosCache.clear();
     user=u; entries={}; fullCache.clear();
     if(!u){ ['daySheet','tagSheet'].forEach(id=>$(id).classList.remove('open')); closeViewer(); showOnly('loginView'); return; }
-    showOnly('loadingView'); renderAccount(); startListening(); loadSettings();
+    showOnly('loadingView'); renderAccount(); startListening();
   });
 }
 initFirebase();
