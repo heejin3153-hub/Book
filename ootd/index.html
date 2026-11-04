@@ -426,6 +426,10 @@
       <div class="suggest hidden" id="lookSuggest"></div>
     </div>
     <div class="kv" id="tagInfo" style="margin-top:12px"></div>
+    <div id="lookCatWrap">
+      <div class="sec-label"><span>분류</span><span class="saved">누르면 모든 기록에 반영돼요</span></div>
+      <div class="mt-tags" id="lookCats"></div>
+    </div>
     <div id="coWrap">
       <div class="sec-label"><span>같이 입은 옷</span><span class="saved">눌러서 조합하기</span></div>
       <div class="co-tags" id="coTags"></div>
@@ -1305,7 +1309,7 @@ function renderLook(){
     lookIOs.push(lazy(root, grid, async el=>{
       const list=await photosForDay(d);
       lookPhotos.set(d, list);
-      if(!list.length){ el.innerHTML='<span class="saved">사진 없이 기록한 날</span>'; return; }
+      if(!list.length){ el.style.display='block'; el.style.minHeight='0'; el.innerHTML='<span class="saved">사진 없이 기록한 날</span>'; return; }
       for(const p of list){
         const b=document.createElement('button'); b.className='ph';
         b.innerHTML=`<img src="${p.thumb}" alt="">`;
@@ -1317,6 +1321,15 @@ function renderLook(){
   // 태그 하나만 골랐을 때만 이름 바꾸기/삭제
   const one = look.filters.length===1;
   $('tagActions').classList.toggle('hidden', !one);
+  // 옷 태그 하나를 보고 있을 때: 분류 바꾸기 버튼 줄
+  const oneItem = one && look.filters[0].kind==='item';
+  $('lookCatWrap').classList.toggle('hidden', !oneItem);
+  if(oneItem){
+    detectCats(tagStats().c);
+    const cur=catOf(look.filters[0].name).toLowerCase();
+    $('lookCats').innerHTML = CATS.map(c=>`<button class="mt-tag${c.toLowerCase()===cur?' top':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')
+      + `<button class="mt-tag${!cur?' top':''}" data-cat="">분류 없음</button>`;
+  }
   if(one){
     const isB=look.filters[0].kind==='brand';
     $('renameTagBtn').textContent = isB ? '✏️ 브랜드 이름 바꾸기' : '✏️ 태그 이름 바꾸기';
@@ -1718,6 +1731,17 @@ $('renameTagBtn').onclick=()=>{
   const nn = f.kind==='brand' ? promptRenameBrand(f.name) : promptRenameTag(f.name);
   if(nn){ f.name=nn; renderLook(); }
 };
+// 모아보기에서 분류 바꾸기
+$('lookCats').addEventListener('click', e=>{
+  const b=e.target.closest('[data-cat]'); if(!b) return;
+  const f=look.filters[0]; if(!f || f.kind!=='item') return;
+  const cat=b.dataset.cat, nn=withCat(f.name, cat);
+  if(nn===f.name) return;
+  if(!confirm(`#${f.name}\n→ #${nn}\n\n${cat ? cat+' 분류로 바꿀까요?' : '분류를 뺄까요?'} (모든 기록에 반영돼요)`)) return;
+  const n=renameTagsEverywhere(t=>t===f.name?nn:t);
+  f.name=nn; renderLook();
+  toast(`${n}일의 기록에서 바꿨어요`, 2000);
+});
 // 없는 옷 표시: 모든 기록에서 태그 앞에 X_ 를 붙이거나 뗌
 $('goneTagBtn').onclick=()=>{
   const f=look.filters[0]; if(!f || f.kind!=='item') return;
