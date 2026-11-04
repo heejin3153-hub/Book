@@ -329,6 +329,7 @@
           <option value="few">적게 쓴 순</option>
           <option value="recent">최근에 쓴 순</option>
         </select>
+        <select class="sel" id="tlCat" aria-label="분류"></select>
         <select class="sel" id="tlOwn" aria-label="보유 여부">
           <option value="all">전체</option>
           <option value="own">지금 있는 옷</option>
@@ -1422,7 +1423,16 @@ function tagStats(){
 function renderTagList(){
   const { c, last }=tagStats();
   const q=normTag($('tlSearch').value).toLowerCase(), own=$('tlOwn').value, sort=$('tlSort').value;
-  const list=Object.keys(c).filter(t=>(!q || t.toLowerCase().includes(q)) && (own==='all' || (own==='gone')===isGone(t)));
+  // 분류 필터: 전체 / 분류 없음 / Top / Outer …
+  const catSel=$('tlCat'), prevCat=catSel.value||'all';
+  const catCount={}; let noneCount=0;
+  for(const t in c){ const k=catOf(t); if(k) catCount[k.toLowerCase()]=(catCount[k.toLowerCase()]||0)+1; else noneCount++; }
+  catSel.innerHTML=`<option value="all">분류 전체</option><option value="none">분류 없음 (${noneCount})</option>`
+    + CATS.map(k=>`<option value="${esc(k.toLowerCase())}">${esc(k)} (${catCount[k.toLowerCase()]||0})</option>`).join('');
+  catSel.value=[...catSel.options].some(o=>o.value===prevCat)?prevCat:'all';
+  const cf=catSel.value;
+  const list=Object.keys(c).filter(t=>(!q || t.toLowerCase().includes(q)) && (own==='all' || (own==='gone')===isGone(t))
+    && (cf==='all' || (cf==='none' ? !catOf(t) : catOf(t).toLowerCase()===cf)));
   list.sort({
     name:(a,b)=>brandOf(a).localeCompare(brandOf(b),'ko') || stripGone(a).localeCompare(stripGone(b),'ko'),
     count:(a,b)=>c[b]-c[a]||a.localeCompare(b,'ko'),
@@ -1445,7 +1455,7 @@ function renderTagList(){
     }
     html+=`<div class="tl-row" data-t="${esc(t)}">
       <div class="tl-main" data-act="open"><div class="tl-name${isGone(t)?' gone':''}">#${esc(t)}</div>
-        <div class="tl-sub">${c[t]}회 · 마지막 ${fmtKo(last[t])}${isGone(t)?' · 없는 옷':''}</div></div>
+        <div class="tl-sub">${c[t]}회 · 마지막 ${fmtKo(last[t])}${isGone(t)?' · 없는 옷':''}${catOf(t)?` <span class="tl-cat">${esc(catOf(t))}</span>`:' <span class="tl-cat" style="background:none;border:1px dashed var(--border-2);color:var(--text-muted)">분류 없음</span>'}</div></div>
       <button class="tl-btn" data-act="edit" aria-label="이름 수정">✏️</button>
       <button class="tl-btn" data-act="gone" aria-label="${isGone(t)?'다시 있는 옷으로':'없는 옷으로 표시'}">${isGone(t)?'↩︎':'🗃'}</button>
       <button class="tl-btn" data-act="del" aria-label="태그 삭제">🗑</button>
@@ -1498,7 +1508,7 @@ $('tagList').addEventListener('click', e=>{
     commitEntries(changed); renderTagList(); toast(`${changed.length}일의 기록에서 #${t}을(를) 뺐어요`);
   }
 });
-$('tlSearch').oninput=renderTagList; $('tlSort').onchange=renderTagList; $('tlOwn').onchange=renderTagList;
+$('tlSearch').oninput=renderTagList; $('tlSort').onchange=renderTagList; $('tlOwn').onchange=renderTagList; $('tlCat').onchange=renderTagList;
 
 /* ================= 태그 정리: 시즌·종류 단어 일괄 빼기 ================= */
 // 기본으로 체크해 둘 단어 (시즌·옷 종류)
