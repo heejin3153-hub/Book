@@ -287,9 +287,6 @@
     <div class="tools">
       <button class="chip-btn" id="exportBtn">⬇️ 백업 내보내기</button>
       <button class="chip-btn" id="importBtn">⬆️ 백업 불러오기</button>
-      <button class="chip-btn" id="upnoteBtn">📒 UpNote 가져오기</button>
-      <!-- [임시] 전체 삭제 (시행착오용, 나중에 지울 것) -->
-      <button class="chip-btn" id="wipeAllBtn" style="color:var(--danger)">🗑 전체 삭제 (임시)</button>
     </div>
     <div class="account" id="accountRow"></div>
     <div class="sync" id="syncState"></div>
@@ -338,8 +335,6 @@
         <span class="count-label" id="tlCount"></span>
         <button class="link-btn" id="tlSelBtn">선택</button>
       </div>
-      <button class="btn ghost" id="wordBtn" style="width:100%;margin-bottom:6px">🔁 단어 바꾸기 — 예: 스니커즈 → 슈즈</button>
-      <button class="btn ghost" id="cleanBtn" style="width:100%;margin-bottom:6px">🧹 태그 정리 — SSFW, Top 같은 단어 한 번에 빼기</button>
       <div id="tagList"></div>
     </div>
     <p class="hint">✏️ 이름을 고치면 그 태그가 달린 모든 기록에 반영돼요. 이미 있는 이름으로 바꾸면 하나로 합쳐져요.<br>오타 찾기는 "적게 쓴 순"으로 보면 편해요.</p>
@@ -387,7 +382,6 @@
 <input type="file" id="fileInput" accept="image/*" multiple hidden>
 <input type="file" id="dayFileInput" accept="image/*" multiple hidden>
 <input type="file" id="importInput" accept="application/json,.json" hidden>
-<input type="file" id="upnoteInput" accept=".zip,.html,.htm,image/*,application/zip,text/html" multiple hidden>
 
 <!-- 하루 기록 -->
 <div class="sheet-bg" id="daySheet">
@@ -441,44 +435,6 @@
       <button class="btn ghost" id="goneTagBtn"></button>
       <button class="btn danger" id="deleteTagBtn">태그 삭제</button>
     </div>
-  </div>
-</div>
-
-<!-- 태그 정리 -->
-<div class="sheet-bg" id="cleanSheet">
-  <div class="sheet" role="dialog" aria-modal="true">
-    <div class="sheet-h">
-      <div class="t">🧹 태그 정리</div>
-      <button class="icon-sq" data-close aria-label="닫기">✕</button>
-    </div>
-    <p class="saved" style="margin:0 0 10px;line-height:1.6">태그에서 뺄 단어를 고르세요. 브랜드(맨 앞)는 그대로 두고, <b>_로 나뉜 뒤쪽 단어</b>만 빼요.<br>예) COS_와이드카고팬츠_화이트_Bottom_SSFW → COS_와이드카고팬츠_화이트</p>
-    <div class="sec-label"><span>뺄 단어</span><span class="saved">자주 나오는 단어 · 숫자는 들어간 태그 수</span></div>
-    <div class="tags" id="cleanTokens"></div>
-    <div class="tag-input-wrap"><input class="tag-input" id="cleanAdd" placeholder="다른 단어 추가 (예: Acc)" autocomplete="off" autocapitalize="off" enterkeyhint="done"></div>
-    <div class="sec-label"><span>미리보기</span><span class="saved" id="cleanSummary"></span></div>
-    <div id="cleanPreview" style="max-height:40vh;overflow-y:auto;font-size:12.5px;line-height:1.5"></div>
-    <button class="btn primary" id="cleanApply" style="width:100%;margin-top:14px">정리하기</button>
-  </div>
-</div>
-
-<!-- 단어 바꾸기 -->
-<div class="sheet-bg" id="wordSheet">
-  <div class="sheet" role="dialog" aria-modal="true">
-    <div class="sheet-h">
-      <div class="t">🔁 단어 바꾸기</div>
-      <button class="icon-sq" data-close aria-label="닫기">✕</button>
-    </div>
-    <p class="saved" style="margin:0 0 12px;line-height:1.6">태그를 _로 나눈 단어 중 <b>똑같은 단어</b>만 바꿔요. 모든 기록에 반영돼요.<br>예) 스니커즈 → 슈즈 : Vans_화이트_스니커즈 → Vans_화이트_슈즈</p>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input class="tag-input" id="wordFrom" placeholder="바꿀 단어" autocomplete="off" autocapitalize="off" style="flex:1;min-width:0">
-      <span style="font-weight:800;color:var(--text-muted)">→</span>
-      <input class="tag-input" id="wordTo" placeholder="새 단어 (비우면 빼기)" autocomplete="off" autocapitalize="off" style="flex:1;min-width:0">
-    </div>
-    <div class="sec-label"><span>태그에 들어 있는 단어</span><span class="saved">누르면 '바꿀 단어'에 들어가요</span></div>
-    <div class="co-tags" id="wordList" style="flex-wrap:wrap;max-height:120px;overflow-y:auto"></div>
-    <div class="sec-label"><span>미리보기</span><span class="saved" id="wordSummary"></span></div>
-    <div id="wordPreview" style="max-height:36vh;overflow-y:auto;font-size:12.5px;line-height:1.5"></div>
-    <button class="btn primary" id="wordApply" style="width:100%;margin-top:14px">바꾸기</button>
   </div>
 </div>
 
@@ -1625,94 +1581,6 @@ $('tagList').addEventListener('click', e=>{
 });
 $('tlSearch').oninput=renderTagList; $('tlSort').onchange=renderTagList; $('tlOwn').onchange=renderTagList; $('tlCat').onchange=renderTagList;
 
-/* ================= 태그 정리: 시즌·종류 단어 일괄 빼기 ================= */
-// 기본으로 체크해 둘 단어 (시즌·옷 종류)
-const CLEAN_DEFAULT=['SS','FW','SSFW','FWSS','SF','Top','Tops','Bottom','Bottoms','Outer','Bag','Bags','Shoes','Shirts','Shirt','Sneakers','Knit','Dress','Acc','Accessory','Skirt','Pants','Jacket','Coat','Hat','Cap'];
-let cleanSel=new Set(), cleanExtra=[];
-function tokensOfTag(t){ return stripGone(t).split('_'); }
-function cleanTag(t, sel){
-  const pre=isGone(t)?GONE:'', parts=tokensOfTag(t);
-  const kept=[parts[0], ...parts.slice(1).filter(x=>!sel.has(x.toLowerCase()))];
-  return pre + kept.filter(Boolean).join('_');
-}
-function cleanCandidates(){
-  const { c }=tagStats(), cnt={};
-  for(const t in c) for(const w of new Set(tokensOfTag(t).slice(1))) if(/^[A-Za-z]+$/.test(w)) cnt[w]=(cnt[w]||0)+1;
-  for(const w of cleanExtra) cnt[w]=cnt[w]||0;
-  return Object.keys(cnt).filter(w=>cnt[w]>=2 || cleanExtra.includes(w) || CLEAN_DEFAULT.some(d=>d.toLowerCase()===w.toLowerCase()))
-    .sort((a,b)=>cnt[b]-cnt[a]).map(w=>[w,cnt[w]]);
-}
-function openClean(){
-  const cand=cleanCandidates();
-  cleanSel=new Set(cand.map(([w])=>w.toLowerCase()).filter(w=>CLEAN_DEFAULT.some(d=>d.toLowerCase()===w)));
-  renderClean(); openSheet('cleanSheet');
-}
-function renderClean(){
-  const cand=cleanCandidates();
-  $('cleanTokens').innerHTML=cand.length ? cand.map(([w,n])=>`<button class="tag${cleanSel.has(w.toLowerCase())?' filter-chip':''}" data-w="${esc(w)}" style="border:none;cursor:pointer">${cleanSel.has(w.toLowerCase())?'✓ ':''}${esc(w)} <span style="opacity:.6">${n}</span></button>`).join('') : '<span class="saved">뺄 만한 단어가 없어요</span>';
-  const { c }=tagStats(), changes=[], target={};
-  for(const t of Object.keys(c).sort((a,b)=>a.localeCompare(b,'ko'))){ const n=cleanTag(t, cleanSel); if(n!==t){ changes.push([t,n]); } (target[n] ||= []).push(t); }
-  const merges=Object.values(target).filter(l=>l.length>1).length;
-  $('cleanSummary').textContent = changes.length ? `${changes.length}개 바뀜`+(merges?` · ${merges}곳에서 같은 이름끼리 합쳐짐`:'') : '바뀌는 태그 없음';
-  $('cleanPreview').innerHTML = changes.map(([a,b])=>`<div style="padding:5px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-muted);text-decoration:line-through">#${esc(a)}</span><br>→ <b>#${esc(b)}</b>${target[b].length>1?' <span class="saved">(합쳐짐)</span>':''}</div>`).join('');
-  $('cleanApply').disabled=!changes.length; $('cleanApply').style.opacity=changes.length?1:.4;
-  $('cleanApply').textContent = changes.length ? `태그 ${changes.length}개 정리하기` : '정리하기';
-}
-$('cleanBtn').onclick=openClean;
-$('cleanTokens').addEventListener('click', e=>{
-  const b=e.target.closest('[data-w]'); if(!b) return;
-  const w=b.dataset.w.toLowerCase(); if(cleanSel.has(w)) cleanSel.delete(w); else cleanSel.add(w); renderClean();
-});
-$('cleanAdd').addEventListener('keydown', e=>{
-  if(e.isComposing || e.key!=='Enter') return; e.preventDefault();
-  const w=$('cleanAdd').value.trim().replace(/^_+|_+$/g,''); if(!w) return;
-  if(!cleanExtra.includes(w)) cleanExtra.push(w); cleanSel.add(w.toLowerCase()); $('cleanAdd').value=''; renderClean();
-});
-$('cleanApply').onclick=async ()=>{
-  const sel=new Set(cleanSel);
-  if(!confirm('미리보기대로 모든 기록의 태그를 바꿀까요?\n(같은 이름이 되는 태그는 하나로 합쳐져요)')) return;
-  const n=renameTagsEverywhere(t=>cleanTag(t, sel));
-  closeSheet('cleanSheet'); renderTagList();
-  toast(`${n}일의 기록에서 태그를 정리했어요`, 3000);
-};
-/* ================= 단어 바꾸기 (태그 속 단어 일괄 변경) ================= */
-function replaceWord(t, from, to){
-  const pre=isGone(t)?GONE:'', f=from.toLowerCase();
-  const parts=stripGone(t).split('_').map(x=> x.toLowerCase()===f ? to : x).filter(Boolean);
-  return parts.length ? pre+parts.join('_') : t;
-}
-function wordCounts(){
-  const { c }=tagStats(), cnt={};
-  for(const t in c) for(const w of new Set(stripGone(t).split('_').slice(1))) if(w) cnt[w]=(cnt[w]||0)+1;
-  return cnt;
-}
-function renderWord(){
-  const from=$('wordFrom').value.trim().replace(/^_+|_+$/g,''), to=normTag($('wordTo').value).replace(/^_+|_+$/g,'');
-  const cnt=wordCounts(), q=from.toLowerCase();
-  $('wordList').innerHTML=Object.keys(cnt).filter(w=>!q || w.toLowerCase().includes(q))
-    .sort((a,b)=>cnt[b]-cnt[a]||a.localeCompare(b,'ko')).slice(0,60)
-    .map(w=>`<button class="co-tag" data-w="${esc(w)}">${esc(w)}<span class="k">${cnt[w]}</span></button>`).join('') || '<span class="saved">일치하는 단어가 없어요</span>';
-  const { c }=tagStats(), changes=[], target={};
-  if(from){
-    for(const t of Object.keys(c).sort((a,b)=>a.localeCompare(b,'ko'))){ const n=replaceWord(t, from, to); if(n!==t) changes.push([t,n]); (target[n] ||= []).push(t); }
-  }
-  $('wordSummary').textContent = !from ? '' : changes.length ? `${changes.length}개 바뀜` : '바뀌는 태그 없음';
-  $('wordPreview').innerHTML = changes.map(([a,b])=>`<div style="padding:5px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-muted);text-decoration:line-through">#${esc(a)}</span><br>→ <b>#${esc(b)}</b>${target[b]&&target[b].length>1||c[b]?' <span class="saved">(같은 태그와 합쳐짐)</span>':''}</div>`).join('');
-  $('wordApply').disabled=!changes.length; $('wordApply').style.opacity=changes.length?1:.4;
-  $('wordApply').textContent = changes.length ? `태그 ${changes.length}개 바꾸기` : '바꾸기';
-}
-$('wordBtn').onclick=()=>{ $('wordFrom').value=''; $('wordTo').value=''; renderWord(); openSheet('wordSheet'); };
-$('wordFrom').oninput=renderWord; $('wordTo').oninput=renderWord;
-$('wordList').addEventListener('click', e=>{ const b=e.target.closest('[data-w]'); if(!b) return; $('wordFrom').value=b.dataset.w; renderWord(); $('wordTo').focus(); });
-$('wordApply').onclick=()=>{
-  const from=$('wordFrom').value.trim().replace(/^_+|_+$/g,''), to=normTag($('wordTo').value).replace(/^_+|_+$/g,'');
-  if(!from) return;
-  if(!confirm(to ? `태그 속 "${from}"을(를) 모두 "${to}"(으)로 바꿀까요?` : `태그 속 "${from}" 단어를 모두 뺄까요?`)) return;
-  const n=renameTagsEverywhere(t=>replaceWord(t, from, to));
-  closeSheet('wordSheet'); renderTagList();
-  toast(`${n}일의 기록에서 바꿨어요`, 2500);
-};
-
 /* ================= 옷장 ================= */
 let closetIOs=[];
 function renderCloset(){
@@ -1864,220 +1732,6 @@ $('importInput').onchange=async e=>{
   }catch(err){ toast('백업 파일을 읽을 수 없어요'); }
 };
 
-/* ================= UpNote 가져오기 (일회성) =================
-   UpNote에서 HTML로 내보낸 노트를 읽어서
-   - 제목의 #2026 #0808 → 날짜
-   - 본문의 나머지 #태그 → 옷 태그
-   - 본문 글 → 일기
-   - <img> → 사진 (zip 안의 Files/ 폴더 또는 같이 고른 사진 파일에서 찾음)
-   사진 문서 id를 "날짜+파일이름"으로 정해서, 두 번 가져와도 중복으로 쌓이지 않음 */
-$('upnoteBtn').onclick=()=>$('upnoteInput').click();
-$('upnoteInput').onchange=e=>{ const fs=[...e.target.files]; e.target.value=''; if(fs.length) importUpnote(fs); };
-
-function loadJSZip(){
-  if(window.JSZip) return Promise.resolve(window.JSZip);
-  return new Promise((res,rej)=>{
-    const sc=document.createElement('script');
-    sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-    sc.onload=()=>res(window.JSZip); sc.onerror=()=>rej(new Error('zip 도구를 불러오지 못했어요'));
-    document.head.appendChild(sc);
-  });
-}
-const baseName=p=>p.split('/').pop();
-function joinPath(dir, rel){
-  const out=dir?dir.split('/'):[];
-  for(const part of rel.split('/')){ if(part==='..') out.pop(); else if(part && part!=='.') out.push(part); }
-  return out.join('/');
-}
-function validDate(y,m,d){
-  const dt=new Date(+y, +m-1, +d);
-  return dt.getFullYear()===+y && dt.getMonth()===+m-1 && dt.getDate()===+d;
-}
-// 줄바꿈을 살려서 글자만 뽑기
-function noteText(el){
-  let out='';
-  const walk=n=>{
-    for(const c of n.childNodes){
-      if(c.nodeType===3) out+=c.nodeValue.replace(/ /g,' ');
-      else if(c.nodeName==='BR') out+='\n';
-      else if(/^(DIV|P|LI|H[1-6]|BLOCKQUOTE|UL|OL)$/.test(c.nodeName)){ out+='\n'; walk(c); out+='\n'; }
-      else walk(c);
-    }
-  };
-  walk(el);
-  return out.split('\n').map(l=>l.trim()).filter(Boolean).join('\n');
-}
-function parseUpnote(html, fileName){
-  const doc=new DOMParser().parseFromString(html,'text/html');
-  const root=doc.querySelector('.shine-editor')||doc.body;
-  const head=root.querySelector('h1,h2,h3,h4,h5,h6');
-  const tagOf=a=>(a.getAttribute('data-upnote-tag')||a.textContent||'').trim();
-  // 날짜: 제목의 연도 태그 + MMDD 태그 (없으면 파일 이름 2026_0808 에서)
-  let date=null;
-  if(head){
-    const ht=[...head.querySelectorAll('[data-upnote-tag]')].map(a=>tagOf(a).replace(/^#/,''));
-    const yi=ht.findIndex(t=>/^(19|20)\d{2}$/.test(t));
-    const md=yi>=0 ? ht.slice(yi+1).concat(ht.slice(0,yi)).find(t=>/^\d{4}$/.test(t)) : null;
-    if(yi>=0 && md && validDate(ht[yi], md.slice(0,2), md.slice(2))) date=`${ht[yi]}-${md.slice(0,2)}-${md.slice(2)}`;
-  }
-  if(!date){
-    const m=(fileName||'').match(/((?:19|20)\d{2})\D{0,3}(\d{2})\D?(\d{2})/);   // 2026_0808, #2024 #0921 등
-    if(m && validDate(m[1],m[2],m[3])) date=`${m[1]}-${m[2]}-${m[3]}`;
-  }
-  const tags=[...root.querySelectorAll('[data-upnote-tag]')]
-    .filter(a=>!head || !head.contains(a)).map(a=>normTag(tagOf(a)))
-    .filter(t=>t && !/^\d+$/.test(t))   // #2024 #0116 같은 날짜용 숫자 태그는 옷 태그가 아님
-    .filter(t=>t.includes('_'));        // _ 없는 태그(#돈가스 등)는 태그로 넣지 않고 일기 속 글자로 남김 (아래)
-  const images=[...root.querySelectorAll('img')].map(i=>{ const s=i.getAttribute('src')||''; try{ return decodeURIComponent(s); }catch(e){ return s; } })
-    .filter(s=>s && !/^(https?:|data:)/.test(s));
-  const clone=root.cloneNode(true);
-  const cloneHead=clone.querySelector('h1,h2,h3,h4,h5,h6');   // 날짜가 적힌 제목 줄만 빼고 본문 글을 씀
-  if(cloneHead) cloneHead.remove();
-  // _ 없는 태그는 원래 자리에 # 없이 글자로 바꾸고, 나머지(옷 태그·숫자 태그) 링크는 지움
-  clone.querySelectorAll('[data-upnote-tag]').forEach(a=>{
-    const t=normTag(tagOf(a));
-    if(t && !t.includes('_') && !/^\d+$/.test(t)) a.replaceWith(doc.createTextNode(' '+t+' '));
-    else a.remove();
-  });
-  clone.querySelectorAll('img,style,script').forEach(n=>n.remove());
-  // 옷 줄 앞에 붙은 이모지(🧥👚👖👟👜)는 빼고, 이모지만 남은 줄은 없앰
-  const text=noteText(clone).replace(/(?:🧥|👚|👖|👟|👜)\uFE0F?/gu,'')
-    .split('\n').map(l=>l.replace(/[ \t]{2,}/g,' ').trim()
-      .replace(/^[\/+,]\s*/,'').replace(/\s*[\/+,]$/,'').trim())   // 태그가 빠진 자리에 남은 앞뒤 + / , 정리
-    .filter(l=>l && !/^[\/+,·&|\-~]+$/.test(l))   // 태그 사이 구분 기호(/ + ,)만 남은 줄도 없앰
-    .filter(l=>!/^[월화수목금토일]요일$/.test(l))    // 제목 없이 본문에 쓴 날짜 줄에 남는 요일
-    .join('\n');
-  return { date, tags:[...new Set(tags)], text, images };
-}
-function hashId(str){
-  let h1=0x811c9dc5, h2=0x01000193;
-  for(let i=0;i<str.length;i++){ const c=str.charCodeAt(i); h1=Math.imul(h1^c,16777619)>>>0; h2=Math.imul(h2^c,2246822507)>>>0; }
-  return 'upnote-'+h1.toString(16).padStart(8,'0')+h2.toString(16).padStart(8,'0');
-}
-async function importUpnote(files){
-  toast('UpNote 파일 읽는 중…', 120000);
-  const notes=[];                 // { html, name, dir }
-  let links=0;                    // 내용 없이 다른 파일을 가리키기만 하는 바로가기
-  const imgs=new Map();           // 경로 또는 파일이름 → () => Promise<Blob>
-  const addImg=(path, get)=>{ imgs.set(path, get); if(!imgs.has(baseName(path))) imgs.set(baseName(path), get); };
-  const mimeOf=n=>/\.png$/i.test(n)?'image/png':/\.gif$/i.test(n)?'image/gif':/\.webp$/i.test(n)?'image/webp':/\.hei[cf]$/i.test(n)?'image/heic':'image/jpeg';
-  try{
-    for(const f of files){
-      if(/\.zip$/i.test(f.name) || f.type==='application/zip'){
-        if(f.size>500*1024*1024 && !confirm(`zip 파일이 ${Math.round(f.size/1024/1024)}MB로 커서 폰에서는 멈출 수 있어요.\n연도별 등으로 나눠서 여러 번 가져오는 걸 추천해요.\n그래도 계속할까요?`)){ toast('',1); return; }
-        const JSZip=await loadJSZip();
-        // 맥에서 만든 zip은 한글 파일 이름이 깨져 보일 수 있어서 UTF-8로 읽음
-        const zip=await JSZip.loadAsync(f, { decodeFileName: bytes=>new TextDecoder('utf-8').decode(bytes).normalize('NFC') });
-        for(const entry of Object.values(zip.files)){
-          if(entry.dir || /(^|\/)(__MACOSX|\.)/.test(entry.name)) continue;
-          if(/\.html?$/i.test(entry.name)){
-            const i=entry.name.lastIndexOf('/');
-            const html=await entry.async('string');
-            if(!/<(html|body|div|h\d|p)\b/i.test(html)){ links++; continue; }   // 바로가기(링크) 파일은 건너뜀
-            notes.push({ html, name:baseName(entry.name), dir:i>=0?entry.name.slice(0,i):'' });
-          } else if(/\.(jpe?g|png|gif|webp|hei[cf])$/i.test(entry.name)){
-            addImg(entry.name, async()=>new Blob([await entry.async('arraybuffer')],{ type:mimeOf(entry.name) }));
-          }
-        }
-      } else if(/\.html?$/i.test(f.name) || f.type==='text/html'){
-        const html=await f.text();
-        if(!/<(html|body|div|h\d|p)\b/i.test(html)){ links++; continue; }
-        notes.push({ html, name:f.name, dir:'' });
-      } else if(f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|hei[cf])$/i.test(f.name)){
-        addImg(f.name, async()=>f);
-      }
-    }
-  }catch(err){ console.error(err); toast('파일을 읽지 못했어요: '+err.message, 5000); return; }
-  if(!notes.length){
-    toast(links ? `노트 내용이 없어요. 바로가기 파일 ${links}개만 들어 있어요 — 내보낸 폴더 전체(맨 위 폴더)를 압축해서 올려주세요` : 'UpNote HTML 노트를 찾지 못했어요', 8000);
-    return;
-  }
-
-  // 날짜별로 합치기 (같은 날 노트가 여러 개면 태그·글·사진을 합침)
-  const byDate=new Map(); let noDate=0;
-  for(const n of notes){
-    const r=parseUpnote(n.html, n.name);
-    if(!r.date){ noDate++; continue; }
-    const g=byDate.get(r.date) || { date:r.date, tags:[], texts:[], images:new Map() };
-    for(const t of r.tags) if(!g.tags.includes(t)) g.tags.push(t);
-    if(r.text && !g.texts.includes(r.text)) g.texts.push(r.text);
-    for(const src of r.images){
-      const getter=imgs.get(joinPath(n.dir, src)) || imgs.get(src) || imgs.get(baseName(src));
-      if(!g.images.has(baseName(src))) g.images.set(baseName(src), getter||null);
-    }
-    byDate.set(r.date, g);
-  }
-  const days=[...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
-  if(!days.length){ toast('노트에서 날짜를 찾지 못했어요 (제목에 #2026 #0808 형식이 필요해요)', 5000); return; }
-  const allTags=new Set(days.flatMap(d=>d.tags));
-  const photoJobs=days.flatMap(d=>[...d.images].map(([name,get])=>({ date:d.date, name, get })));
-  const found=photoJobs.filter(j=>j.get), missing=photoJobs.length-found.length;
-  const range=`${days[0].date.replace(/-/g,'.')} ~ ${days[days.length-1].date.replace(/-/g,'.')}`;
-  toast('', 1);
-  const ok=confirm(
-    `UpNote에서 가져올 내용\n\n`+
-    `· 기록 ${days.length}일 (${range})\n`+
-    `· 옷 태그 ${allTags.size}종류\n`+
-    (found.length ? `· 사진 ${found.length}장`+(missing?` (파일을 못 찾은 사진 ${missing}장)`:'')+`\n`
-                  : `· 사진은 빼고 옷 태그·일기만 가져와요\n`)+
-    (noDate?`· 날짜를 못 찾은 노트 ${noDate}개는 건너뛰어요\n`:'')+
-    `\n이미 있는 날짜는 태그·일기를 합쳐요. 가져올까요?`);
-  if(!ok) return;
-
-  // 1) 태그·일기
-  const merged=days.map(d=>{
-    const cur=entryOf(d.date);
-    const tags=[...cur.tags]; for(const t of d.tags) if(!tags.includes(t)) tags.push(t);
-    let text=cur.text||'';
-    for(const t of d.texts) if(!text.includes(t)) text = text ? text+'\n\n'+t : t;
-    return { date:d.date, tags, text };
-  });
-  commitEntries(merged);
-
-  // 2) 사진 (한 장씩 줄여서 저장)
-  let done=0, failed=0, dup=0; const pending=[];
-  for(const j of found){
-    toast(`사진 가져오는 중… ${done+failed+dup+1} / ${found.length}`, 600000);
-    try{
-      const id=hashId(j.date+'/'+j.name);
-      if((await photosForDay(j.date)).some(p=>p.id===id)){ dup++; continue; }   // 예전에 가져온 사진
-      const im=await loadImage(await j.get());
-      const sig=photoSig(im);
-      if(await isDuplicate(j.date, sig, pending, id)){ dup++; continue; }        // 같은 사진이 이미 있음
-      const full=shrinkFull(im), thumb=shrink(im,...THUMB);
-      const meta={ id, date:j.date, thumb, sig, source:'upnote', addedAt:Date.now(), name:j.name };
-      fullCache.set(id, full); pending.push(meta);
-      const b=fdb.batch();
-      b.set(col(C_PHOTO).doc(id), meta);
-      b.set(col(C_FULL).doc(id), { data:full });
-      await save(b.commit());
-      dayPhotosCache.delete(j.date);
-      done++;
-    }catch(err){ console.error(err); failed++; }
-  }
-  const last=days[days.length-1].date.split('-').map(Number);
-  view={ y:last[0], m:last[1]-1 }; renderCal();
-  toast(`가져오기 끝! 기록 ${days.length}일, 사진 ${done}장`+(dup?` · 이미 있는 사진 ${dup}장 건너뜀`:'')+(failed?` (사진 ${failed}장 실패)`:'')+(missing&&found.length?` · 못 찾은 사진 ${missing}장`:''), 6000);
-}
-
-/* ================= [임시] 전체 삭제 — 시행착오용, 나중에 이 블록과 버튼(wipeAllBtn)을 지우면 됨 ================= */
-$('wipeAllBtn').onclick=async ()=>{
-  if(!confirm('모든 기록(사진·옷 태그·일기)을 전부 삭제할까요?\n되돌릴 수 없어요.')) return;
-  const typed=prompt('정말 지우려면 "전체삭제"라고 입력하세요');
-  if(typed===null || typed.replace(/\s/g,'')!=='전체삭제'){ toast('취소했어요'); return; }
-  toast('전체 삭제 중…', 120000);
-  try{
-    const photoIds=(await col(C_PHOTO).get()).docs.map(d=>d.id);
-    const entryIds=(await col(C_ENTRY).get()).docs.map(d=>d.id);
-    const ops=[...photoIds.flatMap(id=>[col(C_PHOTO).doc(id), col(C_FULL).doc(id)]), ...entryIds.map(id=>col(C_ENTRY).doc(id))];
-    for(let i=0;i<ops.length;i+=450){ const b=fdb.batch(); ops.slice(i,i+450).forEach(r=>b.delete(r)); await save(b.commit()); }
-    for(const st of months.values()) st.list=[];
-    entries={}; dayPhotosCache.clear(); fullCache.clear(); sigCache.clear();
-    refresh();
-    toast(`전체 삭제했어요 (사진 ${photoIds.length}장, 기록 ${entryIds.length}일)`, 4000);
-  }catch(e){ console.error(e); toast('삭제 중 오류가 났어요: '+(e.code||e.message), 5000); }
-};
-
 /* ================= 공통 UI ================= */
 function openSheet(id){ $(id).classList.add('open'); }
 function closeSheet(id){
@@ -2095,7 +1749,7 @@ document.querySelectorAll('.sheet-bg').forEach(bg=>{
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if($('viewer').classList.contains('open')) return closeViewer();
-  for(const id of ['wordSheet','cleanSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
+  for(const id of ['tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
 let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms); }
 
