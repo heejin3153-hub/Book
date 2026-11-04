@@ -110,6 +110,12 @@
   .rank-row .c{ font-size:13px; font-weight:800; color:var(--accent-dark); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .empty-msg{ text-align:center; color:var(--text-muted); font-size:13px; padding:30px 10px; line-height:1.6; }
 
+  /* 사진 선택 삭제 */
+  .day.sel::after, .photos .ph.sel::after{ content:'✓'; position:absolute; inset:0; z-index:2; display:flex; align-items:center; justify-content:center; background:rgba(91,91,214,.45); color:#fff; font-size:22px; font-weight:800; border-radius:inherit; }
+  .grid.selecting .day:not(.has):not(.empty){ opacity:.35; }
+  .selbar{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(18px + var(--safe-b)); z-index:21; display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border-2); border-radius:30px; padding:8px 8px 8px 16px; box-shadow:0 6px 20px rgba(0,0,0,.18); white-space:nowrap; max-width:calc(100% - 24px); }
+  .selbar .info{ font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
+  .selbar .btn{ border-radius:20px; }
   .fab{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(22px + var(--safe-b)); background:var(--accent); color:#fff; border:none; border-radius:30px; padding:15px 26px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 6px 20px rgba(91,91,214,0.35); z-index:20; white-space:nowrap; }
   .tools{ display:flex; justify-content:center; gap:8px; margin-top:14px; flex-wrap:wrap; }
   .chip-btn{ background:var(--surface); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:20px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; }
@@ -231,7 +237,7 @@
         <div class="m" id="monthLabel"></div>
         <button class="nav-btn" id="nextBtn" aria-label="다음 달">›</button>
       </div>
-      <div class="month-meta"><span id="monthMeta"></span> <button class="link-btn" id="todayBtn">오늘</button></div>
+      <div class="month-meta"><span id="monthMeta"></span> <button class="link-btn" id="todayBtn">오늘</button> <button class="link-btn" id="selBtn">선택</button></div>
       <div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
       <div class="grid" id="grid"></div>
     </div>
@@ -288,6 +294,11 @@
 </div>
 
 <button class="fab" id="addBtn">＋ 사진 올리기</button>
+<div class="selbar hidden" id="selBar">
+  <span class="info" id="selInfo"></span>
+  <button class="btn ghost" id="selCancel">취소</button>
+  <button class="btn danger" id="selDelete" style="background:var(--danger);color:#fff;border:none">사진 삭제</button>
+</div>
 </div>
 <input type="file" id="fileInput" accept="image/*" multiple hidden>
 <input type="file" id="dayFileInput" accept="image/*" multiple hidden>
@@ -301,6 +312,7 @@
       <div class="t" id="dayTitle"></div>
       <button class="icon-sq" data-close aria-label="닫기">✕</button>
     </div>
+    <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
     <div class="photos" id="dayPhotos"></div>
     <div class="sec-label"><span>옷 태그</span><span class="saved" id="savedMark"></span></div>
     <div class="tags" id="dayTags"></div>
@@ -565,11 +577,66 @@ function renderCal(){
     } else if(hasContent(e)){ const dot=document.createElement('span'); dot.className='note-dot'; cell.appendChild(dot); }
     const dn=document.createElement('span'); dn.className='dn'; dn.textContent=d; cell.appendChild(dn);
     cell.setAttribute('aria-label', `${m+1}월 ${d}일${list.length?`, 사진 ${list.length}장`:''}`);
-    cell.onclick=()=>openDay(key);
+    if(selDays.has(key)) cell.classList.add('sel');
+    cell.onclick=()=>{
+      if(!selMode) return openDay(key);
+      if(!list.length) return;
+      if(selDays.has(key)) selDays.delete(key); else selDays.set(key, list.map(p=>p.id));
+      renderCal();
+    };
     g.appendChild(cell);
   }
+  g.classList.toggle('selecting', selMode);
   $('monthMeta').innerHTML=`이번 달 <b>${rec}</b>일 기록`;
+  updateSelBar();
 }
+
+/* ================= 사진 골라서 삭제 =================
+   사진만 지우고 그날의 옷 태그·일기는 남김 */
+let selMode=false; const selDays=new Map();   // 날짜 → 사진 id 목록
+function setSelMode(on){
+  selMode=on; selDays.clear();
+  $('selBtn').textContent = on ? '선택 끝' : '선택';
+  $('selBar').classList.toggle('hidden', !on);
+  $('addBtn').classList.toggle('hidden', on);
+  renderCal();
+}
+function updateSelBar(){
+  if(!selMode) return;
+  const n=[...selDays.values()].reduce((a,l)=>a+l.length,0);
+  $('selInfo').textContent = selDays.size ? `${selDays.size}일 · 사진 ${n}장` : '지울 날짜를 눌러 고르세요';
+  $('selDelete').disabled = !selDays.size;
+  $('selDelete').style.opacity = selDays.size ? 1 : .4;
+}
+async function deletePhotos(ids){
+  for(let i=0;i<ids.length;i+=200){
+    const b=fdb.batch();
+    for(const id of ids.slice(i,i+200)){ b.delete(col(C_PHOTO).doc(id)); b.delete(col(C_FULL).doc(id)); fullCache.delete(id); }
+    await save(b.commit());
+  }
+  const gone=new Set(ids);
+  dropLocal(p=>!gone.has(p.id));
+  for(const [d,l] of dayPhotosCache) dayPhotosCache.set(d, l.filter(p=>!gone.has(p.id)));
+}
+$('selBtn').onclick=()=>setSelMode(!selMode);
+$('selCancel').onclick=()=>setSelMode(false);
+$('selDelete').onclick=async ()=>{
+  const ids=[...selDays.values()].flat();
+  if(!ids.length) return;
+  if(!confirm(`${selDays.size}일의 사진 ${ids.length}장을 삭제할까요?\n옷 태그와 일기는 그대로 남아요.`)) return;
+  await deletePhotos(ids);
+  setSelMode(false); toast(`사진 ${ids.length}장을 삭제했어요`);
+};
+
+// 날짜 화면에서 몇 장만 골라 지우기
+let daySel=null;   // 선택 중이면 Set(id)
+$('photoSelBtn').onclick=()=>{ daySel = daySel ? null : new Set(); renderDayPhotos(); };
+$('photoDelBtn').onclick=async ()=>{
+  if(!daySel || !daySel.size) return;
+  if(!confirm(`사진 ${daySel.size}장을 삭제할까요?\n옷 태그와 일기는 그대로 남아요.`)) return;
+  const ids=[...daySel]; await deletePhotos(ids);
+  daySel=null; renderDayPhotos(); renderCal(); toast(`사진 ${ids.length}장을 삭제했어요`);
+};
 
 /* ================= 사진 추가 ================= */
 async function addFiles(files, forced){
@@ -617,7 +684,7 @@ function saveEntry(e){
   renderCal();
 }
 function openDay(d){
-  curDay=d; syncMonths();
+  curDay=d; daySel=null; syncMonths();
   $('dayTitle').textContent=fmtKo(d);
   renderDayPhotos(); renderDayTags();
   $('diary').value=entryOf(d).text;
@@ -627,11 +694,23 @@ function openDay(d){
 }
 function renderDayPhotos(){
   const box=$('dayPhotos'); box.innerHTML='';
-  for(const p of (photosByDate()[curDay]||[])){
-    const b=document.createElement('button'); b.className='ph';
+  const list=photosByDate()[curDay]||[];
+  if(daySel) for(const id of [...daySel]) if(!list.some(p=>p.id===id)) daySel.delete(id);
+  $('photoSelBtn').classList.toggle('hidden', !list.length);
+  $('photoSelBtn').textContent = daySel ? '취소' : '선택';
+  $('photoDelBtn').classList.toggle('hidden', !daySel);
+  $('photoDelBtn').textContent = daySel && daySel.size ? `${daySel.size}장 삭제  ` : '지울 사진을 고르세요  ';
+  for(const p of list){
+    const b=document.createElement('button'); b.className='ph'+(daySel&&daySel.has(p.id)?' sel':'');
     const im=document.createElement('img'); im.src=p.thumb; im.alt=''; b.appendChild(im);
-    b.onclick=()=>openViewer(p, photosByDate()[curDay]); box.appendChild(b);
+    b.onclick=()=>{
+      if(!daySel) return openViewer(p, list);
+      if(daySel.has(p.id)) daySel.delete(p.id); else daySel.add(p.id);
+      renderDayPhotos();
+    };
+    box.appendChild(b);
   }
+  if(daySel) return;
   const add=document.createElement('button'); add.className='ph add'; add.textContent='＋'; add.setAttribute('aria-label','사진 추가');
   add.onclick=()=>{ pendingDay=curDay; $('dayFileInput').click(); };
   box.appendChild(add);
@@ -1268,7 +1347,7 @@ async function importUpnote(files){
 /* ================= 공통 UI ================= */
 function openSheet(id){ $(id).classList.add('open'); }
 function closeSheet(id){
-  if(id==='daySheet'){ flushDiary(); curDay=null; hideSuggest(); }
+  if(id==='daySheet'){ flushDiary(); curDay=null; daySel=null; hideSuggest(); }
   if(id==='tagSheet'){ lookIOs.forEach(io=>io.disconnect()); lookIOs=[]; hideLookSuggest(); }
   $(id).classList.remove('open');
   if(!$('statsView').classList.contains('hidden')) renderStats();
@@ -1287,6 +1366,7 @@ let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.class
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
   const t=b.dataset.tab;
+  if(selMode) setSelMode(false);
   $('calView').classList.toggle('hidden', t!=='cal');
   $('closetView').classList.toggle('hidden', t!=='closet');
   $('statsView').classList.toggle('hidden', t!=='stats');
