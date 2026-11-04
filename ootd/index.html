@@ -482,6 +482,23 @@
   </div>
 </div>
 
+<!-- 촬영일 없는 사진 날짜 묻기 -->
+<div class="sheet-bg" id="askDateSheet" style="z-index:65">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h"><div class="t" id="adTitle"></div></div>
+    <img id="adImg" alt="" style="width:100%;max-height:32vh;object-fit:contain;border-radius:12px;background:var(--bg);display:block">
+    <div class="saved" id="adName" style="margin:6px 0 12px;word-break:break-all"></div>
+    <p class="saved" style="margin:0 0 10px">사진에 찍은 날짜 정보가 없어요 (캡처·메신저로 받은 사진 등). 어떻게 할까요?</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn primary" id="adFile"></button>
+      <button class="btn ghost" id="adToday">오늘 날짜로</button>
+      <div style="display:flex;gap:8px"><input type="date" id="adPick" class="tag-input" style="flex:1;min-width:0"><button class="btn ghost" id="adPickBtn">이 날짜로</button></div>
+      <button class="btn danger" id="adSkip">올리지 않기</button>
+      <button class="link-btn" id="adRestFile" style="margin-top:4px"></button>
+    </div>
+  </div>
+</div>
+
 <div class="viewer" id="viewer">
   <button class="x" id="viewerClose" aria-label="닫기">✕</button>
   <div class="pos" id="viewerPos"></div>
@@ -807,29 +824,42 @@ async function addFiles(files, forced){
   files=[...files].filter(f=>f.type.startsWith('image/')||/\.(heic|heif)$/i.test(f.name));
   if(!files.length) return;
   toast(`사진 ${files.length}장 처리 중…`, 60000);
-  let ok=0, noExif=0, failed=0, dup=0; const dates=new Set(), pending=[];
+  let ok=0, failed=0, dup=0, skipped=0; const dates=new Set(), pending=[], noDate=[];
+  // 사진 한 장 저장 (중복이면 건너뜀)
+  const upload=async (im, date, source)=>{
+    const sig=photoSig(im);
+    if(await isDuplicate(date, sig, pending)){ dup++; return; }
+    const id=newId(), full=shrinkFull(im), thumb=shrink(im,...THUMB);
+    const meta={ id, date, thumb, sig, source, addedAt:Date.now() };
+    fullCache.set(id, full); pending.push(meta);
+    const b=fdb.batch();
+    b.set(col(C_PHOTO).doc(id), meta);
+    b.set(col(C_FULL).doc(id), { data: full });
+    save(b.commit());
+    ok++; dates.add(date);
+  };
   for(const f of files){
     try{
       const ex=forced?null:await readExifDate(f);
-      const date=forced||ex||ymd(new Date(f.lastModified||Date.now()));
-      const im=await loadImage(f);
-      const sig=photoSig(im);
-      if(await isDuplicate(date, sig, pending)){ dup++; continue; }
-      if(!forced&&!ex) noExif++;
-      const id=newId(), full=shrinkFull(im), thumb=shrink(im,...THUMB);
-      const meta={ id, date, thumb, sig, source: forced?'manual':(ex?'exif':'file'), addedAt:Date.now() };
-      fullCache.set(id, full); pending.push(meta);
-      const b=fdb.batch();
-      b.set(col(C_PHOTO).doc(id), meta);
-      b.set(col(C_FULL).doc(id), { data: full });
-      save(b.commit());
-      ok++; dates.add(date);
+      if(!forced && !ex){ noDate.push(f); continue; }   // 촬영일 없는 사진은 나중에 하나씩 물어봄
+      await upload(await loadImage(f), forced||ex, forced?'manual':'exif');
     }catch(e){ console.error(e); failed++; }
+  }
+  // 촬영일 정보가 없는 사진: 한 장씩 어떻게 할지 물어보기
+  if(noDate.length){
+    toast('', 1);
+    const answers=await askPhotoDates(noDate);
+    toast('사진 저장 중…', 60000);
+    for(let i=0;i<noDate.length;i++){
+      const a=answers[i];
+      if(!a){ skipped++; continue; }
+      try{ await upload(await loadImage(noDate[i]), a.date, a.source); }catch(e){ console.error(e); failed++; }
+    }
   }
   for(const d of dates) dayPhotosCache.delete(d);
   let msg = ok ? `${ok}장 추가했어요` : '새로 추가한 사진이 없어요';
   if(dup) msg+=` · 이미 있는 사진 ${dup}장은 건너뛰었어요`;
-  if(noExif) msg+=` · ${noExif}장은 촬영일 정보가 없어 파일 날짜로 넣었어요`;
+  if(skipped) msg+=` · ${skipped}장은 올리지 않았어요`;
   if(failed) msg+=` · ${failed}장은 열 수 없었어요 (HEIC는 JPG로 바꿔 올려주세요)`;
   toast(msg, 4500);
   if(curDay) return;
@@ -837,6 +867,38 @@ async function addFiles(files, forced){
   if(sorted.length){ const [yy,mm]=sorted[sorted.length-1].split('-').map(Number); view={y:yy,m:mm-1}; }
   renderCal();
   if(dates.size===1) openDay(sorted[0]);   // 하루치만 올렸으면 바로 태그 입력 화면으로
+}
+
+/* ---- 촬영일 정보가 없는 사진: 한 장씩 날짜 물어보기 ----
+   결과: 사진마다 { date, source } 또는 null(올리지 않음) */
+function askPhotoDates(files){
+  return new Promise(resolve=>{
+    const out=[]; let i=0, url=null;
+    const show=()=>{
+      if(url){ URL.revokeObjectURL(url); url=null; }
+      if(i>=files.length){ $('askDateSheet').classList.remove('open'); resolve(out); return; }
+      const f=files[i], fd=ymd(new Date(f.lastModified||Date.now()));
+      url=URL.createObjectURL(f);
+      $('adTitle').textContent = `촬영 날짜를 알 수 없는 사진${files.length>1?` (${i+1}/${files.length})`:''}`;
+      $('adImg').src=url;
+      $('adName').textContent = f.name;
+      $('adFile').textContent = `파일 날짜로 (${fmtKo(fd,false)})`; $('adFile').dataset.d=fd;
+      $('adPick').value = fd;
+      $('adRestFile').classList.toggle('hidden', files.length-i<2);
+      $('adRestFile').textContent = `남은 ${files.length-i}장 모두 파일 날짜로`;
+      $('askDateSheet').classList.add('open');
+    };
+    const answer=a=>{ out[i]=a; i++; show(); };
+    $('adFile').onclick=()=>answer({ date:$('adFile').dataset.d, source:'file' });
+    $('adToday').onclick=()=>answer({ date:ymd(new Date()), source:'manual' });
+    $('adPickBtn').onclick=()=>{ const d=$('adPick').value; if(!d){ toast('날짜를 골라주세요'); return; } answer({ date:d, source:'manual' }); };
+    $('adSkip').onclick=()=>answer(null);
+    $('adRestFile').onclick=()=>{
+      for(; i<files.length; i++) out[i]={ date:ymd(new Date(files[i].lastModified||Date.now())), source:'file' };
+      show();
+    };
+    show();
+  });
 }
 
 /* ================= 하루 기록 시트 ================= */
@@ -2027,6 +2089,7 @@ function closeSheet(id){
   if(!$('tagsView').classList.contains('hidden')) renderTagList();
 }
 document.querySelectorAll('.sheet-bg').forEach(bg=>{
+  if(bg.id==='askDateSheet') return;   // 날짜 묻기 창은 버튼으로만 닫힘
   bg.addEventListener('click', e=>{ if(e.target===bg || e.target.closest('[data-close]')) closeSheet(bg.id); });
 });
 document.addEventListener('keydown', e=>{
