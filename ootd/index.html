@@ -332,7 +332,7 @@
         <div class="stat-box"><div class="n" id="sTags">0</div><div class="l" id="sTagsL">옷 태그</div></div>
         <div class="stat-box"><div class="n" id="sAvg">0</div><div class="l">하루 평균 태그</div></div>
       </div>
-      <div class="seg" id="statMode" style="display:flex;margin-bottom:10px"><button data-m="rank" class="on" style="flex:1">순위</button><button data-m="month" style="flex:1">월별</button><button data-m="season" style="flex:1">계절별</button></div>
+      <div class="seg" id="statMode" style="display:flex;margin-bottom:10px"><button data-m="rank" class="on" style="flex:1">순위</button><button data-m="month" style="flex:1">월별</button><button data-m="season" style="flex:1">계절별</button><button data-m="new" style="flex:1">새 옷</button></div>
       <div class="filters">
         <select class="sel" id="periodSel" aria-label="기간"></select>
         <div class="seg" id="groupSeg"><button data-g="item" class="on">아이템별</button><button data-g="brand">브랜드별</button></div>
@@ -1035,6 +1035,29 @@ function renderSeasonTop(){
   }
   box.innerHTML=html;
 }
+// 새 옷: 태그가 기록에 처음 나온 달 = 새로 생긴 달
+function renderNewItems(){
+  const p=$('periodSel').value||'all';
+  const first={}, total={};
+  for(const d of Object.keys(entries).sort()){
+    const tags=entries[d].tags||[];
+    for(const k of (statGroup==='brand' ? [...new Set(tags.map(brandOf))] : tags)){ if(!first[k]) first[k]=d; total[k]=(total[k]||0)+1; }
+  }
+  const allDates=Object.keys(first).map(k=>first[k]).sort(), startMonth=allDates.length?allDates[0].slice(0,7):'';
+  const by={};
+  for(const k in first){ const m=first[k].slice(0,7); if(periodMatch(first[k],p)) (by[m] ||= []).push(k); }
+  const months=Object.keys(by).sort().reverse();
+  const box=$('rankList');
+  if(!months.length){ box.innerHTML='<div class="empty-msg">이 기간에 새로 생긴 옷이 없어요</div>'; return; }
+  const what = statGroup==='brand' ? '브랜드' : '옷';
+  box.innerHTML=months.map(m=>{
+    const items=by[m].sort((a,b)=>first[a].localeCompare(first[b])||a.localeCompare(b,'ko'));
+    const chips=items.map(k=>`<button class="mt-tag" data-n="${esc(k)}" data-p="all">${statGroup==='brand'?'':'#'}${esc(stripGone(k))}<span class="k">${fmtKo(first[k],false).split(' ')[0]} · ${total[k]}회</span></button>`).join('');
+    return `<div class="mt-block"><div class="mt-h"><b>${periodLabel(m)}</b><span>새 ${what} ${items.length}개</span></div>
+      ${m===startMonth?'<div class="saved" style="margin:-4px 0 8px">기록을 시작한 달이라 원래 있던 옷도 모두 여기에 들어가요</div>':''}
+      <div class="mt-tags">${chips}</div></div>`;
+  }).join('');
+}
 function renderStats(){
   fillPeriods();
   const { list, days, tagSum } = computeStats();
@@ -1050,6 +1073,7 @@ function renderStats(){
   $('sAvg').textContent = days ? (tagSum/days).toFixed(1) : '0';
   if(statMode==='month') return renderMonthTop();
   if(statMode==='season') return renderSeasonTop();
+  if(statMode==='new') return renderNewItems();
   const q=$('tagSearch').value.trim().toLowerCase().replace(/^#/,'');
   const sort=$('sortSel').value;
   let rows=list.filter(s=>!q || s.name.toLowerCase().includes(q.replace(/\s+/g,'_')) || s.name.toLowerCase().includes(q));
