@@ -324,6 +324,7 @@
         </select>
         <span class="count-label" id="tlCount"></span>
       </div>
+      <button class="btn ghost" id="wordBtn" style="width:100%;margin-bottom:6px">🔁 단어 바꾸기 — 예: 스니커즈 → 슈즈</button>
       <button class="btn ghost" id="cleanBtn" style="width:100%;margin-bottom:6px">🧹 태그 정리 — SSFW, Top 같은 단어 한 번에 빼기</button>
       <div id="tagList"></div>
     </div>
@@ -434,6 +435,27 @@
     <div class="sec-label"><span>미리보기</span><span class="saved" id="cleanSummary"></span></div>
     <div id="cleanPreview" style="max-height:40vh;overflow-y:auto;font-size:12.5px;line-height:1.5"></div>
     <button class="btn primary" id="cleanApply" style="width:100%;margin-top:14px">정리하기</button>
+  </div>
+</div>
+
+<!-- 단어 바꾸기 -->
+<div class="sheet-bg" id="wordSheet">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h">
+      <div class="t">🔁 단어 바꾸기</div>
+      <button class="icon-sq" data-close aria-label="닫기">✕</button>
+    </div>
+    <p class="saved" style="margin:0 0 12px;line-height:1.6">태그를 _로 나눈 단어 중 <b>똑같은 단어</b>만 바꿔요. 모든 기록에 반영돼요.<br>예) 스니커즈 → 슈즈 : Vans_화이트_스니커즈 → Vans_화이트_슈즈</p>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="tag-input" id="wordFrom" placeholder="바꿀 단어" autocomplete="off" autocapitalize="off" style="flex:1;min-width:0">
+      <span style="font-weight:800;color:var(--text-muted)">→</span>
+      <input class="tag-input" id="wordTo" placeholder="새 단어 (비우면 빼기)" autocomplete="off" autocapitalize="off" style="flex:1;min-width:0">
+    </div>
+    <div class="sec-label"><span>태그에 들어 있는 단어</span><span class="saved">누르면 '바꿀 단어'에 들어가요</span></div>
+    <div class="co-tags" id="wordList" style="flex-wrap:wrap;max-height:120px;overflow-y:auto"></div>
+    <div class="sec-label"><span>미리보기</span><span class="saved" id="wordSummary"></span></div>
+    <div id="wordPreview" style="max-height:36vh;overflow-y:auto;font-size:12.5px;line-height:1.5"></div>
+    <button class="btn primary" id="wordApply" style="width:100%;margin-top:14px">바꾸기</button>
   </div>
 </div>
 
@@ -1447,6 +1469,44 @@ $('cleanApply').onclick=async ()=>{
   closeSheet('cleanSheet'); renderTagList();
   toast(`${n}일의 기록에서 태그를 정리했어요`, 3000);
 };
+/* ================= 단어 바꾸기 (태그 속 단어 일괄 변경) ================= */
+function replaceWord(t, from, to){
+  const pre=isGone(t)?GONE:'', f=from.toLowerCase();
+  const parts=stripGone(t).split('_').map(x=> x.toLowerCase()===f ? to : x).filter(Boolean);
+  return parts.length ? pre+parts.join('_') : t;
+}
+function wordCounts(){
+  const { c }=tagStats(), cnt={};
+  for(const t in c) for(const w of new Set(stripGone(t).split('_').slice(1))) if(w) cnt[w]=(cnt[w]||0)+1;
+  return cnt;
+}
+function renderWord(){
+  const from=$('wordFrom').value.trim().replace(/^_+|_+$/g,''), to=normTag($('wordTo').value).replace(/^_+|_+$/g,'');
+  const cnt=wordCounts(), q=from.toLowerCase();
+  $('wordList').innerHTML=Object.keys(cnt).filter(w=>!q || w.toLowerCase().includes(q))
+    .sort((a,b)=>cnt[b]-cnt[a]||a.localeCompare(b,'ko')).slice(0,60)
+    .map(w=>`<button class="co-tag" data-w="${esc(w)}">${esc(w)}<span class="k">${cnt[w]}</span></button>`).join('') || '<span class="saved">일치하는 단어가 없어요</span>';
+  const { c }=tagStats(), changes=[], target={};
+  if(from){
+    for(const t of Object.keys(c).sort((a,b)=>a.localeCompare(b,'ko'))){ const n=replaceWord(t, from, to); if(n!==t) changes.push([t,n]); (target[n] ||= []).push(t); }
+  }
+  $('wordSummary').textContent = !from ? '' : changes.length ? `${changes.length}개 바뀜` : '바뀌는 태그 없음';
+  $('wordPreview').innerHTML = changes.map(([a,b])=>`<div style="padding:5px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-muted);text-decoration:line-through">#${esc(a)}</span><br>→ <b>#${esc(b)}</b>${target[b]&&target[b].length>1||c[b]?' <span class="saved">(같은 태그와 합쳐짐)</span>':''}</div>`).join('');
+  $('wordApply').disabled=!changes.length; $('wordApply').style.opacity=changes.length?1:.4;
+  $('wordApply').textContent = changes.length ? `태그 ${changes.length}개 바꾸기` : '바꾸기';
+}
+$('wordBtn').onclick=()=>{ $('wordFrom').value=''; $('wordTo').value=''; renderWord(); openSheet('wordSheet'); };
+$('wordFrom').oninput=renderWord; $('wordTo').oninput=renderWord;
+$('wordList').addEventListener('click', e=>{ const b=e.target.closest('[data-w]'); if(!b) return; $('wordFrom').value=b.dataset.w; renderWord(); $('wordTo').focus(); });
+$('wordApply').onclick=()=>{
+  const from=$('wordFrom').value.trim().replace(/^_+|_+$/g,''), to=normTag($('wordTo').value).replace(/^_+|_+$/g,'');
+  if(!from) return;
+  if(!confirm(to ? `태그 속 "${from}"을(를) 모두 "${to}"(으)로 바꿀까요?` : `태그 속 "${from}" 단어를 모두 뺄까요?`)) return;
+  const n=renameTagsEverywhere(t=>replaceWord(t, from, to));
+  closeSheet('wordSheet'); renderTagList();
+  toast(`${n}일의 기록에서 바꿨어요`, 2500);
+};
+
 /* ================= 옷장 ================= */
 let closetIOs=[];
 function renderCloset(){
@@ -1818,7 +1878,7 @@ document.querySelectorAll('.sheet-bg').forEach(bg=>{
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if($('viewer').classList.contains('open')) return closeViewer();
-  for(const id of ['cleanSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
+  for(const id of ['wordSheet','cleanSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
 let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms); }
 
