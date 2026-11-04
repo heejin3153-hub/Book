@@ -437,10 +437,11 @@ function shrink(im, max, q){
 // 캔버스에 다시 그려서 저장하므로 위치(GPS)·기기 정보 같은 EXIF 메타데이터는 저장되지 않음
 const THUMB=[320,0.7];
 function shrinkFull(im){
-  for(const [max,q] of [[1080,0.75],[960,0.7],[800,0.65]]){
-    const d=shrink(im,max,q); if(d.length<600000) return d;
+  // 긴 변 2048px (아이패드 전체화면에서도 선명). Firestore 문서 1MB 제한을 넘으면 한 단계씩 줄임
+  for(const [max,q] of [[2048,0.8],[2048,0.72],[1800,0.72],[1600,0.7],[1280,0.7]]){
+    const d=shrink(im,max,q); if(d.length<900000) return d;
   }
-  return shrink(im,640,0.6);
+  return shrink(im,1080,0.65);
 }
 
 /* ---- 같은 사진 알아보기 ----
