@@ -248,6 +248,8 @@
       <button class="chip-btn" id="exportBtn">⬇️ 백업 내보내기</button>
       <button class="chip-btn" id="importBtn">⬆️ 백업 불러오기</button>
       <button class="chip-btn" id="upnoteBtn">📒 UpNote 가져오기</button>
+      <!-- [임시] 전체 삭제 (시행착오용, 나중에 지울 것) -->
+      <button class="chip-btn" id="wipeAllBtn" style="color:var(--danger)">🗑 전체 삭제 (임시)</button>
     </div>
     <div class="account" id="accountRow"></div>
     <div class="sync" id="syncState"></div>
@@ -1325,7 +1327,12 @@ function parseUpnote(html, fileName){
   const cloneHead=clone.querySelector('h1,h2,h3,h4,h5,h6');   // 날짜가 적힌 제목 줄만 빼고 본문 글을 씀
   if(cloneHead) cloneHead.remove();
   clone.querySelectorAll('[data-upnote-tag],img,style,script').forEach(n=>n.remove());
-  return { date, tags:[...new Set(tags)], text:noteText(clone), images };
+  // 옷 줄 앞에 붙은 이모지(🧥👚👖👟👜)는 빼고, 이모지만 남은 줄은 없앰
+  const text=noteText(clone).replace(/(?:🧥|👚|👖|👟|👜)\uFE0F?/gu,'')
+    .split('\n').map(l=>l.trim())
+    .filter(l=>l && !/^[\/+,·&|\-~]+$/.test(l))   // 태그 사이 구분 기호(/ + ,)만 남은 줄도 없앰
+    .join('\n');
+  return { date, tags:[...new Set(tags)], text, images };
 }
 function hashId(str){
   let h1=0x811c9dc5, h2=0x01000193;
@@ -1437,6 +1444,24 @@ async function importUpnote(files){
   view={ y:last[0], m:last[1]-1 }; renderCal();
   toast(`가져오기 끝! 기록 ${days.length}일, 사진 ${done}장`+(dup?` · 이미 있는 사진 ${dup}장 건너뜀`:'')+(failed?` (사진 ${failed}장 실패)`:'')+(missing&&found.length?` · 못 찾은 사진 ${missing}장`:''), 6000);
 }
+
+/* ================= [임시] 전체 삭제 — 시행착오용, 나중에 이 블록과 버튼(wipeAllBtn)을 지우면 됨 ================= */
+$('wipeAllBtn').onclick=async ()=>{
+  if(!confirm('모든 기록(사진·옷 태그·일기)을 전부 삭제할까요?\n되돌릴 수 없어요.')) return;
+  const typed=prompt('정말 지우려면 "전체삭제"라고 입력하세요');
+  if(typed===null || typed.replace(/\s/g,'')!=='전체삭제'){ toast('취소했어요'); return; }
+  toast('전체 삭제 중…', 120000);
+  try{
+    const photoIds=(await col(C_PHOTO).get()).docs.map(d=>d.id);
+    const entryIds=(await col(C_ENTRY).get()).docs.map(d=>d.id);
+    const ops=[...photoIds.flatMap(id=>[col(C_PHOTO).doc(id), col(C_FULL).doc(id)]), ...entryIds.map(id=>col(C_ENTRY).doc(id))];
+    for(let i=0;i<ops.length;i+=450){ const b=fdb.batch(); ops.slice(i,i+450).forEach(r=>b.delete(r)); await save(b.commit()); }
+    for(const st of months.values()) st.list=[];
+    entries={}; dayPhotosCache.clear(); fullCache.clear(); sigCache.clear();
+    refresh();
+    toast(`전체 삭제했어요 (사진 ${photoIds.length}장, 기록 ${entryIds.length}일)`, 4000);
+  }catch(e){ console.error(e); toast('삭제 중 오류가 났어요: '+(e.code||e.message), 5000); }
+};
 
 /* ================= 공통 UI ================= */
 function openSheet(id){ $(id).classList.add('open'); }
