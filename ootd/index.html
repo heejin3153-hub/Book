@@ -1645,20 +1645,13 @@ function parseUpnote(html, fileName){
   }
   const tags=[...root.querySelectorAll('[data-upnote-tag]')]
     .filter(a=>!head || !head.contains(a)).map(a=>normTag(tagOf(a)))
-    .filter(t=>t && !/^\d+$/.test(t))   // #2024 #0116 같은 날짜용 숫자 태그는 옷 태그가 아님
-    .filter(t=>t.includes('_'));        // _ 없는 태그(#돈가스 등)는 태그가 아니라 일기 글로 남김 (아래)
+    .filter(t=>t && !/^\d+$/.test(t));   // #2024 #0116 같은 날짜용 숫자 태그는 옷 태그가 아님
   const images=[...root.querySelectorAll('img')].map(i=>{ const s=i.getAttribute('src')||''; try{ return decodeURIComponent(s); }catch(e){ return s; } })
     .filter(s=>s && !/^(https?:|data:)/.test(s));
   const clone=root.cloneNode(true);
   const cloneHead=clone.querySelector('h1,h2,h3,h4,h5,h6');   // 날짜가 적힌 제목 줄만 빼고 본문 글을 씀
   if(cloneHead) cloneHead.remove();
-  // _ 없는 태그는 그 자리에 # 없이 글자로 남기고, 나머지 태그 링크는 지움
-  clone.querySelectorAll('[data-upnote-tag]').forEach(a=>{
-    const t=normTag(tagOf(a));
-    if(t && !t.includes('_') && !/^\d+$/.test(t)) a.replaceWith(doc.createTextNode(' '+t+' '));
-    else a.remove();
-  });
-  clone.querySelectorAll('img,style,script').forEach(n=>n.remove());
+  clone.querySelectorAll('[data-upnote-tag],img,style,script').forEach(n=>n.remove());
   // 옷 줄 앞에 붙은 이모지(🧥👚👖👟👜)는 빼고, 이모지만 남은 줄은 없앰
   const text=noteText(clone).replace(/(?:🧥|👚|👖|👟|👜)\uFE0F?/gu,'')
     .split('\n').map(l=>l.replace(/[ \t]{2,}/g,' ').trim())
