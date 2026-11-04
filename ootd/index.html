@@ -669,6 +669,14 @@ function photosByDate(){
   for(const k in m) m[k].sort(photoCmp);
   return m;
 }
+// 검색: 띄어 쓴 단어가 순서와 상관없이 모두 들어 있으면 찾음. 대소문자·#·_ 는 무시
+// 예) "그레이 니트" → COS_니트_그레이 / "왁스자켓" → Barbour_왁스_자켓
+function searchWords(q){ return String(q||'').toLowerCase().replace(/#/g,' ').split(/[\s_]+/).filter(Boolean); }
+function matchSearch(text, q){
+  const words=Array.isArray(q)?q:searchWords(q); if(!words.length) return true;
+  const hay=String(text).toLowerCase(), flat=hay.replace(/_/g,'');
+  return words.every(w=>hay.includes(w) || flat.includes(w));
+}
 function normTag(s){ return s.trim().replace(/^#+/,'').trim().replace(/\s+/g,'_'); }
 // 'X_'로 시작하는 태그 = 지금은 없는 옷. 브랜드는 X_ 뒤에서 찾음 (X_Lemoir_중청데님 → Lemoir)
 const GONE='X_';
@@ -934,7 +942,7 @@ function updateSuggest(){
   const q=normTag($('tagInput').value).toLowerCase();
   const cur=new Set(entryOf(curDay).tags);
   const c=tagCounts();
-  sugItems=Object.keys(c).filter(t=>!cur.has(t) && (!q || t.toLowerCase().includes(q)))
+  sugItems=Object.keys(c).filter(t=>!cur.has(t) && matchSearch(t, $('tagInput').value))
     .sort((a,b)=>{ const as=a.toLowerCase().startsWith(q), bs=b.toLowerCase().startsWith(q); return (bs-as)||(c[b]-c[a])||a.localeCompare(b); })
     .slice(0,30);
   const box=$('suggest');
@@ -1169,7 +1177,7 @@ function renderStats(){
   if(statMode==='new') return renderNewItems();
   const q=$('tagSearch').value.trim().toLowerCase().replace(/^#/,'');
   const sort=$('sortSel').value;
-  let rows=list.filter(s=>!q || s.name.toLowerCase().includes(q.replace(/\s+/g,'_')) || s.name.toLowerCase().includes(q));
+  let rows=list.filter(s=>matchSearch(s.name, $('tagSearch').value));
   rows.sort({
     count:(a,b)=>b.count-a.count||b.last.localeCompare(a.last),
     recent:(a,b)=>b.last.localeCompare(a.last)||b.count-a.count,
@@ -1328,7 +1336,7 @@ function updateLookSuggest(){
   const brands = q ? [...new Set(Object.keys(tagCounts()).map(brandOf))].filter(b=>b.toLowerCase().startsWith(q) && !look.filters.some(f=>f.kind==='brand'&&f.name===b)) : [];
   lookSug = [
     ...brands.slice(0,3).map(b=>({ kind:'brand', name:b, label:`${b} (브랜드 전체)`, k:'' })),
-    ...Object.keys(c).filter(t=>!q || t.toLowerCase().includes(q))
+    ...Object.keys(c).filter(t=>matchSearch(t, $('lookInput').value))
       .sort((a,b)=>{ const as=a.toLowerCase().startsWith(q), bs=b.toLowerCase().startsWith(q); return (bs-as)||(c[b]-c[a])||a.localeCompare(b); })
       .slice(0,30).map(t=>({ kind:'item', name:t, label:'#'+t, k:c[t]+'회' }))
   ];
@@ -1431,7 +1439,7 @@ function renderTagList(){
     + CATS.map(k=>`<option value="${esc(k.toLowerCase())}">${esc(k)} (${catCount[k.toLowerCase()]||0})</option>`).join('');
   catSel.value=[...catSel.options].some(o=>o.value===prevCat)?prevCat:'all';
   const cf=catSel.value;
-  const list=Object.keys(c).filter(t=>(!q || t.toLowerCase().includes(q)) && (own==='all' || (own==='gone')===isGone(t))
+  const list=Object.keys(c).filter(t=>matchSearch(t, $('tlSearch').value) && (own==='all' || (own==='gone')===isGone(t))
     && (cf==='all' || (cf==='none' ? !catOf(t) : catOf(t).toLowerCase()===cf)));
   list.sort({
     name:(a,b)=>brandOf(a).localeCompare(brandOf(b),'ko') || stripGone(a).localeCompare(stripGone(b),'ko'),
@@ -1605,7 +1613,7 @@ function renderCloset(){
   for(const d in entries) for(const t of entries[d].tags||[]){ c[t]=(c[t]||0)+1; if(!last[t]||d>last[t]) last[t]=d; }
   const q=normTag($('closetSearch').value).toLowerCase();
   const own=$('closetOwn').value;
-  const items=Object.keys(c).filter(t=>(!q || t.toLowerCase().includes(q)) && (own==='all' || (own==='gone')===isGone(t)));
+  const items=Object.keys(c).filter(t=>matchSearch(t, $('closetSearch').value) && (own==='all' || (own==='gone')===isGone(t)));
   items.sort({
     count:(a,b)=>c[b]-c[a]||last[b].localeCompare(last[a]),
     recent:(a,b)=>last[b].localeCompare(last[a])||c[b]-c[a],
