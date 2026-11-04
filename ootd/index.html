@@ -185,6 +185,18 @@
   .ph .ord-bar button{ width:30px; height:30px; border-radius:8px; border:none; background:rgba(255,255,255,.9); color:#111; font-size:16px; font-weight:800; cursor:pointer; }
   .ph .ord-bar button:disabled{ opacity:.25; }
   .ph .ord-no{ position:absolute; top:4px; left:4px; z-index:3; background:var(--accent); color:#fff; font-size:11px; font-weight:800; border-radius:6px; padding:1px 6px; }
+  /* 태그 분류 붙이기 */
+  .tl-row.sel{ background:var(--accent-soft); border-radius:10px; }
+  .tl-row[data-act="pick"]{ cursor:pointer; }
+  .tl-check{ flex-shrink:0; width:22px; height:22px; border-radius:6px; border:1.5px solid var(--border-2); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:#fff; }
+  .tl-row.sel .tl-check{ background:var(--accent); border-color:var(--accent); }
+  .tl-cat{ display:inline-block; font-size:10px; font-weight:800; color:var(--accent-dark); background:var(--accent-soft); border-radius:5px; padding:0 5px; margin-left:4px; vertical-align:1px; }
+  .catbar{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(14px + var(--safe-b)); z-index:22; width:min(600px, calc(100% - 24px)); background:var(--surface); border:1px solid var(--border-2); border-radius:18px; padding:12px; box-shadow:0 6px 24px rgba(0,0,0,.2); }
+  .catbar-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:13px; }
+  .catbar-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .catbar-chips button{ border:none; border-radius:9px; padding:8px 11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; background:var(--accent); color:#fff; }
+  .catbar-chips button.ghost{ background:var(--bg); color:var(--text); border:1.5px solid var(--border-2); }
+  .catbar-chips button:disabled{ opacity:.35; }
   .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
   /* 모아보기 */
   .filter-chip{ background:var(--accent); color:#fff; }
@@ -323,6 +335,7 @@
           <option value="gone">없는 옷</option>
         </select>
         <span class="count-label" id="tlCount"></span>
+        <button class="link-btn" id="tlSelBtn">선택</button>
       </div>
       <button class="btn ghost" id="wordBtn" style="width:100%;margin-bottom:6px">🔁 단어 바꾸기 — 예: 스니커즈 → 슈즈</button>
       <button class="btn ghost" id="cleanBtn" style="width:100%;margin-bottom:6px">🧹 태그 정리 — SSFW, Top 같은 단어 한 번에 빼기</button>
@@ -358,6 +371,11 @@
 </div>
 
 <button class="fab" id="addBtn">＋ 사진 올리기</button>
+<!-- 태그 목록: 고른 태그에 분류 붙이기 -->
+<div class="catbar hidden" id="catBar">
+  <div class="catbar-top"><b id="catInfo">태그를 고르세요</b><span><button class="link-btn" id="catAll">보이는 것 전체</button><button class="link-btn" id="catCancel">취소</button></span></div>
+  <div class="catbar-chips" id="catChips"></div>
+</div>
 <div class="selbar hidden" id="selBar">
   <span class="info" id="selInfo"></span>
   <button class="btn ghost" id="selAll">전체</button>
@@ -1343,6 +1361,59 @@ $('lookInput').addEventListener('keydown', e=>{
 });
 
 /* ================= 태그 목록 (확인·수정) ================= */
+/* ---- 고른 태그에 분류(Top·Outer·Bottom·Shoes·Bag·ACC) 붙이기 ----
+   태그 맨 뒤에 _분류 를 붙임. 이미 다른 분류가 붙어 있으면 새 분류로 바꿈 */
+const CATS=['Top','Outer','Bottom','Shoes','Bag','ACC'];
+let tlSel=null, tlVisible=[];
+const catSet=()=>new Set(CATS.map(x=>x.toLowerCase()));
+function catOf(t){ const parts=stripGone(t).split('_'); const last=parts[parts.length-1]; return parts.length>1 && catSet().has(last.toLowerCase()) ? last : ''; }
+function withCat(t, cat){
+  const pre=isGone(t)?GONE:'';
+  let parts=stripGone(t).split('_');
+  parts=[parts[0], ...parts.slice(1).filter(x=>!catSet().has(x.toLowerCase()))];   // 기존 분류는 빼고
+  if(cat) parts.push(cat);
+  return pre+parts.join('_');
+}
+function setTlSel(on){
+  tlSel = on ? new Set() : null;
+  document.body.style.paddingBottom = on ? '220px' : '';
+  if(!on) $('catBar').classList.add('hidden');
+  $('tlSelBtn').textContent = on ? '선택 끝' : '선택';
+}
+function updateCatBar(){
+  if(!tlSel) return;
+  $('catBar').classList.remove('hidden');
+  const n=tlSel.size;
+  $('catInfo').textContent = n ? `${n}개 선택 · 붙일 분류를 누르세요` : '태그를 고르세요';
+  const allOn = tlVisible.length && tlVisible.every(t=>tlSel.has(t));
+  $('catAll').textContent = allOn ? '전체 해제' : '보이는 것 전체';
+  $('catChips').innerHTML = CATS.map(c=>`<button data-cat="${esc(c)}" ${n?'':'disabled'}>${esc(c)}</button>`).join('')
+    + `<button class="ghost" data-cat="__custom" ${n?'':'disabled'}>직접 입력</button><button class="ghost" data-cat="" ${n?'':'disabled'}>분류 빼기</button>`;
+}
+$('tlSelBtn').onclick=()=>{ setTlSel(!tlSel); renderTagList(); };
+$('catCancel').onclick=()=>{ setTlSel(false); renderTagList(); };
+$('catAll').onclick=()=>{
+  const allOn = tlVisible.length && tlVisible.every(t=>tlSel.has(t));
+  for(const t of tlVisible){ if(allOn) tlSel.delete(t); else tlSel.add(t); }
+  renderTagList();
+};
+$('catChips').addEventListener('click', e=>{
+  const b=e.target.closest('[data-cat]'); if(!b || !tlSel || !tlSel.size) return;
+  let cat=b.dataset.cat;
+  if(cat==='__custom'){
+    const v=prompt('붙일 분류를 입력하세요 (예: Dress, Knit)'); if(v===null) return;
+    cat=normTag(v).replace(/^_+|_+$/g,''); if(!cat) return;
+    if(!CATS.some(x=>x.toLowerCase()===cat.toLowerCase())) CATS.push(cat);
+  }
+  const map=new Map([...tlSel].map(t=>[t, withCat(t, cat)]));
+  const changes=[...map].filter(([a,b])=>a!==b);
+  if(!changes.length){ toast('이미 그렇게 되어 있어요'); return; }
+  const sample=changes.slice(0,3).map(([a,b])=>`#${a}\n → #${b}`).join('\n');
+  if(!confirm(`${changes.length}개 태그에 ${cat?'_'+cat+' 분류를 붙일까요?':'붙은 분류를 뺄까요?'}\n\n${sample}${changes.length>3?'\n…':''}`)) return;
+  const n=renameTagsEverywhere(t=>map.get(t)||t);
+  tlSel=new Set(); renderTagList();
+  toast(`태그 ${changes.length}개를 바꿨어요 (${n}일의 기록)`, 2500);
+});
 function tagStats(){
   const c={}, last={};
   for(const d in entries) for(const t of entries[d].tags||[]){ c[t]=(c[t]||0)+1; if(!last[t]||d>last[t]) last[t]=d; }
@@ -1365,6 +1436,13 @@ function renderTagList(){
   let html='', prevBrand=null;
   for(const t of list){
     if(sort==='name' && brandOf(t)!==prevBrand){ prevBrand=brandOf(t); html+=`<div class="tl-brand">${esc(prevBrand)}</div>`; }
+    if(tlSel){
+      html+=`<div class="tl-row${tlSel.has(t)?' sel':''}" data-t="${esc(t)}" data-act="pick">
+        <span class="tl-check">${tlSel.has(t)?'✓':''}</span>
+        <div class="tl-main"><div class="tl-name${isGone(t)?' gone':''}">#${esc(t)}</div>
+        <div class="tl-sub">${c[t]}회${catOf(t)?` <span class="tl-cat">${esc(catOf(t))}</span>`:''}</div></div></div>`;
+      continue;
+    }
     html+=`<div class="tl-row" data-t="${esc(t)}">
       <div class="tl-main" data-act="open"><div class="tl-name${isGone(t)?' gone':''}">#${esc(t)}</div>
         <div class="tl-sub">${c[t]}회 · 마지막 ${fmtKo(last[t])}${isGone(t)?' · 없는 옷':''}</div></div>
@@ -1374,6 +1452,8 @@ function renderTagList(){
     </div>`;
   }
   box.innerHTML=html;
+  tlVisible=list;
+  updateCatBar();
 }
 function startTagEdit(row){
   const old=row.dataset.t;
@@ -1398,6 +1478,7 @@ function saveTagEdit(row){
 $('tagList').addEventListener('click', e=>{
   const btn=e.target.closest('[data-act]'); if(!btn) return;
   const row=btn.closest('.tl-row'), t=row.dataset.t, act=btn.dataset.act;
+  if(act==='pick'){ if(tlSel.has(t)) tlSel.delete(t); else tlSel.add(t); renderTagList(); return; }
   if(act==='open') openLook([{ kind:'item', name:t }]);
   else if(act==='edit'){
     if(document.querySelector('.tl-edit')) renderTagList();   // 다른 줄을 고치던 중이면 닫고
@@ -1886,6 +1967,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
   const t=b.dataset.tab;
   if(selMode) setSelMode(false);
+  if(tlSel) setTlSel(false);
   $('calView').classList.toggle('hidden', t!=='cal');
   $('closetView').classList.toggle('hidden', t!=='closet');
   $('statsView').classList.toggle('hidden', t!=='stats');
