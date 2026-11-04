@@ -179,6 +179,12 @@
   .mt-tag{ border:none; background:var(--accent-soft); color:var(--accent-dark); border-radius:8px; padding:6px 9px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; text-align:left; word-break:break-all; }
   .mt-tag .k{ opacity:.65; margin-left:4px; font-weight:700; }
   .mt-tag.top{ background:var(--accent); color:#fff; }
+  /* 사진 순서 바꾸기 */
+  .photos .ph.ord{ cursor:default; }
+  .ph .ord-bar{ position:absolute; left:0; right:0; bottom:0; z-index:3; display:flex; justify-content:space-between; padding:4px; background:linear-gradient(transparent, rgba(0,0,0,.55)); }
+  .ph .ord-bar button{ width:30px; height:30px; border-radius:8px; border:none; background:rgba(255,255,255,.9); color:#111; font-size:16px; font-weight:800; cursor:pointer; }
+  .ph .ord-bar button:disabled{ opacity:.25; }
+  .ph .ord-no{ position:absolute; top:4px; left:4px; z-index:3; background:var(--accent); color:#fff; font-size:11px; font-weight:800; border-radius:6px; padding:1px 6px; }
   .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
   /* 모아보기 */
   .filter-chip{ background:var(--accent); color:#fff; }
@@ -370,7 +376,7 @@
       <div class="t" id="dayTitle"></div>
       <button class="icon-sq" data-close aria-label="닫기">✕</button>
     </div>
-    <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
+    <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn" id="photoOrdBtn">순서</button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
     <div class="photos" id="dayPhotos"></div>
     <div class="sec-label"><span>옷 태그 <span style="font-weight:500">· 누르면 이름 수정(모든 기록에 반영), ✕는 이 날에서만 빼기</span></span><span class="saved" id="savedMark"></span></div>
     <div class="tags" id="dayTags"></div>
@@ -439,6 +445,7 @@
   <button class="nav r" id="viewerNext" aria-label="다음 사진">›</button>
   <div class="bar">
     <input type="date" id="viewerDate">
+    <button class="btn ghost" id="viewerCover">⭐ 대표 사진</button>
     <button class="btn ghost" id="viewerMove">이 날짜로 옮기기</button>
     <button class="btn danger" id="viewerDel" style="color:#ff8a8a;border-color:#444">삭제</button>
     <div class="src" id="viewerSrc"></div>
@@ -613,10 +620,12 @@ function syncMonths(){
   for(const [k,st] of months) if(!want.has(k) && st.unsub){ st.unsub(); st.unsub=null; }
 }
 function dropLocal(keep){ for(const st of months.values()) st.list=st.list.filter(keep); }
+// 사진 순서: 직접 정한 순서(order)가 먼저, 없으면 올린 순서. 맨 앞 사진이 캘린더·옷장에 보임
+const photoCmp=(a,b)=>((a.order??1e15)-(b.order??1e15)) || (a.addedAt-b.addedAt);
 function photosByDate(){
   const byId=new Map(); for(const st of months.values()) for(const p of st.list) byId.set(p.id,p);
   const m={}; for(const p of byId.values()) (m[p.date] ||= []).push(p);
-  for(const k in m) m[k].sort((a,b)=>a.addedAt-b.addedAt);
+  for(const k in m) m[k].sort(photoCmp);
   return m;
 }
 function normTag(s){ return s.trim().replace(/^#+/,'').trim().replace(/\s+/g,'_'); }
@@ -732,7 +741,7 @@ $('selDelete').onclick=async ()=>{
 
 // 날짜 화면에서 몇 장만 골라 지우기
 let daySel=null;   // 선택 중이면 Set(id)
-$('photoSelBtn').onclick=()=>{ daySel = daySel ? null : new Set(); renderDayPhotos(); };
+$('photoSelBtn').onclick=()=>{ daySel = daySel ? null : new Set(); dayOrd=false; renderDayPhotos(); };
 $('photoDelBtn').onclick=async ()=>{
   if(!daySel || !daySel.size) return;
   if(!confirm(`사진 ${daySel.size}장을 삭제할까요?\n옷 태그와 일기는 그대로 남아요.`)) return;
@@ -786,7 +795,7 @@ function saveEntry(e){
   renderCal();
 }
 function openDay(d){
-  curDay=d; daySel=null; syncMonths();
+  curDay=d; daySel=null; dayOrd=false; syncMonths();
   $('dayTitle').textContent=fmtKo(d);
   renderDayPhotos(); renderDayTags();
   $('diary').value=entryOf(d).text;
@@ -798,7 +807,20 @@ function renderDayPhotos(){
   const box=$('dayPhotos'); box.innerHTML='';
   const list=photosByDate()[curDay]||[];
   if(daySel) for(const id of [...daySel]) if(!list.some(p=>p.id===id)) daySel.delete(id);
-  $('photoSelBtn').classList.toggle('hidden', !list.length);
+  $('photoOrdBtn').classList.toggle('hidden', list.length<2 || !!daySel);
+  $('photoOrdBtn').textContent = dayOrd ? '완료' : '순서';
+  $('photoSelBtn').classList.toggle('hidden', !list.length || dayOrd);
+  if(dayOrd){
+    list.forEach((p,i)=>{
+      const b=document.createElement('div'); b.className='ph ord';
+      b.innerHTML=`<img src="${p.thumb}" alt=""><span class="ord-no">${i===0?'⭐ 대표':i+1}</span>
+        <div class="ord-bar"><button aria-label="앞으로" ${i===0?'disabled':''}>‹</button><button aria-label="뒤로" ${i===list.length-1?'disabled':''}>›</button></div>`;
+      const [l,r]=b.querySelectorAll('.ord-bar button');
+      l.onclick=()=>movePhoto(list, i, i-1); r.onclick=()=>movePhoto(list, i, i+1);
+      box.appendChild(b);
+    });
+    return;
+  }
   $('photoSelBtn').textContent = daySel ? '취소' : '선택';
   $('photoDelBtn').classList.toggle('hidden', !daySel);
   $('photoDelBtn').textContent = daySel && daySel.size ? `${daySel.size}장 삭제  ` : '지울 사진을 고르세요  ';
@@ -817,6 +839,32 @@ function renderDayPhotos(){
   add.onclick=()=>{ pendingDay=curDay; $('dayFileInput').click(); };
   box.appendChild(add);
 }
+/* ---- 사진 순서 바꾸기 ---- */
+let dayOrd=false;
+$('photoOrdBtn').onclick=()=>{ dayOrd=!dayOrd; daySel=null; renderDayPhotos(); };
+function saveOrder(list){
+  const b=fdb.batch();
+  list.forEach((p,i)=>{ p.order=i; b.update(col(C_PHOTO).doc(p.id), { order:i }); });
+  save(b.commit());
+  if(list[0]) dayPhotosCache.delete(list[0].date);
+  renderCal();
+}
+function movePhoto(list, from, to){
+  if(to<0 || to>=list.length) return;
+  const arr=[...list]; const [x]=arr.splice(from,1); arr.splice(to,0,x);
+  saveOrder(arr); renderDayPhotos();
+}
+// 크게 보기에서 ⭐ 대표 사진: 그날 맨 앞으로
+$('viewerCover').onclick=async ()=>{
+  const p=viewerPhoto; if(!p) return;
+  const list=[...await photosForDay(p.date)];
+  const i=list.findIndex(x=>x.id===p.id);
+  if(i===0){ toast('이미 대표 사진이에요'); return; }
+  if(i>0){ list.splice(i,1); list.unshift(p); } else list.unshift(p);
+  saveOrder(list);
+  if($('daySheet').classList.contains('open')) renderDayPhotos();
+  toast('대표 사진으로 정했어요 — 캘린더에 이 사진이 보여요', 2500);
+};
 function renderDayTags(){
   const box=$('dayTags'); box.innerHTML='';
   const e=entryOf(curDay);
@@ -1119,7 +1167,7 @@ async function photosForDay(d){
   if(dayPhotosCache.has(d)) return dayPhotosCache.get(d);
   try{
     const s=await col(C_PHOTO).where('date','==',d).get();
-    const l=s.docs.map(x=>x.data()).sort((a,b)=>a.addedAt-b.addedAt);
+    const l=s.docs.map(x=>x.data()).sort(photoCmp);
     dayPhotosCache.set(d,l); return l;
   }catch(e){ console.error(e); return []; }
 }
