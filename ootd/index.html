@@ -395,7 +395,7 @@
       </div>
       <button class="icon-sq" data-close aria-label="닫기">✕</button>
     </div>
-    <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn" id="photoOrdBtn">순서</button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
+    <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn hidden" id="photoPasteBtn">📋 붙여넣기</button><button class="link-btn" id="photoOrdBtn">순서</button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
     <div class="photos" id="dayPhotos"></div>
     <div class="sec-label"><span>옷 태그 <span style="font-weight:500">· 누르면 이름 수정(모든 기록에 반영), ✕는 이 날에서만 빼기</span></span><span class="saved" id="savedMark"></span></div>
     <div class="tags" id="dayTags"></div>
@@ -897,7 +897,14 @@ function askPhotoDates(files){
 
 /* ================= 하루 기록 시트 ================= */
 function entryOf(d){ const e=entries[d]; return e ? { date:d, tags:[...(e.tags||[])], text:e.text||'' } : { date:d, tags:[], text:'' }; }
+// 일기 태그 순서: 아우터 → 탑 → 니트 → 셔츠 → 보텀 → 슈즈 → 백 → 액세서리 → (분류 없는 태그)
+const TAG_ORDER={ outer:0, top:1, knit:2, shirts:3, shirt:3, bottom:4, shoes:5, sneakers:5, boots:5, bag:6, acc:7 };
+function sortTags(tags){
+  const rank=t=>{ const { parts, end }=coreParts(t); const c=end>1 ? parts[end-1].toLowerCase() : ''; return c in TAG_ORDER ? TAG_ORDER[c] : 8; };
+  return tags.map((t,i)=>[t,i]).sort((a,b)=>rank(a[0])-rank(b[0]) || a[1]-b[1]).map(x=>x[0]);   // 같은 분류끼리는 원래 순서 유지
+}
 function saveEntry(e){
+  e.tags=sortTags(e.tags);
   if(hasContent(e)){ entries[e.date]=e; save(col(C_ENTRY).doc(e.date).set(e)); }
   else if(entries[e.date]){ delete entries[e.date]; save(col(C_ENTRY).doc(e.date).delete()); }
   $('savedMark').textContent='저장됨 ✓';
@@ -956,6 +963,8 @@ function renderDayPhotos(){
   const list=photosByDate()[curDay]||[];
   if(daySel) for(const id of [...daySel]) if(!list.some(p=>p.id===id)) daySel.delete(id);
   $('photoOrdBtn').classList.toggle('hidden', list.length<2 || !!daySel);
+  // 복사한 사진 붙여넣기 (아이폰은 이 버튼을 눌러야 붙여넣기가 허용됨, PC는 Ctrl+V도 됨)
+  $('photoPasteBtn').classList.toggle('hidden', !(navigator.clipboard && navigator.clipboard.read) || !!daySel || dayOrd);
   $('photoOrdBtn').textContent = dayOrd ? '완료' : '순서';
   $('photoSelBtn').classList.toggle('hidden', !list.length || dayOrd);
   if(dayOrd){
@@ -987,14 +996,6 @@ function renderDayPhotos(){
   const add=document.createElement('button'); add.className='ph add'; add.textContent='＋'; add.setAttribute('aria-label','사진 추가');
   add.onclick=()=>{ pendingDay=curDay; $('dayFileInput').click(); };
   box.appendChild(add);
-  // 복사한 사진 붙여넣기 (아이폰은 이 버튼을 눌러야 붙여넣기가 허용됨)
-  if(navigator.clipboard && navigator.clipboard.read){
-    const pst=document.createElement('button'); pst.className='ph add'; pst.style.fontSize='13px'; pst.style.flexDirection='column'; pst.style.gap='4px';
-    const isPC=matchMedia('(hover:hover) and (pointer:fine)').matches;
-    pst.innerHTML='<span style="font-size:22px">📋</span>붙여넣기'+(isPC?'<span style="font-size:11px;opacity:.7">(Ctrl+V)</span>':'');
-    const day=curDay; pst.onclick=()=>pasteFromClipboard(day);
-    box.appendChild(pst);
-  }
 }
 /* ---- 사진 순서 바꾸기 ---- */
 let dayOrd=false;
@@ -1023,6 +1024,8 @@ $('viewerCover').onclick=async ()=>{
   toast('대표 사진으로 정했어요 — 캘린더에 이 사진이 보여요', 2500);
 };
 /* ================= 복사한 사진 붙여넣기 ================= */
+$('photoPasteBtn').onclick=()=>pasteFromClipboard(curDay);
+if(matchMedia('(hover:hover) and (pointer:fine)').matches) $('photoPasteBtn').textContent='📋 붙여넣기 (Ctrl+V)';
 async function pasteFromClipboard(day){
   try{
     const items=await navigator.clipboard.read(), files=[];
@@ -1075,9 +1078,9 @@ function renderDayTags(){
   const box=$('dayTags'); box.innerHTML='';
   const e=entryOf(curDay);
   if(!e.tags.length){ box.innerHTML='<span class="saved">아직 태그가 없어요</span>'; return; }
-  e.tags.forEach((t,i)=>{
+  sortTags(e.tags).forEach(t=>{
     const s=document.createElement('span'); s.className='tag'; s.innerHTML=`<span class="tname" style="cursor:pointer">#${esc(t)}</span><button aria-label="이 날에서 태그 빼기">✕</button>`;
-    s.querySelector('button').onclick=()=>{ const en=entryOf(curDay); en.text=$('diary').value; en.tags.splice(i,1); saveEntry(en); renderDayTags(); };
+    s.querySelector('button').onclick=()=>{ const en=entryOf(curDay); en.text=$('diary').value; en.tags=en.tags.filter(x=>x!==t); saveEntry(en); renderDayTags(); };
     s.querySelector('.tname').onclick=()=>{ flushDiary(); if(promptRenameTag(t)) renderDayTags(); };
     box.appendChild(s);
   });
