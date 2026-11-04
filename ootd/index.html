@@ -150,12 +150,13 @@
   .btn-row{ display:flex; gap:8px; flex-wrap:wrap; }
   /* 옷장 */
   .closet{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 8px; }
-  .closet-item{ display:flex; flex-direction:column; justify-content:flex-start; align-self:start; border:none; background:none; padding:0; text-align:left; cursor:pointer; color:var(--text); font:inherit; min-width:0; }
-  .closet-item .im{ aspect-ratio:3/4; border-radius:10px; overflow:hidden; background:var(--bg); border:1px solid var(--border); }
+  @media (min-width:560px){ .closet{ grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px 10px; } }
+  .closet-item{ display:flex; flex-direction:column; justify-content:flex-start; align-self:start; width:100%; min-width:0; border:none; background:none; padding:0; text-align:left; cursor:pointer; color:var(--text); font:inherit; }
+  .closet-item .im{ width:100%; aspect-ratio:3/4; border-radius:10px; overflow:hidden; background:var(--bg); border:1px solid var(--border); }
   .closet-item img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .closet-item .nm{ font-size:12px; font-weight:700; margin-top:5px; word-break:break-all; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .closet-item .c{ font-size:11px; color:var(--text-muted); margin-top:2px; }
-  .closet-item .ph-brand{ height:100%; display:flex; align-items:center; justify-content:center; text-align:center; padding:8px; font-size:13px; font-weight:800; color:var(--text-muted); word-break:break-all; background:var(--accent-soft); }
+  .closet-item .nm{ width:100%; font-size:12px; font-weight:700; margin-top:6px; word-break:break-all; line-height:1.35; min-height:calc(12px*1.35*2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .closet-item .c{ width:100%; font-size:11px; color:var(--text-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .closet-item .ph-brand{ height:100%; display:flex; align-items:center; justify-content:center; text-align:center; padding:8px; font-size:12px; font-weight:800; line-height:1.3; color:var(--text-muted); word-break:break-all; background:var(--accent-soft); overflow:hidden; }
   .closet-item.gone .im{ opacity:.45; filter:grayscale(1); }
   .closet-item .gone-badge{ display:inline-block; font-size:10px; font-weight:700; color:var(--text-muted); border:1px solid var(--border-2); border-radius:6px; padding:0 4px; margin-left:4px; vertical-align:1px; }
   .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
