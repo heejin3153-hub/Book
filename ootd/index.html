@@ -238,6 +238,7 @@
     <div class="tools">
       <button class="chip-btn" id="exportBtn">⬇️ 백업 내보내기</button>
       <button class="chip-btn" id="importBtn">⬆️ 백업 불러오기</button>
+      <button class="chip-btn" id="upnoteBtn">📒 UpNote 가져오기</button>
     </div>
     <div class="account" id="accountRow"></div>
     <div class="sync" id="syncState"></div>
@@ -291,6 +292,7 @@
 <input type="file" id="fileInput" accept="image/*" multiple hidden>
 <input type="file" id="dayFileInput" accept="image/*" multiple hidden>
 <input type="file" id="importInput" accept="application/json,.json" hidden>
+<input type="file" id="upnoteInput" accept=".zip,.html,.htm,image/*,application/zip,text/html" multiple hidden>
 
 <!-- 하루 기록 -->
 <div class="sheet-bg" id="daySheet">
@@ -432,11 +434,50 @@ function shrink(im, max, q){
   c.getContext('2d').drawImage(im,0,0,c.width,c.height);
   return c.toDataURL('image/jpeg', q);
 }
+// 캔버스에 다시 그려서 저장하므로 위치(GPS)·기기 정보 같은 EXIF 메타데이터는 저장되지 않음
+const THUMB=[320,0.7];
 function shrinkFull(im){
-  for(const [max,q] of [[1440,0.82],[1200,0.75],[1000,0.7],[800,0.65]]){
-    const d=shrink(im,max,q); if(d.length<900000) return d;
+  for(const [max,q] of [[1080,0.75],[960,0.7],[800,0.65]]){
+    const d=shrink(im,max,q); if(d.length<600000) return d;
   }
   return shrink(im,640,0.6);
+}
+
+/* ---- 같은 사진 알아보기 ----
+   사진을 9x8 흑백으로 줄인 밝기 패턴(dHash) + 평균 색으로 '지문'을 만들어,
+   같은 날짜에 지문이 거의 같은 사진이 있으면 중복으로 보고 건너뜀
+   (원본·압축본·다른 앱에서 내보낸 같은 사진도 걸러짐) */
+function photoSig(im){
+  const c=document.createElement('canvas'); c.width=9; c.height=8;
+  const x=c.getContext('2d', { willReadFrequently:true }); x.drawImage(im,0,0,9,8);
+  const d=x.getImageData(0,0,9,8).data;
+  let bits='', r=0, g=0, b=0;
+  for(let y=0;y<8;y++) for(let i=0;i<9;i++){
+    const a=(y*9+i)*4; r+=d[a]; g+=d[a+1]; b+=d[a+2];
+    if(i<8){ const gr=v=>d[v]*.3+d[v+1]*.59+d[v+2]*.11; bits+= gr(a)>gr(a+4)?'1':'0'; }
+  }
+  const hx=n=>Math.round(n/72).toString(16).padStart(2,'0');
+  return BigInt('0b'+bits).toString(16).padStart(16,'0')+hx(r)+hx(g)+hx(b);
+}
+function sameSig(a,b){
+  if(!a||!b) return false;
+  let x=BigInt('0x'+a.slice(0,16))^BigInt('0x'+b.slice(0,16)), n=0;
+  while(x){ n+=Number(x&1n); x>>=1n; }
+  const col=i=>parseInt(a.slice(16+i*2,18+i*2),16)-parseInt(b.slice(16+i*2,18+i*2),16);
+  return n<=6 && Math.abs(col(0))+Math.abs(col(1))+Math.abs(col(2))<=36;
+}
+const sigCache=new Map();
+async function sigOf(p){
+  if(p.sig) return p.sig;
+  if(sigCache.has(p.id)) return sigCache.get(p.id);
+  try{ const im=await loadImage(await (await fetch(p.thumb)).blob()); const s=photoSig(im); sigCache.set(p.id,s); return s; }
+  catch(e){ return null; }
+}
+// 그 날짜에 이미 같은 사진이 있는지 (pending: 이번에 같이 올리는 중인 사진들)
+async function isDuplicate(date, sig, pending, exceptId){
+  const list=[...await photosForDay(date), ...pending.filter(x=>x.date===date)];
+  for(const p of list){ if(p.id!==exceptId && sameSig(sig, await sigOf(p))) return true; }
+  return false;
 }
 
 /* ================= 상태 / 유틸 ================= */
@@ -534,23 +575,28 @@ async function addFiles(files, forced){
   files=[...files].filter(f=>f.type.startsWith('image/')||/\.(heic|heif)$/i.test(f.name));
   if(!files.length) return;
   toast(`사진 ${files.length}장 처리 중…`, 60000);
-  let ok=0, noExif=0, failed=0; const dates=new Set(), jobs=[];
+  let ok=0, noExif=0, failed=0, dup=0; const dates=new Set(), pending=[];
   for(const f of files){
     try{
       const ex=forced?null:await readExifDate(f);
       const date=forced||ex||ymd(new Date(f.lastModified||Date.now()));
-      if(!forced&&!ex) noExif++;
       const im=await loadImage(f);
-      const id=newId(), full=shrinkFull(im), thumb=shrink(im,360,0.75);
-      fullCache.set(id, full);
+      const sig=photoSig(im);
+      if(await isDuplicate(date, sig, pending)){ dup++; continue; }
+      if(!forced&&!ex) noExif++;
+      const id=newId(), full=shrinkFull(im), thumb=shrink(im,...THUMB);
+      const meta={ id, date, thumb, sig, source: forced?'manual':(ex?'exif':'file'), addedAt:Date.now() };
+      fullCache.set(id, full); pending.push(meta);
       const b=fdb.batch();
-      b.set(col(C_PHOTO).doc(id), { id, date, thumb, source: forced?'manual':(ex?'exif':'file'), addedAt:Date.now() });
+      b.set(col(C_PHOTO).doc(id), meta);
       b.set(col(C_FULL).doc(id), { data: full });
-      jobs.push(save(b.commit()));
+      save(b.commit());
       ok++; dates.add(date);
-    }catch(e){ failed++; }
+    }catch(e){ console.error(e); failed++; }
   }
-  let msg=`${ok}장 추가했어요`;
+  for(const d of dates) dayPhotosCache.delete(d);
+  let msg = ok ? `${ok}장 추가했어요` : '새로 추가한 사진이 없어요';
+  if(dup) msg+=` · 이미 있는 사진 ${dup}장은 건너뛰었어요`;
   if(noExif) msg+=` · ${noExif}장은 촬영일 정보가 없어 파일 날짜로 넣었어요`;
   if(failed) msg+=` · ${failed}장은 열 수 없었어요 (HEIC는 JPG로 바꿔 올려주세요)`;
   toast(msg, 4500);
@@ -698,7 +744,7 @@ async function showViewerPhoto(){
   $('viewerNext').classList.toggle('hidden', !many || viewerIdx===viewerList.length-1);
   $('viewerImg').src=fullCache.get(p.id) || p.thumb;
   $('viewerDate').value=p.date;
-  $('viewerSrc').textContent={exif:'📷 사진 촬영일로 등록됨', file:'📁 촬영일 정보가 없어 파일 날짜로 등록됨', manual:'✏️ 직접 고른 날짜'}[p.source]||'';
+  $('viewerSrc').textContent={exif:'📷 사진 촬영일로 등록됨', file:'📁 촬영일 정보가 없어 파일 날짜로 등록됨', manual:'✏️ 직접 고른 날짜', upnote:'📒 UpNote에서 가져옴'}[p.source]||'';
   if(!fullCache.has(p.id)){
     try{
       const snap=await col(C_FULL).doc(p.id).get();
@@ -1046,6 +1092,177 @@ $('importInput').onchange=async e=>{
     toast(`사진 ${np}장, 기록 ${merged.length}일을 불러왔어요`, 3000);
   }catch(err){ toast('백업 파일을 읽을 수 없어요'); }
 };
+
+/* ================= UpNote 가져오기 (일회성) =================
+   UpNote에서 HTML로 내보낸 노트를 읽어서
+   - 제목의 #2026 #0808 → 날짜
+   - 본문의 나머지 #태그 → 옷 태그
+   - 본문 글 → 일기
+   - <img> → 사진 (zip 안의 Files/ 폴더 또는 같이 고른 사진 파일에서 찾음)
+   사진 문서 id를 "날짜+파일이름"으로 정해서, 두 번 가져와도 중복으로 쌓이지 않음 */
+$('upnoteBtn').onclick=()=>$('upnoteInput').click();
+$('upnoteInput').onchange=e=>{ const fs=[...e.target.files]; e.target.value=''; if(fs.length) importUpnote(fs); };
+
+function loadJSZip(){
+  if(window.JSZip) return Promise.resolve(window.JSZip);
+  return new Promise((res,rej)=>{
+    const sc=document.createElement('script');
+    sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    sc.onload=()=>res(window.JSZip); sc.onerror=()=>rej(new Error('zip 도구를 불러오지 못했어요'));
+    document.head.appendChild(sc);
+  });
+}
+const baseName=p=>p.split('/').pop();
+function joinPath(dir, rel){
+  const out=dir?dir.split('/'):[];
+  for(const part of rel.split('/')){ if(part==='..') out.pop(); else if(part && part!=='.') out.push(part); }
+  return out.join('/');
+}
+function validDate(y,m,d){
+  const dt=new Date(+y, +m-1, +d);
+  return dt.getFullYear()===+y && dt.getMonth()===+m-1 && dt.getDate()===+d;
+}
+// 줄바꿈을 살려서 글자만 뽑기
+function noteText(el){
+  let out='';
+  const walk=n=>{
+    for(const c of n.childNodes){
+      if(c.nodeType===3) out+=c.nodeValue.replace(/ /g,' ');
+      else if(c.nodeName==='BR') out+='\n';
+      else if(/^(DIV|P|LI|H[1-6]|BLOCKQUOTE|UL|OL)$/.test(c.nodeName)){ out+='\n'; walk(c); out+='\n'; }
+      else walk(c);
+    }
+  };
+  walk(el);
+  return out.split('\n').map(l=>l.trim()).filter(Boolean).join('\n');
+}
+function parseUpnote(html, fileName){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const root=doc.querySelector('.shine-editor')||doc.body;
+  const head=root.querySelector('h1,h2,h3,h4,h5,h6');
+  const tagOf=a=>(a.getAttribute('data-upnote-tag')||a.textContent||'').trim();
+  // 날짜: 제목의 연도 태그 + MMDD 태그 (없으면 파일 이름 2026_0808 에서)
+  let date=null;
+  if(head){
+    const ht=[...head.querySelectorAll('[data-upnote-tag]')].map(a=>tagOf(a).replace(/^#/,''));
+    const yi=ht.findIndex(t=>/^(19|20)\d{2}$/.test(t));
+    const md=yi>=0 ? ht.slice(yi+1).concat(ht.slice(0,yi)).find(t=>/^\d{4}$/.test(t)) : null;
+    if(yi>=0 && md && validDate(ht[yi], md.slice(0,2), md.slice(2))) date=`${ht[yi]}-${md.slice(0,2)}-${md.slice(2)}`;
+  }
+  if(!date){
+    const m=(fileName||'').match(/((?:19|20)\d{2})[_\-. ]?(\d{2})[_\-. ]?(\d{2})/);
+    if(m && validDate(m[1],m[2],m[3])) date=`${m[1]}-${m[2]}-${m[3]}`;
+  }
+  const tags=[...root.querySelectorAll('[data-upnote-tag]')]
+    .filter(a=>!head || !head.contains(a)).map(a=>normTag(tagOf(a))).filter(Boolean);
+  const images=[...root.querySelectorAll('img')].map(i=>{ const s=i.getAttribute('src')||''; try{ return decodeURIComponent(s); }catch(e){ return s; } })
+    .filter(s=>s && !/^(https?:|data:)/.test(s));
+  const clone=root.cloneNode(true);
+  const cloneHead=clone.querySelector('h1,h2,h3,h4,h5,h6');   // 날짜가 적힌 제목 줄만 빼고 본문 글을 씀
+  if(cloneHead) cloneHead.remove();
+  clone.querySelectorAll('[data-upnote-tag],img,style,script').forEach(n=>n.remove());
+  return { date, tags:[...new Set(tags)], text:noteText(clone), images };
+}
+function hashId(str){
+  let h1=0x811c9dc5, h2=0x01000193;
+  for(let i=0;i<str.length;i++){ const c=str.charCodeAt(i); h1=Math.imul(h1^c,16777619)>>>0; h2=Math.imul(h2^c,2246822507)>>>0; }
+  return 'upnote-'+h1.toString(16).padStart(8,'0')+h2.toString(16).padStart(8,'0');
+}
+async function importUpnote(files){
+  toast('UpNote 파일 읽는 중…', 120000);
+  const notes=[];                 // { html, name, dir }
+  const imgs=new Map();           // 경로 또는 파일이름 → () => Promise<Blob>
+  const addImg=(path, get)=>{ imgs.set(path, get); if(!imgs.has(baseName(path))) imgs.set(baseName(path), get); };
+  const mimeOf=n=>/\.png$/i.test(n)?'image/png':/\.gif$/i.test(n)?'image/gif':/\.webp$/i.test(n)?'image/webp':/\.hei[cf]$/i.test(n)?'image/heic':'image/jpeg';
+  try{
+    for(const f of files){
+      if(/\.zip$/i.test(f.name) || f.type==='application/zip'){
+        if(f.size>500*1024*1024 && !confirm(`zip 파일이 ${Math.round(f.size/1024/1024)}MB로 커서 폰에서는 멈출 수 있어요.\n연도별 등으로 나눠서 여러 번 가져오는 걸 추천해요.\n그래도 계속할까요?`)){ toast('',1); return; }
+        const JSZip=await loadJSZip();
+        const zip=await JSZip.loadAsync(f);
+        for(const entry of Object.values(zip.files)){
+          if(entry.dir || /(^|\/)(__MACOSX|\.)/.test(entry.name)) continue;
+          if(/\.html?$/i.test(entry.name)){
+            const i=entry.name.lastIndexOf('/');
+            notes.push({ html:await entry.async('string'), name:baseName(entry.name), dir:i>=0?entry.name.slice(0,i):'' });
+          } else if(/\.(jpe?g|png|gif|webp|hei[cf])$/i.test(entry.name)){
+            addImg(entry.name, async()=>new Blob([await entry.async('arraybuffer')],{ type:mimeOf(entry.name) }));
+          }
+        }
+      } else if(/\.html?$/i.test(f.name) || f.type==='text/html'){
+        notes.push({ html:await f.text(), name:f.name, dir:'' });
+      } else if(f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|hei[cf])$/i.test(f.name)){
+        addImg(f.name, async()=>f);
+      }
+    }
+  }catch(err){ console.error(err); toast('파일을 읽지 못했어요: '+err.message, 5000); return; }
+  if(!notes.length){ toast('UpNote HTML 노트를 찾지 못했어요', 4000); return; }
+
+  // 날짜별로 합치기 (같은 날 노트가 여러 개면 태그·글·사진을 합침)
+  const byDate=new Map(); let noDate=0;
+  for(const n of notes){
+    const r=parseUpnote(n.html, n.name);
+    if(!r.date){ noDate++; continue; }
+    const g=byDate.get(r.date) || { date:r.date, tags:[], texts:[], images:new Map() };
+    for(const t of r.tags) if(!g.tags.includes(t)) g.tags.push(t);
+    if(r.text && !g.texts.includes(r.text)) g.texts.push(r.text);
+    for(const src of r.images){
+      const getter=imgs.get(joinPath(n.dir, src)) || imgs.get(src) || imgs.get(baseName(src));
+      if(!g.images.has(baseName(src))) g.images.set(baseName(src), getter||null);
+    }
+    byDate.set(r.date, g);
+  }
+  const days=[...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
+  if(!days.length){ toast('노트에서 날짜를 찾지 못했어요 (제목에 #2026 #0808 형식이 필요해요)', 5000); return; }
+  const allTags=new Set(days.flatMap(d=>d.tags));
+  const photoJobs=days.flatMap(d=>[...d.images].map(([name,get])=>({ date:d.date, name, get })));
+  const found=photoJobs.filter(j=>j.get), missing=photoJobs.length-found.length;
+  const range=`${days[0].date.replace(/-/g,'.')} ~ ${days[days.length-1].date.replace(/-/g,'.')}`;
+  toast('', 1);
+  const ok=confirm(
+    `UpNote에서 가져올 내용\n\n`+
+    `· 기록 ${days.length}일 (${range})\n`+
+    `· 옷 태그 ${allTags.size}종류\n`+
+    `· 사진 ${found.length}장`+(missing?` (파일을 못 찾은 사진 ${missing}장)`:'')+`\n`+
+    (noDate?`· 날짜를 못 찾은 노트 ${noDate}개는 건너뛰어요\n`:'')+
+    `\n이미 있는 날짜는 태그·일기를 합쳐요. 가져올까요?`);
+  if(!ok) return;
+
+  // 1) 태그·일기
+  const merged=days.map(d=>{
+    const cur=entryOf(d.date);
+    const tags=[...cur.tags]; for(const t of d.tags) if(!tags.includes(t)) tags.push(t);
+    let text=cur.text||'';
+    for(const t of d.texts) if(!text.includes(t)) text = text ? text+'\n\n'+t : t;
+    return { date:d.date, tags, text };
+  });
+  commitEntries(merged);
+
+  // 2) 사진 (한 장씩 줄여서 저장)
+  let done=0, failed=0, dup=0; const pending=[];
+  for(const j of found){
+    toast(`사진 가져오는 중… ${done+failed+dup+1} / ${found.length}`, 600000);
+    try{
+      const id=hashId(j.date+'/'+j.name);
+      if((await photosForDay(j.date)).some(p=>p.id===id)){ dup++; continue; }   // 예전에 가져온 사진
+      const im=await loadImage(await j.get());
+      const sig=photoSig(im);
+      if(await isDuplicate(j.date, sig, pending, id)){ dup++; continue; }        // 같은 사진이 이미 있음
+      const full=shrinkFull(im), thumb=shrink(im,...THUMB);
+      const meta={ id, date:j.date, thumb, sig, source:'upnote', addedAt:Date.now(), name:j.name };
+      fullCache.set(id, full); pending.push(meta);
+      const b=fdb.batch();
+      b.set(col(C_PHOTO).doc(id), meta);
+      b.set(col(C_FULL).doc(id), { data:full });
+      await save(b.commit());
+      dayPhotosCache.delete(j.date);
+      done++;
+    }catch(err){ console.error(err); failed++; }
+  }
+  const last=days[days.length-1].date.split('-').map(Number);
+  view={ y:last[0], m:last[1]-1 }; renderCal();
+  toast(`가져오기 끝! 기록 ${days.length}일, 사진 ${done}장`+(dup?` · 이미 있는 사진 ${dup}장 건너뜀`:'')+(failed?` (사진 ${failed}장 실패)`:'')+(missing?` · 못 찾은 사진 ${missing}장`:''), 6000);
+}
 
 /* ================= 공통 UI ================= */
 function openSheet(id){ $(id).classList.add('open'); }
