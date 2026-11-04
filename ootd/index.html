@@ -197,6 +197,12 @@
   .catbar-chips button{ border:none; border-radius:9px; padding:8px 11px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; background:var(--accent); color:#fff; }
   .catbar-chips button.ghost{ background:var(--bg); color:var(--text); border:1.5px solid var(--border-2); }
   .catbar-chips button:disabled{ opacity:.35; }
+  .day-nav{ width:30px; height:30px; font-size:18px; font-weight:700; color:var(--text); flex-shrink:0; }
+  .day-nav:disabled{ opacity:.25; }
+  #daySheet .sheet.slide-l{ animation:slideL .22s ease; }
+  #daySheet .sheet.slide-r{ animation:slideR .22s ease; }
+  @keyframes slideL{ from{ transform:translateX(40px); opacity:.3; } to{ transform:none; opacity:1; } }
+  @keyframes slideR{ from{ transform:translateX(-40px); opacity:.3; } to{ transform:none; opacity:1; } }
   .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
   /* 모아보기 */
   .filter-chip{ background:var(--accent); color:#fff; }
@@ -387,7 +393,11 @@
 <div class="sheet-bg" id="daySheet">
   <div class="sheet" role="dialog" aria-modal="true">
     <div class="sheet-h">
-      <div class="t" id="dayTitle"></div>
+      <div style="display:flex;align-items:center;gap:6px;min-width:0">
+        <button class="icon-sq day-nav" id="dayPrev" aria-label="이전 기록">‹</button>
+        <div class="t" id="dayTitle"></div>
+        <button class="icon-sq day-nav" id="dayNext" aria-label="다음 기록">›</button>
+      </div>
       <button class="icon-sq" data-close aria-label="닫기">✕</button>
     </div>
     <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn" id="photoOrdBtn">순서</button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
@@ -868,6 +878,7 @@ function saveEntry(e){
 function openDay(d){
   curDay=d; daySel=null; dayOrd=false; syncMonths();
   $('dayTitle').textContent=fmtKo(d);
+  const [pv,nx]=neighborDays(d); $('dayPrev').disabled=!pv; $('dayNext').disabled=!nx;
   renderDayPhotos(); renderDayTags();
   $('diary').value=entryOf(d).text;
   requestAnimationFrame(fitDiary);
@@ -875,6 +886,43 @@ function openDay(d){
   $('tagInput').value=''; hideSuggest();
   openSheet('daySheet');
 }
+/* ---- 날짜 화면에서 이전/다음 기록으로 넘기기 (옆으로 밀기 · ‹ › · 키보드 ← →) ---- */
+function recordDays(){
+  const set=new Set(Object.keys(entries).filter(d=>hasContent(entries[d])));
+  for(const d in photosByDate()) set.add(d);
+  return [...set].sort();
+}
+function neighborDays(d){
+  const all=recordDays(); let pv=null, nx=null;
+  for(const x of all){ if(x<d) pv=x; else if(x>d && !nx) nx=x; }
+  return [pv, nx];
+}
+function gotoDay(dir){
+  if(!curDay) return;
+  const [pv,nx]=neighborDays(curDay), to=dir<0?pv:nx;
+  if(!to){ toast(dir<0?'이전 기록이 없어요':'다음 기록이 없어요', 1200); return; }
+  flushDiary();
+  const [yy,mm]=to.split('-').map(Number); view={ y:yy, m:mm-1 };
+  openDay(to); renderCal();
+  const sh=$('daySheet').querySelector('.sheet');
+  sh.classList.remove('slide-l','slide-r'); void sh.offsetWidth; sh.classList.add(dir>0?'slide-l':'slide-r');
+  sh.scrollTop=0;
+}
+$('dayPrev').onclick=()=>gotoDay(-1);
+$('dayNext').onclick=()=>gotoDay(1);
+(()=>{ // 옆으로 밀기 (글 입력칸·사진 순서 바꾸기 중에는 안 넘어감)
+  let sx=null, sy=0;
+  const sh=$('daySheet').querySelector('.sheet');
+  sh.addEventListener('touchstart', e=>{
+    if(e.target.closest('input,textarea,.suggest') || dayOrd){ sx=null; return; }
+    sx=e.touches[0].clientX; sy=e.touches[0].clientY;
+  }, { passive:true });
+  sh.addEventListener('touchend', e=>{
+    if(sx===null) return;
+    const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy; sx=null;
+    if(Math.abs(dx)>70 && Math.abs(dx)>Math.abs(dy)*1.8) gotoDay(dx<0?1:-1);
+  });
+})();
 function renderDayPhotos(){
   const box=$('dayPhotos'); box.innerHTML='';
   const list=photosByDate()[curDay]||[];
@@ -914,7 +962,8 @@ function renderDayPhotos(){
   // 복사한 사진 붙여넣기 (아이폰은 이 버튼을 눌러야 붙여넣기가 허용됨)
   if(navigator.clipboard && navigator.clipboard.read){
     const pst=document.createElement('button'); pst.className='ph add'; pst.style.fontSize='13px'; pst.style.flexDirection='column'; pst.style.gap='4px';
-    pst.innerHTML='<span style="font-size:22px">📋</span>붙여넣기';
+    const isPC=matchMedia('(hover:hover) and (pointer:fine)').matches;
+    pst.innerHTML='<span style="font-size:22px">📋</span>붙여넣기'+(isPC?'<span style="font-size:11px;opacity:.7">(Ctrl+V)</span>':'');
     const day=curDay; pst.onclick=()=>pasteFromClipboard(day);
     box.appendChild(pst);
   }
@@ -1818,6 +1867,9 @@ document.querySelectorAll('.sheet-bg').forEach(bg=>{
   bg.addEventListener('click', e=>{ if(e.target===bg || e.target.closest('[data-close]')) closeSheet(bg.id); });
 });
 document.addEventListener('keydown', e=>{
+  // 날짜 화면: ← → 로 이전/다음 기록 (글 입력 중이 아닐 때)
+  if((e.key==='ArrowLeft'||e.key==='ArrowRight') && $('daySheet').classList.contains('open') && !$('viewer').classList.contains('open')
+     && !e.target.closest('input,textarea')){ gotoDay(e.key==='ArrowLeft'?-1:1); return; }
   if(e.key!=='Escape') return;
   if($('viewer').classList.contains('open')) return closeViewer();
   for(const id of ['tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
