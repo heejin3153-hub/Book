@@ -142,6 +142,28 @@
   .btn.ghost{ background:var(--bg); border:1.5px solid var(--border-2); color:var(--text); }
   .btn.danger{ background:none; color:var(--danger); border:1.5px solid var(--border-2); }
   .btn-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  /* 옷장 */
+  .closet{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 8px; }
+  .closet-item{ display:flex; flex-direction:column; justify-content:flex-start; align-self:start; border:none; background:none; padding:0; text-align:left; cursor:pointer; color:var(--text); font:inherit; min-width:0; }
+  .closet-item .im{ aspect-ratio:3/4; border-radius:10px; overflow:hidden; background:var(--bg); border:1px solid var(--border); }
+  .closet-item img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .closet-item .nm{ font-size:12px; font-weight:700; margin-top:5px; word-break:break-all; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .closet-item .c{ font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
+  /* 모아보기 */
+  .filter-chip{ background:var(--accent); color:#fff; }
+  .filter-chip button{ color:#fff; opacity:.8; }
+  .co-tags{ display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+  .co-tags::-webkit-scrollbar{ display:none; }
+  .co-tag{ flex-shrink:0; background:var(--bg); border:1.5px dashed var(--border-2); color:var(--text); border-radius:8px; padding:6px 9px; font-size:12.5px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:inherit; }
+  .co-tag .k{ color:var(--text-muted); margin-left:3px; }
+  .look-day{ margin-bottom:14px; }
+  .look-date{ background:none; border:none; padding:0 0 6px; font-size:12px; font-weight:700; color:var(--text-muted); cursor:pointer; font-family:inherit; }
+  .look-day .photos{ min-height:60px; }
+  /* 사진 넘기기 */
+  .viewer .nav{ position:absolute; top:45%; transform:translateY(-50%); background:rgba(255,255,255,.15); color:#fff; border:none; width:40px; height:56px; border-radius:10px; font-size:26px; cursor:pointer; }
+  .viewer .nav.l{ left:8px; } .viewer .nav.r{ right:8px; }
+  .viewer .pos{ position:absolute; top:calc(22px + env(safe-area-inset-top,0px)); left:16px; color:#fff; font-size:13px; font-weight:700; }
   .worn-list{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px; }
   .worn{ border:none; padding:0; background:none; cursor:pointer; color:var(--text); text-align:left; }
   .worn .im{ aspect-ratio:3/4; border-radius:10px; overflow:hidden; background:var(--bg); border:1px solid var(--border); }
@@ -197,7 +219,8 @@
 
   <div class="tabs">
     <button class="tab active" data-tab="cal">캘린더</button>
-    <button class="tab" data-tab="stats">옷 태그 통계</button>
+    <button class="tab" data-tab="closet">옷장</button>
+    <button class="tab" data-tab="stats">통계</button>
   </div>
 
   <!-- 캘린더 -->
@@ -218,6 +241,24 @@
     </div>
     <div class="account" id="accountRow"></div>
     <div class="sync" id="syncState"></div>
+  </section>
+
+  <!-- 옷장 -->
+  <section id="closetView" class="hidden">
+    <div class="panel">
+      <input class="search" id="closetSearch" type="search" placeholder="옷 검색 (예: Barbour, 부츠)">
+      <div class="filters">
+        <select class="sel" id="closetSort" aria-label="정렬">
+          <option value="count">많이 입은 순</option>
+          <option value="recent">최근에 입은 순</option>
+          <option value="stale">오래 안 입은 순</option>
+          <option value="name">이름순</option>
+        </select>
+        <span class="count-label" id="closetCount"></span>
+      </div>
+      <div class="closet" id="closetGrid"></div>
+    </div>
+    <p class="hint">옷을 누르면 그 옷을 입은 날 사진이 모두 모여요.<br>사진은 그 옷을 가장 최근에 입은 날의 사진이에요.</p>
   </section>
 
   <!-- 통계 -->
@@ -274,17 +315,25 @@
   </div>
 </div>
 
-<!-- 태그 상세 -->
+<!-- 모아보기 -->
 <div class="sheet-bg" id="tagSheet">
   <div class="sheet" role="dialog" aria-modal="true">
     <div class="sheet-h">
-      <div class="t" id="tagTitle"></div>
+      <div class="t" id="tagTitle">모아보기</div>
       <button class="icon-sq" data-close aria-label="닫기">✕</button>
     </div>
-    <div class="kv" id="tagInfo"></div>
-    <div class="tags" id="tagBrandItems" style="margin-top:12px"></div>
-    <div class="sec-label"><span>입은 날</span></div>
-    <div class="worn-list" id="tagWorn"></div>
+    <div class="tags" id="lookFilters"></div>
+    <div class="tag-input-wrap">
+      <input class="tag-input" id="lookInput" placeholder="＋ 같이 입은 옷 태그로 좁히기" autocomplete="off" autocapitalize="off" enterkeyhint="search">
+      <div class="suggest hidden" id="lookSuggest"></div>
+    </div>
+    <div class="kv" id="tagInfo" style="margin-top:12px"></div>
+    <div id="coWrap">
+      <div class="sec-label"><span>같이 입은 옷</span><span class="saved">눌러서 조합하기</span></div>
+      <div class="co-tags" id="coTags"></div>
+    </div>
+    <div class="sec-label"><span>사진</span></div>
+    <div id="lookGallery"></div>
     <div class="btn-row" style="margin-top:16px" id="tagActions">
       <button class="btn ghost" id="renameTagBtn">태그 이름 바꾸기</button>
       <button class="btn danger" id="deleteTagBtn">태그 삭제</button>
@@ -294,7 +343,10 @@
 
 <div class="viewer" id="viewer">
   <button class="x" id="viewerClose" aria-label="닫기">✕</button>
+  <div class="pos" id="viewerPos"></div>
   <img id="viewerImg" alt="">
+  <button class="nav l" id="viewerPrev" aria-label="이전 사진">‹</button>
+  <button class="nav r" id="viewerNext" aria-label="다음 사진">›</button>
   <div class="bar">
     <input type="date" id="viewerDate">
     <button class="btn ghost" id="viewerMove">이 날짜로 옮기기</button>
@@ -390,7 +442,7 @@ function shrinkFull(im){
 /* ================= 상태 / 유틸 ================= */
 let entries={};
 let view=(()=>{ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
-let curDay=null, curTag=null, viewerPhoto=null, pendingDay=null;
+let curDay=null, viewerPhoto=null, viewerList=[], viewerIdx=0, pendingDay=null;
 let statGroup='item';
 const fullCache=new Map();
 const $=id=>document.getElementById(id);
@@ -445,7 +497,10 @@ function hasContent(e){ return e && ((e.tags||[]).length || (e.text||'').trim())
 function refresh(){
   renderCal();
   if($('daySheet').classList.contains('open') && curDay){ renderDayPhotos(); renderDayTags(); }
-  if(!$('statsView').classList.contains('hidden') && !$('tagSheet').classList.contains('open')) renderStats();
+  if(!$('tagSheet').classList.contains('open')){
+    if(!$('statsView').classList.contains('hidden')) renderStats();
+    if(!$('closetView').classList.contains('hidden')) renderCloset();
+  }
 }
 
 /* ================= 캘린더 ================= */
@@ -528,7 +583,7 @@ function renderDayPhotos(){
   for(const p of (photosByDate()[curDay]||[])){
     const b=document.createElement('button'); b.className='ph';
     const im=document.createElement('img'); im.src=p.thumb; im.alt=''; b.appendChild(im);
-    b.onclick=()=>openViewer(p); box.appendChild(b);
+    b.onclick=()=>openViewer(p, photosByDate()[curDay]); box.appendChild(b);
   }
   const add=document.createElement('button'); add.className='ph add'; add.textContent='＋'; add.setAttribute('aria-label','사진 추가');
   add.onclick=()=>{ pendingDay=curDay; $('dayFileInput').click(); };
@@ -625,12 +680,25 @@ $('delDayBtn').onclick=()=>{
 };
 
 /* ================= 사진 크게 보기 ================= */
-async function openViewer(p){
-  viewerPhoto=p;
+function openViewer(p, list){
+  viewerList = (list && list.length) ? list : [p];
+  viewerIdx = Math.max(0, viewerList.findIndex(x=>x.id===p.id));
+  showViewerPhoto();
+  $('viewer').classList.add('open');
+}
+function stepViewer(n){
+  const i=viewerIdx+n; if(i<0 || i>=viewerList.length) return;
+  viewerIdx=i; showViewerPhoto();
+}
+async function showViewerPhoto(){
+  const p=viewerList[viewerIdx]; viewerPhoto=p;
+  const many=viewerList.length>1;
+  $('viewerPos').textContent = many ? `${viewerIdx+1} / ${viewerList.length}` : '';
+  $('viewerPrev').classList.toggle('hidden', !many || viewerIdx===0);
+  $('viewerNext').classList.toggle('hidden', !many || viewerIdx===viewerList.length-1);
   $('viewerImg').src=fullCache.get(p.id) || p.thumb;
   $('viewerDate').value=p.date;
   $('viewerSrc').textContent={exif:'📷 사진 촬영일로 등록됨', file:'📁 촬영일 정보가 없어 파일 날짜로 등록됨', manual:'✏️ 직접 고른 날짜'}[p.source]||'';
-  $('viewer').classList.add('open');
   if(!fullCache.has(p.id)){
     try{
       const snap=await col(C_FULL).doc(p.id).get();
@@ -640,11 +708,22 @@ async function openViewer(p){
 }
 function closeViewer(){ $('viewer').classList.remove('open'); viewerPhoto=null; }
 $('viewerClose').onclick=closeViewer;
+$('viewerPrev').onclick=()=>stepViewer(-1);
+$('viewerNext').onclick=()=>stepViewer(1);
+(()=>{ let sx=null, sy=0; const v=$('viewerImg');
+  v.addEventListener('touchstart',e=>{ sx=e.touches[0].clientX; sy=e.touches[0].clientY; },{passive:true});
+  v.addEventListener('touchend',e=>{ if(sx===null) return; const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy; sx=null;
+    if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)*1.3) stepViewer(dx<0?1:-1); });
+  document.addEventListener('keydown',e=>{ if(!$('viewer').classList.contains('open')) return;
+    if(e.key==='ArrowLeft') stepViewer(-1); if(e.key==='ArrowRight') stepViewer(1); });
+})();
 $('viewerMove').onclick=()=>{
   const d=$('viewerDate').value; if(!d||d===viewerPhoto.date) return;
   save(col(C_PHOTO).doc(viewerPhoto.id).update({ date:d, source:'manual' }));
+  dayPhotosCache.delete(viewerPhoto.date); dayPhotosCache.delete(d);
   viewerPhoto.date=d; viewerPhoto.source='manual';
   closeViewer(); renderCal(); renderDayPhotos();
+  if($('tagSheet').classList.contains('open')) renderLook();
   toast(`${fmtKo(d)}로 옮겼어요 (태그·일기는 그대로예요)`, 3000);
 };
 $('viewerDel').onclick=()=>{
@@ -652,8 +731,9 @@ $('viewerDel').onclick=()=>{
   const id=viewerPhoto.id, b=fdb.batch();
   b.delete(col(C_PHOTO).doc(id)); b.delete(col(C_FULL).doc(id));
   save(b.commit());
-  dropLocal(p=>p.id!==id); fullCache.delete(id);
+  dropLocal(p=>p.id!==id); fullCache.delete(id); dayPhotosCache.delete(viewerPhoto.date);
   closeViewer(); renderCal(); renderDayPhotos(); toast('삭제했어요');
+  if($('tagSheet').classList.contains('open')) renderLook();
 };
 
 /* ================= 태그 통계 ================= */
@@ -715,56 +795,188 @@ function renderStats(){
       <div class="c">${s.count}회</div></div>`;
   }).join('');
 }
-$('rankList').addEventListener('click', e=>{ const r=e.target.closest('.rank-row'); if(r) openTag(r.dataset.n, statGroup); });
+$('rankList').addEventListener('click', e=>{ const r=e.target.closest('.rank-row'); if(r) openLook([{ kind:statGroup, name:r.dataset.n }], $('periodSel').value||'all'); });
 $('periodSel').onchange=renderStats; $('sortSel').onchange=renderStats; $('tagSearch').oninput=renderStats;
 $('groupSeg').addEventListener('click', e=>{
   const b=e.target.closest('button'); if(!b) return;
   statGroup=b.dataset.g; [...$('groupSeg').children].forEach(x=>x.classList.toggle('on',x===b)); renderStats();
 });
 
-function openTag(name, kind){
-  curTag={name, kind};
-  const p=$('periodSel').value||'all';
-  const match = kind==='brand' ? (t=>brandOf(t)===name) : (t=>t===name);
-  const dates=Object.keys(entries).filter(d=>periodMatch(d,p) && (entries[d].tags||[]).some(match)).sort().reverse();
-  $('tagTitle').textContent = kind==='brand' ? name : '#'+name;
-  const periodTxt = p==='all' ? '전체 기간' : $('periodSel').selectedOptions[0].textContent;
-  $('tagInfo').innerHTML = `<span>${esc(periodTxt)} <b>${dates.length}회</b> 착용</span>` + (dates.length?`<span>처음 <b>${fmtKo(dates[dates.length-1],false)}</b></span><span>마지막 <b>${fmtKo(dates[0],false)}</b></span>`:'');
-  const bi=$('tagBrandItems'); bi.innerHTML='';
-  if(kind==='brand'){
-    const c={}; for(const d of dates) for(const t of entries[d].tags) if(match(t)) c[t]=(c[t]||0)+1;
-    for(const t of Object.keys(c).sort((a,b)=>c[b]-c[a])){
-      const s=document.createElement('button'); s.className='tag'; s.style.border='none'; s.style.cursor='pointer';
-      s.textContent=`#${t} · ${c[t]}`; s.onclick=()=>openTag(t,'item'); bi.appendChild(s);
-    }
-  }
-  $('tagActions').classList.toggle('hidden', kind==='brand');
-  const w=$('tagWorn'); w.innerHTML='';
-  if(thumbIO) thumbIO.disconnect();
-  thumbIO=new IntersectionObserver(es=>es.forEach(async en=>{
-    if(!en.isIntersecting) return;
-    thumbIO.unobserve(en.target);
-    const t=await thumbForDay(en.target.dataset.d);
-    if(t) en.target.innerHTML=`<img src="${t}" alt="">`;
-  }), { root:$('tagSheet').querySelector('.sheet'), rootMargin:'300px' });
-  for(const d of dates){
-    const b=document.createElement('button'); b.className='worn';
-    b.innerHTML=`<div class="im" data-d="${d}"></div><div class="d">${fmtKo(d)}</div>`;
-    b.onclick=()=>{ closeSheet('tagSheet'); openDay(d); };
-    w.appendChild(b); thumbIO.observe(b.firstChild);
-  }
+/* ================= 하루 사진 불러오기 (보고 있지 않은 달 포함) ================= */
+const dayPhotosCache=new Map();
+async function photosForDay(d){
+  const st=months.get(monthOfDate(d));
+  if(st && st.loaded) return photosByDate()[d]||[];
+  if(dayPhotosCache.has(d)) return dayPhotosCache.get(d);
+  try{
+    const s=await col(C_PHOTO).where('date','==',d).get();
+    const l=s.docs.map(x=>x.data()).sort((a,b)=>a.addedAt-b.addedAt);
+    dayPhotosCache.set(d,l); return l;
+  }catch(e){ console.error(e); return []; }
+}
+async function thumbForDay(d){ const l=await photosForDay(d); return l.length ? l[0].thumb : null; }
+// 화면에 보일 때만 불러오기
+function lazy(root, el, fn){
+  const io=new IntersectionObserver(es=>es.forEach(en=>{ if(en.isIntersecting){ io.disconnect(); fn(el); } }), { root, rootMargin:'400px' });
+  io.observe(el); return io;
+}
+
+/* ================= 모아보기 (태그 여러 개 = 모두 입은 날) ================= */
+let look={ filters:[], period:'all' }, lookIOs=[], lookPhotos=new Map();
+const fMatch=f=> f.kind==='brand' ? (t=>brandOf(t)===f.name) : (t=>t===f.name);
+const fLabel=f=> f.kind==='brand' ? `${f.name} (브랜드)` : '#'+f.name;
+function periodLabel(p){ if(p==='all') return '전체 기간'; const [y,m]=p.split('-'); return m?`${y}년 ${+m}월`:`${y}년`; }
+function lookDates(){
+  if(!look.filters.length) return [];
+  return Object.keys(entries).filter(d=>periodMatch(d,look.period) && look.filters.every(f=>(entries[d].tags||[]).some(fMatch(f)))).sort().reverse();
+}
+function coCounts(dates){
+  const c={};
+  for(const d of dates) for(const t of entries[d].tags||[])
+    if(!look.filters.some(f=>f.kind==='item' && f.name===t)) c[t]=(c[t]||0)+1;
+  return c;
+}
+function openLook(filters, period='all'){
+  look={ filters, period };
+  $('lookInput').value=''; hideLookSuggest();
+  renderLook();
+  $('tagSheet').querySelector('.sheet').scrollTop=0;
   openSheet('tagSheet');
 }
-let thumbIO=null;
-const dayThumb=new Map();
-async function thumbForDay(d){
-  const local=(photosByDate()[d]||[])[0]; if(local) return local.thumb;
-  if(dayThumb.has(d)) return dayThumb.get(d);
-  try{
-    const s=await col(C_PHOTO).where('date','==',d).limit(1).get();
-    const t=s.empty?null:s.docs[0].data().thumb; dayThumb.set(d,t); return t;
-  }catch(e){ console.error(e); return null; }
+function addLookFilter(f){
+  if(look.filters.some(x=>x.kind===f.kind && x.name===f.name)) return;
+  look.filters.push(f); renderLook();
 }
+function renderLook(){
+  const dates=lookDates();
+  // 고른 조건
+  const fb=$('lookFilters'); fb.innerHTML='';
+  look.filters.forEach((f,i)=>{
+    const s=document.createElement('span'); s.className='tag filter-chip';
+    s.innerHTML=`${esc(fLabel(f))}<button aria-label="조건 빼기">✕</button>`;
+    s.querySelector('button').onclick=()=>{ look.filters.splice(i,1); renderLook(); };
+    fb.appendChild(s);
+  });
+  if(look.period!=='all'){
+    const s=document.createElement('span'); s.className='tag';
+    s.innerHTML=`📅 ${esc(periodLabel(look.period))}<button aria-label="기간 풀기">✕</button>`;
+    s.querySelector('button').onclick=()=>{ look.period='all'; renderLook(); };
+    fb.appendChild(s);
+  }
+  $('tagTitle').textContent = look.filters.length>1 ? '같이 입은 날 모아보기' : '모아보기';
+  // 요약
+  $('tagInfo').innerHTML = !look.filters.length ? '<span>옷 태그를 골라서 모아보세요</span>'
+    : `<span><b>${dates.length}일</b> 입었어요</span>` + (dates.length?`<span>처음 <b>${fmtKo(dates[dates.length-1],false)}</b></span><span>마지막 <b>${fmtKo(dates[0],false)}</b></span>`:'');
+  // 같이 입은 옷 (누르면 조건에 추가)
+  const c=coCounts(dates), co=$('coTags'); co.innerHTML='';
+  const coList=Object.keys(c).sort((a,b)=>c[b]-c[a]||a.localeCompare(b)).slice(0,40);
+  $('coWrap').classList.toggle('hidden', !coList.length);
+  for(const t of coList){
+    const b=document.createElement('button'); b.className='co-tag';
+    b.innerHTML=`+ #${esc(t)}<span class="k">${c[t]}</span>`;
+    b.onclick=()=>addLookFilter({ kind:'item', name:t });
+    co.appendChild(b);
+  }
+  // 사진 (날짜별, 화면에 보일 때 불러옴)
+  lookIOs.forEach(io=>io.disconnect()); lookIOs=[]; lookPhotos=new Map();
+  const g=$('lookGallery'); g.innerHTML='';
+  if(look.filters.length && !dates.length) g.innerHTML='<div class="empty-msg">이 조합으로 입은 날이 없어요</div>';
+  const root=$('tagSheet').querySelector('.sheet');
+  for(const d of dates){
+    const sec=document.createElement('div'); sec.className='look-day';
+    const h=document.createElement('button'); h.className='look-date'; h.textContent=fmtKo(d)+' ›';
+    h.onclick=()=>{ closeSheet('tagSheet'); openDay(d); };
+    const grid=document.createElement('div'); grid.className='photos';
+    sec.append(h, grid); g.appendChild(sec);
+    lookIOs.push(lazy(root, grid, async el=>{
+      const list=await photosForDay(d);
+      lookPhotos.set(d, list);
+      if(!list.length){ el.innerHTML='<span class="saved">사진 없이 기록한 날</span>'; return; }
+      for(const p of list){
+        const b=document.createElement('button'); b.className='ph';
+        b.innerHTML=`<img src="${p.thumb}" alt="">`;
+        b.onclick=()=>openViewer(p, lookViewerList());
+        el.appendChild(b);
+      }
+    }));
+  }
+  // 태그 하나만 골랐을 때만 이름 바꾸기/삭제
+  const one = look.filters.length===1 && look.filters[0].kind==='item';
+  $('tagActions').classList.toggle('hidden', !one);
+}
+function lookViewerList(){
+  const out=[]; for(const d of lookDates()) out.push(...(lookPhotos.get(d)||[])); return out;
+}
+// 모아보기 입력창 자동완성 (지금 조건과 같이 입은 옷 위주)
+let lookSug=[], lookSugIdx=-1;
+function updateLookSuggest(){
+  const q=normTag($('lookInput').value).toLowerCase();
+  const c = look.filters.length ? coCounts(lookDates()) : tagCounts();
+  const brands = q ? [...new Set(Object.keys(tagCounts()).map(brandOf))].filter(b=>b.toLowerCase().startsWith(q) && !look.filters.some(f=>f.kind==='brand'&&f.name===b)) : [];
+  lookSug = [
+    ...brands.slice(0,3).map(b=>({ kind:'brand', name:b, label:`${b} (브랜드 전체)`, k:'' })),
+    ...Object.keys(c).filter(t=>!q || t.toLowerCase().includes(q))
+      .sort((a,b)=>{ const as=a.toLowerCase().startsWith(q), bs=b.toLowerCase().startsWith(q); return (bs-as)||(c[b]-c[a])||a.localeCompare(b); })
+      .slice(0,30).map(t=>({ kind:'item', name:t, label:'#'+t, k:c[t]+'회' }))
+  ];
+  const box=$('lookSuggest');
+  if(!lookSug.length || document.activeElement!==$('lookInput')){ hideLookSuggest(); return; }
+  lookSugIdx=-1;
+  box.innerHTML=lookSug.map((x,i)=>`<button type="button" data-i="${i}"><span>${esc(x.label)}</span><span class="k">${x.k}</span></button>`).join('');
+  box.classList.remove('hidden');
+}
+function hideLookSuggest(){ $('lookSuggest').classList.add('hidden'); lookSugIdx=-1; }
+function pickLook(x){ addLookFilter({ kind:x.kind, name:x.name }); $('lookInput').value=''; updateLookSuggest(); }
+$('lookSuggest').addEventListener('mousedown', e=>e.preventDefault());
+$('lookSuggest').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) pickLook(lookSug[+b.dataset.i]); });
+$('lookInput').addEventListener('input', updateLookSuggest);
+$('lookInput').addEventListener('focus', updateLookSuggest);
+$('lookInput').addEventListener('blur', ()=>setTimeout(()=>{ if(document.activeElement!==$('lookInput')) hideLookSuggest(); },150));
+$('lookInput').addEventListener('keydown', e=>{
+  const box=$('lookSuggest'), isOpen=!box.classList.contains('hidden');
+  if(isOpen && (e.key==='ArrowDown'||e.key==='ArrowUp')){
+    e.preventDefault(); lookSugIdx=(lookSugIdx+(e.key==='ArrowDown'?1:-1)+lookSug.length)%lookSug.length;
+    [...box.children].forEach((b,i)=>b.classList.toggle('act',i===lookSugIdx)); return;
+  }
+  if(e.key==='Enter'){
+    if(e.isComposing) return;
+    e.preventDefault();
+    if(isOpen && lookSugIdx>=0) return pickLook(lookSug[lookSugIdx]);
+    const t=normTag($('lookInput').value); if(!t) return;
+    const exact=lookSug.find(x=>x.kind==='item' && x.name.toLowerCase()===t.toLowerCase());
+    pickLook(exact || lookSug.find(x=>x.kind==='item') || { kind:'item', name:t });
+  }
+});
+
+/* ================= 옷장 ================= */
+let closetIOs=[];
+function renderCloset(){
+  const c={}, last={};
+  for(const d in entries) for(const t of entries[d].tags||[]){ c[t]=(c[t]||0)+1; if(!last[t]||d>last[t]) last[t]=d; }
+  const q=normTag($('closetSearch').value).toLowerCase();
+  const items=Object.keys(c).filter(t=>!q || t.toLowerCase().includes(q));
+  items.sort({
+    count:(a,b)=>c[b]-c[a]||last[b].localeCompare(last[a]),
+    recent:(a,b)=>last[b].localeCompare(last[a])||c[b]-c[a],
+    stale:(a,b)=>last[a].localeCompare(last[b])||c[b]-c[a],
+    name:(a,b)=>a.localeCompare(b,'ko'),
+  }[$('closetSort').value]);
+  $('closetCount').textContent=`옷 ${items.length}개`;
+  closetIOs.forEach(io=>io.disconnect()); closetIOs=[];
+  const g=$('closetGrid'); g.innerHTML='';
+  if(!Object.keys(c).length){ g.innerHTML='<div class="empty-msg" style="grid-column:1/-1">아직 옷 태그가 없어요.<br>캘린더에서 날짜를 눌러 옷 태그를 달면 여기에 옷장이 생겨요.</div>'; return; }
+  if(!items.length){ g.innerHTML='<div class="empty-msg" style="grid-column:1/-1">검색 결과가 없어요</div>'; return; }
+  for(const t of items){
+    const b=document.createElement('button'); b.className='closet-item';
+    b.innerHTML=`<div class="im"></div><div class="nm">#${esc(t)}</div><div class="c">${c[t]}회 · ${fmtKo(last[t],false)}</div>`;
+    b.onclick=()=>openLook([{ kind:'item', name:t }]);
+    g.appendChild(b);
+    closetIOs.push(lazy(null, b.firstChild, async el=>{ const th=await thumbForDay(last[t]); if(th) el.innerHTML=`<img src="${th}" alt="">`; }));
+  }
+}
+$('closetSearch').oninput=renderCloset;
+$('closetSort').onchange=renderCloset;
+
 // 여러 날짜의 태그를 한 번에 바꿀 때는 batch(최대 500개씩)로 저장
 async function commitEntries(list){
   for(let i=0;i<list.length;i+=450){
@@ -777,7 +989,7 @@ async function commitEntries(list){
   }
 }
 $('renameTagBtn').onclick=()=>{
-  const old=curTag.name;
+  const old=look.filters[0].name;
   const nv=prompt('새 태그 이름 (같은 이름의 태그가 있으면 합쳐져요)', old);
   if(nv===null) return; const t=normTag(nv); if(!t||t===old) return;
   const changed=[];
@@ -790,7 +1002,7 @@ $('renameTagBtn').onclick=()=>{
   closeSheet('tagSheet'); toast(`${changed.length}개 기록의 태그를 #${t}(으)로 바꿨어요`, 3000);
 };
 $('deleteTagBtn').onclick=()=>{
-  const old=curTag.name;
+  const old=look.filters[0].name;
   if(!confirm(`모든 기록에서 #${old} 태그를 뺄까요? (사진과 일기는 그대로예요)`)) return;
   const changed=[];
   for(const d in entries){ const e=entryOf(d); if(!e.tags.includes(old)) continue; e.tags=e.tags.filter(x=>x!==old); changed.push(e); }
@@ -839,8 +1051,10 @@ $('importInput').onchange=async e=>{
 function openSheet(id){ $(id).classList.add('open'); }
 function closeSheet(id){
   if(id==='daySheet'){ flushDiary(); curDay=null; hideSuggest(); }
+  if(id==='tagSheet'){ lookIOs.forEach(io=>io.disconnect()); lookIOs=[]; hideLookSuggest(); }
   $(id).classList.remove('open');
   if(!$('statsView').classList.contains('hidden')) renderStats();
+  if(!$('closetView').classList.contains('hidden')) renderCloset();
 }
 document.querySelectorAll('.sheet-bg').forEach(bg=>{
   bg.addEventListener('click', e=>{ if(e.target===bg || e.target.closest('[data-close]')) closeSheet(bg.id); });
@@ -854,10 +1068,13 @@ let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.class
 
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
-  const s=b.dataset.tab==='stats';
-  $('calView').classList.toggle('hidden',s); $('statsView').classList.toggle('hidden',!s);
-  $('addBtn').classList.toggle('hidden',s);
-  if(s) renderStats(); else renderCal();
+  const t=b.dataset.tab;
+  $('calView').classList.toggle('hidden', t!=='cal');
+  $('closetView').classList.toggle('hidden', t!=='closet');
+  $('statsView').classList.toggle('hidden', t!=='stats');
+  $('addBtn').classList.toggle('hidden', t!=='cal');
+  window.scrollTo(0,0);
+  if(t==='stats') renderStats(); else if(t==='closet') renderCloset(); else renderCal();
 });
 $('prevBtn').onclick=()=>{ if(--view.m<0){view.m=11;view.y--;} renderCal(); };
 $('nextBtn').onclick=()=>{ if(++view.m>11){view.m=0;view.y++;} renderCal(); };
@@ -919,7 +1136,7 @@ function initFirebase(){
   fbAuth.onAuthStateChanged(u=>{
     unsubs.forEach(f=>f()); unsubs=[];
     for(const st of months.values()) if(st.unsub) st.unsub();
-    months.clear(); dayThumb.clear();
+    months.clear(); dayPhotosCache.clear();
     user=u; entries={}; fullCache.clear();
     if(!u){ ['daySheet','tagSheet'].forEach(id=>$(id).classList.remove('open')); closeViewer(); showOnly('loginView'); return; }
     showOnly('loadingView'); renderAccount(); startListening();
