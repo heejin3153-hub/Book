@@ -786,7 +786,7 @@ async function addFiles(files, forced){
     const sig=photoSig(im);
     if(await isDuplicate(date, sig, pending)){ dup++; return; }
     const id=newId(), full=shrinkFull(im), thumb=shrink(im,...THUMB);
-    const meta={ id, date, thumb, sig, source, addedAt:Date.now() };
+    const meta={ id, date, thumb, thumbV:2, sig, source, addedAt:Date.now() };
     fullCache.set(id, full); pending.push(meta);
     const b=fdb.batch();
     b.set(col(C_PHOTO).doc(id), meta);
@@ -911,6 +911,13 @@ function renderDayPhotos(){
   const add=document.createElement('button'); add.className='ph add'; add.textContent='＋'; add.setAttribute('aria-label','사진 추가');
   add.onclick=()=>{ pendingDay=curDay; $('dayFileInput').click(); };
   box.appendChild(add);
+  // 복사한 사진 붙여넣기 (아이폰은 이 버튼을 눌러야 붙여넣기가 허용됨)
+  if(navigator.clipboard && navigator.clipboard.read){
+    const pst=document.createElement('button'); pst.className='ph add'; pst.style.fontSize='13px'; pst.style.flexDirection='column'; pst.style.gap='4px';
+    pst.innerHTML='<span style="font-size:22px">📋</span>붙여넣기';
+    const day=curDay; pst.onclick=()=>pasteFromClipboard(day);
+    box.appendChild(pst);
+  }
 }
 /* ---- 사진 순서 바꾸기 ---- */
 let dayOrd=false;
@@ -938,6 +945,55 @@ $('viewerCover').onclick=async ()=>{
   if($('daySheet').classList.contains('open')) renderDayPhotos();
   toast('대표 사진으로 정했어요 — 캘린더에 이 사진이 보여요', 2500);
 };
+/* ================= 복사한 사진 붙여넣기 ================= */
+async function pasteFromClipboard(day){
+  try{
+    const items=await navigator.clipboard.read(), files=[];
+    for(const it of items){
+      const type=it.types.find(t=>t.startsWith('image/'));
+      if(type){ const blob=await it.getType(type); files.push(new File([blob], `붙여넣은 사진.${type.split('/')[1]||'png'}`, { type, lastModified:Date.now() })); }
+    }
+    if(!files.length){ toast('복사된 사진이 없어요. 사진 앱에서 사진을 "복사"한 뒤 다시 눌러주세요', 3500); return; }
+    addFiles(files, day||undefined);
+  }catch(e){ console.error(e); toast('붙여넣기를 허용해 주세요 (또는 사진을 다시 복사해 주세요)', 3500); }
+}
+// PC: Ctrl/⌘+V 로 붙여넣기 (날짜 화면이 열려 있으면 그 날짜로, 아니면 날짜를 물어봄)
+document.addEventListener('paste', e=>{
+  if(!user || $('appView').classList.contains('hidden')) return;
+  const files=[...(e.clipboardData?.files||[])].filter(f=>f.type.startsWith('image/'));
+  if(!files.length) return;            // 글자 붙여넣기는 그대로
+  e.preventDefault();
+  addFiles(files.map(f=>new File([f], f.name||'붙여넣은 사진.png', { type:f.type, lastModified:Date.now() })), curDay||undefined);
+});
+
+/* ================= 이미 올린 사진의 썸네일을 선명하게 다시 만들기 =================
+   예전(320px) 썸네일을 큰 사진에서 480px로 다시 만듦. 앱을 열면 뒤에서 조금씩 진행하고,
+   다 끝나면 이 기기에서는 다시 하지 않음 (새로 올리는 사진은 처음부터 선명함) */
+let thumbJob=false;
+async function upgradeThumbs(){
+  if(thumbJob || !user) return;
+  const doneKey='ootd-thumbs-v2-'+user.uid;
+  try{ if(localStorage.getItem(doneKey)) return; }catch(e){}
+  thumbJob=true;
+  try{
+    const snap=await col(C_PHOTO).get();
+    const todo=snap.docs.map(d=>d.data()).filter(p=>!(p.thumbV>=2));
+    let n=0;
+    for(const p of todo){
+      if(!user) break;
+      setSync(`썸네일 선명하게 만드는 중 ${++n}/${todo.length}`);
+      try{
+        const fs=await col(C_FULL).doc(p.id).get();       // 메모리에 쌓이지 않게 캐시에 넣지 않음
+        if(!fs.exists) { await col(C_PHOTO).doc(p.id).update({ thumbV:2 }); continue; }
+        const im=await loadImage(await (await fetch(fs.data().data)).blob());
+        await col(C_PHOTO).doc(p.id).update({ thumb:shrink(im,...THUMB), thumbV:2 });
+      }catch(e){ console.error(e); }
+    }
+    if(user){ try{ localStorage.setItem(doneKey,'1'); }catch(e){} }
+  }catch(e){ console.error(e); }
+  thumbJob=false; setSync();
+}
+
 function renderDayTags(){
   const box=$('dayTags'); box.innerHTML='';
   const e=entryOf(curDay);
@@ -1822,7 +1878,7 @@ function renderAccount(){
 }
 function startListening(){
   let gotE=false;
-  const ready=()=>{ if(gotE){ showOnly('appView'); refresh(); } };
+  const ready=()=>{ if(gotE){ showOnly('appView'); refresh(); setTimeout(upgradeThumbs, 3000); } };
   syncMonths();
   unsubs.push(col(C_ENTRY).onSnapshot(s=>{ const m={}; s.forEach(d=>m[d.id]=d.data()); entries=m; gotE=true; ready(); },
     e=>{ console.error(e); toast('기록을 불러오지 못했어요: '+e.code, 5000); gotE=true; ready(); }));
