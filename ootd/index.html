@@ -1227,6 +1227,9 @@ $('diary').addEventListener('input', ()=>{
   clearTimeout(diaryTimer);
   diaryTimer=setTimeout(flushDiary, 800);
 });
+// 앱을 닫거나 다른 앱으로 넘어갈 때도 쓰던 일기를 바로 저장
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushDiary(); });
+window.addEventListener('pagehide', ()=>flushDiary());
 function flushDiary(){
   if(!curDay) return;
   clearTimeout(diaryTimer);
