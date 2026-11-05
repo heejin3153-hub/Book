@@ -81,7 +81,6 @@
   .day .note-dot{ position:absolute; left:50%; bottom:8px; transform:translateX(-50%); width:6px; height:6px; border-radius:50%; background:var(--accent); }
   .grid.loading .day:not(.empty){ animation:pulse 1.1s ease-in-out infinite; }
   @keyframes pulse{ 50%{ opacity:.45; } }
-  .day.hl{ outline:3px solid var(--accent); outline-offset:-3px; }
 
   /* 태그 */
   .tag{ display:inline-flex; align-items:center; gap:4px; background:var(--accent-soft); color:var(--accent-dark); border-radius:8px; padding:6px 9px; font-size:13px; font-weight:600; max-width:100%; word-break:break-all; }
@@ -117,8 +116,6 @@
   .selbar .info{ font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
   .selbar .btn{ border-radius:20px; }
   .fab{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(22px + var(--safe-b)); background:var(--accent); color:#fff; border:none; border-radius:30px; padding:15px 26px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 6px 20px rgba(91,91,214,0.35); z-index:20; white-space:nowrap; }
-  .tools{ display:flex; justify-content:center; gap:8px; margin-top:14px; flex-wrap:wrap; }
-  .chip-btn{ background:var(--surface); border:1.5px solid var(--border-2); color:var(--text-muted); border-radius:20px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; }
   .hint{ margin-top:12px; color:var(--text-muted); font-size:12px; line-height:1.6; text-align:center; }
 
   /* 시트(모달) */
@@ -250,11 +247,6 @@
   .viewer .nav{ position:absolute; top:45%; transform:translateY(-50%); background:rgba(255,255,255,.15); color:#fff; border:none; width:40px; height:56px; border-radius:10px; font-size:26px; cursor:pointer; }
   .viewer .nav.l{ left:8px; } .viewer .nav.r{ right:8px; }
   .viewer .pos{ position:absolute; top:calc(22px + env(safe-area-inset-top,0px)); left:16px; color:#fff; font-size:13px; font-weight:700; }
-  .worn-list{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px; }
-  .worn{ border:none; padding:0; background:none; cursor:pointer; color:var(--text); text-align:left; }
-  .worn .im{ aspect-ratio:3/4; border-radius:10px; overflow:hidden; background:var(--bg); border:1px solid var(--border); }
-  .worn img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .worn .d{ font-size:11px; font-weight:700; margin-top:4px; color:var(--text-muted); }
   .kv{ display:flex; gap:14px; flex-wrap:wrap; font-size:13px; color:var(--text-muted); }
   .kv b{ color:var(--text); }
 
@@ -433,9 +425,8 @@
         <button class="icon-sq" data-close aria-label="닫기">✕</button>
       </div>
     </div>
-    <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn hidden" id="photoPasteBtn">📋 붙여넣기</button><button class="link-btn" id="photoOrdBtn">순서</button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
+    <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn" id="photoOrdBtn">순서</button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
     <div class="photos" id="dayPhotos"></div>
-    <div class="paste-zone hidden" id="pasteZone" contenteditable="true" inputmode="none" aria-label="여기를 길게 눌러 붙여넣기"></div>
     <div class="sec-label"><span>옷 태그 <span style="font-weight:500">· 누르면 이름 수정(모든 기록에 반영), ✕는 이 날에서만 빼기</span></span><span class="saved" id="savedMark"></span></div>
     <div class="tags" id="dayTags"></div>
     <div class="tag-input-wrap">
@@ -483,14 +474,14 @@
 </div>
 
 <!-- 사진 올리기: 고르기 / 붙여넣기 -->
-<div class="sheet-bg" id="addSheet">
+<div class="sheet-bg" id="addSheet" style="z-index:56">
   <div class="sheet" role="dialog" aria-modal="true">
     <div class="sheet-h">
-      <div class="t">사진 올리기</div>
+      <div class="t" id="addTitle">사진 올리기</div>
       <button class="icon-sq" data-close aria-label="닫기">✕</button>
     </div>
     <button class="btn primary" id="addPick" style="width:100%;padding:14px">📷 사진 보관함에서 고르기</button>
-    <div class="sec-label" style="margin-top:18px"><span>📋 복사한 사진 붙여넣기</span><span class="saved">붙여넣으면 날짜를 물어봐요</span></div>
+    <div class="sec-label" style="margin-top:18px"><span>📋 복사한 사진 붙여넣기</span><span class="saved" id="addHint">붙여넣으면 날짜를 물어봐요</span></div>
     <div class="paste-zone" id="addPasteZone" contenteditable="true" inputmode="none" aria-label="여기를 길게 눌러 붙여넣기"></div>
   </div>
 </div>
@@ -994,7 +985,7 @@ function saveEntry(e){
   renderCal();
 }
 function openDay(d){
-  curDay=d; daySel=null; dayOrd=false; syncMonths(); closePasteZone();
+  curDay=d; daySel=null; dayOrd=false; syncMonths();
   $('dayTitle').textContent=fmtKo(d);
   const [pv,nx]=neighborDays(d); $('dayPrev').disabled=!pv; $('dayNext').disabled=!nx;
   renderDayPhotos(); renderDayTags();
@@ -1078,7 +1069,6 @@ function renderDayPhotos(){
   if(daySel) for(const id of [...daySel]) if(!list.some(p=>p.id===id)) daySel.delete(id);
   $('photoOrdBtn').classList.toggle('hidden', list.length<2 || !!daySel);
   // 복사한 사진 붙여넣기 (아이폰은 이 버튼을 눌러야 붙여넣기가 허용됨, PC는 Ctrl+V도 됨)
-  $('photoPasteBtn').classList.toggle('hidden', !(navigator.clipboard && navigator.clipboard.read) || !!daySel || dayOrd);
   $('photoOrdBtn').textContent = dayOrd ? '완료' : '순서';
   $('photoSelBtn').classList.toggle('hidden', !list.length || dayOrd);
   if(dayOrd){
@@ -1108,7 +1098,7 @@ function renderDayPhotos(){
   }
   if(daySel) return;
   const add=document.createElement('button'); add.className='ph add'; add.textContent='＋'; add.setAttribute('aria-label','사진 추가');
-  add.onclick=()=>{ pendingDay=curDay; $('dayFileInput').click(); };
+  add.onclick=()=>openAddSheet(curDay);   // 고르기 / 붙여넣기 선택
   box.appendChild(add);
 }
 /* ---- 사진 순서 바꾸기 ---- */
@@ -1137,37 +1127,20 @@ $('viewerCover').onclick=async ()=>{
   if($('daySheet').classList.contains('open')) renderDayPhotos();
   toast('대표 사진으로 정했어요 — 캘린더에 이 사진이 보여요', 2500);
 };
-/* ================= 복사한 사진 붙여넣기 =================
-   - 아이폰: 사파리는 버튼으로 클립보드를 직접 읽는 걸 막는 경우가 많아서,
-     붙여넣기 칸을 열고 그 칸을 길게 눌러 「붙여넣기」하는 방식 (채팅앱과 같은 방식)
-   - PC: Ctrl/⌘+V 또는 버튼 */
-const isPC=matchMedia('(hover:hover) and (pointer:fine)').matches;
-if(isPC) $('photoPasteBtn').textContent='📋 붙여넣기 (Ctrl+V)';
-$('photoPasteBtn').onclick=()=>{
-  if(isPC && navigator.clipboard && navigator.clipboard.read) return pasteFromClipboard(curDay);
-  openPasteZone();
-};
-function openPasteZone(){
-  const z=$('pasteZone');
-  z.innerHTML=''; z.classList.remove('hidden');
-  z.focus();
-  z.scrollIntoView({ block:'nearest', behavior:'smooth' });
+/* ================= 사진 올리기 창 · 복사한 사진 붙여넣기 =================
+   ＋(날짜 화면) 또는 ＋ 사진 올리기(캘린더)를 누르면: 보관함에서 고르기 / 붙여넣기 칸
+   - 아이폰·아이패드: 붙여넣기 칸을 길게 눌러 「붙여넣기」 (사파리는 버튼으로 클립보드를 읽는 걸 막음)
+   - PC: 어디서든 Ctrl/⌘+V (날짜 화면이면 그 날짜로, 아니면 날짜를 물어봄) */
+let addDay=null;   // 날짜 화면에서 열었으면 그 날짜
+function openAddSheet(day){
+  addDay=day||null;
+  $('addTitle').textContent = addDay ? `${fmtKo(addDay,false)} 사진 추가` : '사진 올리기';
+  $('addHint').textContent = addDay ? '붙여넣으면 이 날짜에 들어가요' : '붙여넣으면 날짜를 물어봐요';
+  $('addPasteZone').innerHTML='';
+  openSheet('addSheet');
 }
-function closePasteZone(){
-  const z=$('pasteZone'); z.innerHTML=''; z.classList.add('hidden'); z.blur();
-  if($('addSheet').classList.contains('open')){ $('addPasteZone').innerHTML=''; $('addPasteZone').blur(); closeSheet('addSheet'); }
-}
-async function pasteFromClipboard(day){
-  try{
-    const items=await navigator.clipboard.read(), files=[];
-    for(const it of items){
-      const type=it.types.find(t=>t.startsWith('image/'));
-      if(type){ const blob=await it.getType(type); files.push(new File([blob], `붙여넣은 사진.${type.split('/')[1]||'png'}`, { type, lastModified:Date.now() })); }
-    }
-    if(!files.length){ toast('복사된 사진이 없어요. 사진 앱에서 사진을 "복사"한 뒤 다시 눌러주세요', 3500); return; }
-    addFiles(files, day||undefined);
-  }catch(e){ console.error(e); openPasteZone(); toast('아래 칸을 길게 눌러 「붙여넣기」를 눌러주세요', 3000); }
-}
+function closeAddSheet(){ $('addPasteZone').innerHTML=''; $('addPasteZone').blur(); if($('addSheet').classList.contains('open')) closeSheet('addSheet'); }
+const pasteDay=()=> $('addSheet').classList.contains('open') ? addDay : curDay;
 // 붙여넣은 내용에서 사진 꺼내기 (items 쪽에만 들어오는 브라우저도 있어서 둘 다 봄)
 function imagesFromClipboard(cd){
   const out=[];
@@ -1178,14 +1151,10 @@ function imagesFromClipboard(cd){
 document.addEventListener('paste', e=>{
   if(!user || $('appView').classList.contains('hidden')) return;
   const files=imagesFromClipboard(e.clipboardData);
-  if(!files.length){
-    // 사진이 파일로 안 오고 붙여넣기 칸에 그림으로만 들어오는 경우는 아래 input 에서 처리
-    if(e.target.closest && e.target.closest('.paste-zone')) return;
-    return;                              // 글자 붙여넣기는 그대로
-  }
+  if(!files.length) return;   // 글자 붙여넣기는 그대로 (붙여넣기 칸에 그림으로만 들어오는 경우는 아래 input 에서 처리)
   e.preventDefault();
-  closePasteZone();
-  addFiles(files, curDay||undefined);
+  const day=pasteDay(); closeAddSheet();
+  addFiles(files, day||undefined);
 });
 // 붙여넣기 칸에 사진이 <img>로 들어온 경우 (일부 아이폰 버전)
 async function onPasteZoneInput(z){
@@ -1193,12 +1162,12 @@ async function onPasteZoneInput(z){
   if(!imgs.length){ if(z.textContent.trim()) { z.innerHTML=''; toast('사진만 붙여넣을 수 있어요', 2000); } return; }
   const files=[];
   for(const im of imgs){
-    try{ const blob=await (await fetch(im.src)).blob(); if(blob.type.startsWith('image/')||blob.size) files.push(new File([blob], '붙여넣은 사진.'+((blob.type.split('/')[1])||'png'), { type:blob.type||'image/png', lastModified:Date.now() })); }catch(err){ console.error(err); }
+    try{ const blob=await (await fetch(im.src)).blob(); if(blob.size) files.push(new File([blob], '붙여넣은 사진.'+((blob.type.split('/')[1])||'png'), { type:blob.type||'image/png', lastModified:Date.now() })); }catch(err){ console.error(err); }
   }
-  closePasteZone();
-  if(files.length) addFiles(files, curDay||undefined); else toast('사진을 가져오지 못했어요. 다시 복사해서 붙여넣어 주세요', 3000);
+  const day=pasteDay(); closeAddSheet();
+  if(files.length) addFiles(files, day||undefined); else toast('사진을 가져오지 못했어요. 다시 복사해서 붙여넣어 주세요', 3000);
 }
-$('pasteZone').addEventListener('input', ()=>onPasteZoneInput($('pasteZone')));
+$('addPasteZone').addEventListener('input', ()=>onPasteZoneInput($('addPasteZone')));
 // 맥 사파리는 입력칸에 커서가 없으면 ⌘+V 를 막음 → 누르는 순간 보이지 않는 칸으로 커서를 옮겨서 받음
 document.addEventListener('keydown', e=>{
   if(!(e.metaKey||e.ctrlKey) || e.key.toLowerCase()!=='v' || !user) return;
@@ -1208,9 +1177,6 @@ document.addEventListener('keydown', e=>{
   setTimeout(()=>{ if(document.activeElement===h){ h.blur(); h.innerHTML=''; } }, 1000);
 }, true);
 $('hiddenPaste').addEventListener('input', ()=>{ const h=$('hiddenPaste'); if(h.querySelector('img')) onPasteZoneInput(h); else h.innerHTML=''; });
-$('addPasteZone').addEventListener('input', ()=>onPasteZoneInput($('addPasteZone')));
-
-$('pasteZone').addEventListener('blur', ()=>setTimeout(()=>{ if(document.activeElement!==$('pasteZone') && !$('pasteZone').querySelector('img')) closePasteZone(); }, 400));
 
 /* ================= 이미 올린 사진의 썸네일을 선명하게 다시 만들기 =================
    예전(320px) 썸네일을 큰 사진에서 480px로 다시 만듦. 앱을 열면 뒤에서 조금씩 진행하고,
@@ -2092,8 +2058,11 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
 $('prevBtn').onclick=()=>{ if(--view.m<0){view.m=11;view.y--;} renderCal(); };
 $('nextBtn').onclick=()=>{ if(++view.m>11){view.m=0;view.y++;} renderCal(); };
 $('todayBtn').onclick=()=>{ const d=new Date(); view={y:d.getFullYear(),m:d.getMonth()}; renderCal(); };
-$('addBtn').onclick=()=>{ $('addPasteZone').innerHTML=''; openSheet('addSheet'); };
-$('addPick').onclick=()=>{ closeSheet('addSheet'); $('fileInput').click(); };
+$('addBtn').onclick=()=>openAddSheet(null);
+$('addPick').onclick=()=>{
+  const d=addDay; closeSheet('addSheet');
+  if(d){ pendingDay=d; $('dayFileInput').click(); } else $('fileInput').click();
+};
 $('fileInput').onchange=e=>{ addFiles(e.target.files); e.target.value=''; };
 $('dayFileInput').onchange=e=>{ const d=pendingDay; pendingDay=null; addFiles(e.target.files, d); e.target.value=''; };
 (()=>{ let sx=null, sy=0; const g=$('grid');
