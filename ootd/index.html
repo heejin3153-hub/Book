@@ -421,7 +421,10 @@
         <div class="t" id="dayTitle"></div>
         <button class="icon-sq day-nav" id="dayNext" aria-label="다음 기록">›</button>
       </div>
-      <button class="icon-sq" data-close aria-label="닫기">✕</button>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="icon-sq" id="delDayBtn" aria-label="이 날 기록 삭제" title="이 날 기록 삭제" style="font-size:15px">🗑</button>
+        <button class="icon-sq" data-close aria-label="닫기">✕</button>
+      </div>
     </div>
     <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn hidden" id="photoPasteBtn">📋 붙여넣기</button><button class="link-btn" id="photoOrdBtn">순서</button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
     <div class="photos" id="dayPhotos"></div>
@@ -433,10 +436,6 @@
     </div>
     <div class="sec-label"><span>일기</span></div>
     <textarea class="diary" id="diary" placeholder="오늘은 어땠나요?"></textarea>
-    <div class="btn-row" style="margin-top:14px; justify-content:space-between">
-      <button class="btn danger" id="delDayBtn">이 날 기록 삭제</button>
-      <button class="btn primary" data-close>완료</button>
-    </div>
     <div id="otdWrap" class="hidden" style="margin-top:28px">
       <div class="sec-label"><span id="otdTitle">📅 과거의 오늘</span><span class="saved" id="otdCount"></span></div>
       <div id="otdList"></div>
