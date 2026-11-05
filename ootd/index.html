@@ -228,6 +228,9 @@
   .otd-more{ background:none; border:none; color:var(--accent); font-size:12px; font-weight:700; padding:4px 0 0; cursor:pointer; font-family:inherit; }
   .otd-tags{ display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
   .otd-tags span{ font-size:11px; font-weight:600; color:var(--accent-dark); background:var(--accent-soft); border-radius:6px; padding:2px 6px; }
+  .tt-item{ display:flex; justify-content:space-between; gap:8px; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid var(--border); padding:11px 6px; font-size:14px; color:var(--text); cursor:pointer; font-family:inherit; word-break:break-all; }
+  .tt-item .k{ color:var(--text-muted); font-size:12px; flex-shrink:0; }
+  .tt-item.on{ background:var(--accent-soft); color:var(--accent-dark); font-weight:700; border-radius:8px; }
   .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
   /* 모아보기 */
   .filter-chip{ background:var(--accent); color:#fff; }
@@ -485,6 +488,21 @@
     <div class="saved" id="srCount" style="margin:0 2px 8px"></div>
     <button class="btn ghost hidden" id="srToTag" style="width:100%;margin-bottom:10px"></button>
     <div id="srList"></div>
+  </div>
+</div>
+
+<!-- 태그로 만들기: 태그 고르기 -->
+<div class="sheet-bg" id="toTagSheet" style="z-index:55">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h">
+      <div class="t" id="ttTitle"></div>
+      <button class="icon-sq" data-close aria-label="닫기">✕</button>
+    </div>
+    <p class="saved" id="ttInfo" style="margin:0 0 12px;line-height:1.6"></p>
+    <input class="tag-input" id="ttInput" placeholder="기존 태그 검색 또는 새 태그 이름" autocomplete="off" autocapitalize="off" enterkeyhint="done">
+    <div class="sec-label"><span>기존 태그에서 고르기</span><span class="saved">자주 쓴 순</span></div>
+    <div id="ttList" style="max-height:38vh;overflow-y:auto"></div>
+    <button class="btn primary" id="ttApply" style="width:100%;margin-top:14px"></button>
   </div>
 </div>
 
@@ -1982,7 +2000,7 @@ document.addEventListener('keydown', e=>{
      && !e.target.closest('input,textarea')){ gotoDay(e.key==='ArrowLeft'?-1:1); return; }
   if(e.key!=='Escape') return;
   if($('viewer').classList.contains('open')) return closeViewer();
-  for(const id of ['searchSheet','menuSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
+  for(const id of ['toTagSheet','searchSheet','menuSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
 let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms); }
 
@@ -2112,17 +2130,43 @@ function updateToTagBtn(){
   btn.classList.toggle('hidden', !hits.length);
   btn.textContent=`🏷 '${ph}'를 태그로 만들기 (${hits.length}일)`;
 }
+// 태그로 만들기: 기존 태그에서 고르거나 새 이름 입력
+let ttPh='';
 $('srToTag').onclick=()=>{
-  const ph=$('diarySearch').value.trim().replace(/^#/,'');
-  const { hits, partial }=toTagPlan(ph); if(!hits.length) return;
-  const name=prompt(`본문의 '${ph}'를 태그로 바꿔요.\n태그 이름을 정하세요 (예: 오빠_반바지_Bottom)`, normTag(ph));
-  if(name===null) return;
-  const tag=normTag(name); if(!tag) return;
-  // 예시: 다른 글이 같이 있는 줄을 우선 보여줌
-  const lines=hits.flatMap(d=>entries[d].text.split('\n').filter(l=>phraseRe(ph).test(l)));
-  const exLine=(lines.find(l=>l.trim().length>ph.length+2) || lines[0] || '').slice(0,60);
-  const after=cleanText(exLine.replace(phraseRe(ph),'$1')) || '(빈 줄은 지워져요)';
-  if(!confirm(`${hits.length}일의 일기에서\n· #${tag} 태그를 붙이고\n· 본문의 '${ph}'를 지울까요?\n\n예) "${exLine}"\n → "${after}"${partial.length?`\n\n※ 다른 글자에 붙어 쓰인 ${partial.length}일은 그대로 둬요`:''}`)) return;
+  ttPh=$('diarySearch').value.trim().replace(/^#/,'');
+  const { hits, partial }=toTagPlan(ttPh); if(!hits.length) return;
+  const lines=hits.flatMap(d=>entries[d].text.split('\n').filter(l=>phraseRe(ttPh).test(l)));
+  const exLine=(lines.find(l=>l.trim().length>ttPh.length+2) || lines[0] || '').slice(0,60);
+  const after=cleanText(exLine.replace(phraseRe(ttPh),'$1')) || '(빈 줄은 지워져요)';
+  $('ttTitle').textContent=`'${ttPh}' → 태그로 만들기`;
+  $('ttInfo').innerHTML=`<b>${hits.length}일</b>의 일기에 태그를 붙이고 본문에서 '${esc(ttPh)}'를 지워요.<br>예) "${esc(exLine)}" → "${esc(after)}"`
+    + (partial.length?`<br><span style="opacity:.8">※ 다른 글자에 붙어 쓰인 ${partial.length}일은 그대로 둬요</span>`:'');
+  $('ttInput').value='';
+  renderTtList();
+  openSheet('toTagSheet');
+};
+function ttChosen(){ return normTag($('ttInput').value) || normTag(ttPh); }
+function renderTtList(){
+  const c=tagCounts(), typed=$('ttInput').value.trim();
+  // 입력한 글자로 찾고, 아무것도 안 쳤으면 검색한 단어와 비슷한 태그를 먼저 보여줌
+  const q = typed || ttPh;
+  let list=Object.keys(c).filter(t=>matchSearch(t, q));
+  if(!typed && list.length<5){   // 비슷한 게 적으면 단어 일부로도 찾아봄 (예: 오빠반바지 → 반바지)
+    const parts=[...new Set([ttPh.slice(-3), ttPh.slice(-2)])].filter(x=>x.length>=2);
+    for(const p of parts) for(const t of Object.keys(c)) if(t.toLowerCase().includes(p.toLowerCase()) && !list.includes(t)) list.push(t);
+  }
+  list.sort((a,b)=>c[b]-c[a]||a.localeCompare(b,'ko'));
+  const chosen=ttChosen(), exists=!!c[chosen];
+  $('ttList').innerHTML = list.slice(0,40).map(t=>`<button class="tt-item${t===chosen?' on':''}" data-t="${esc(t)}"><span>#${esc(t)}</span><span class="k">${c[t]}회</span></button>`).join('')
+    || '<div class="saved" style="padding:8px 2px">비슷한 기존 태그가 없어요. 위에 새 태그 이름을 입력하세요</div>';
+  $('ttApply').textContent = `#${chosen} ${exists?'(기존 태그)':'(새 태그)'} 붙이기`;
+}
+$('ttInput').addEventListener('input', renderTtList);
+$('ttInput').addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); $('ttApply').click(); } });
+$('ttList').addEventListener('click', e=>{ const b=e.target.closest('[data-t]'); if(!b) return; $('ttInput').value=b.dataset.t; renderTtList(); });
+$('ttApply').onclick=()=>{
+  const ph=ttPh, tag=ttChosen(); if(!tag) return;
+  const { hits }=toTagPlan(ph); if(!hits.length){ closeSheet('toTagSheet'); return; }
   const changed=hits.map(d=>{
     const e=entryOf(d);
     e.text=cleanText(e.text.replace(phraseRe(ph),'$1'));
@@ -2131,7 +2175,7 @@ $('srToTag').onclick=()=>{
     return e;
   });
   commitEntries(changed);
-  renderSearch();
+  closeSheet('toTagSheet'); renderSearch();
   toast(`${changed.length}일의 일기에 #${tag} 태그를 붙였어요`, 3000);
 };
 
