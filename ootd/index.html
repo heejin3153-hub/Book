@@ -590,6 +590,8 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<!-- 맥 사파리용: 입력칸이 아닌 곳에서 ⌘+V 를 눌렀을 때 붙여넣기를 받아줄 보이지 않는 칸 -->
+<div id="hiddenPaste" contenteditable="true" aria-hidden="true" tabindex="-1" style="position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none"></div>
 
 <script>
 /* ================= Firebase (독서기록과 같은 프로젝트) =================
@@ -1197,6 +1199,15 @@ async function onPasteZoneInput(z){
   if(files.length) addFiles(files, curDay||undefined); else toast('사진을 가져오지 못했어요. 다시 복사해서 붙여넣어 주세요', 3000);
 }
 $('pasteZone').addEventListener('input', ()=>onPasteZoneInput($('pasteZone')));
+// 맥 사파리는 입력칸에 커서가 없으면 ⌘+V 를 막음 → 누르는 순간 보이지 않는 칸으로 커서를 옮겨서 받음
+document.addEventListener('keydown', e=>{
+  if(!(e.metaKey||e.ctrlKey) || e.key.toLowerCase()!=='v' || !user) return;
+  const a=document.activeElement;
+  if(a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return;   // 입력칸이면 그대로
+  const h=$('hiddenPaste'); h.innerHTML=''; h.focus({ preventScroll:true });
+  setTimeout(()=>{ if(document.activeElement===h){ h.blur(); h.innerHTML=''; } }, 1000);
+}, true);
+$('hiddenPaste').addEventListener('input', ()=>{ const h=$('hiddenPaste'); if(h.querySelector('img')) onPasteZoneInput(h); else h.innerHTML=''; });
 $('addPasteZone').addEventListener('input', ()=>onPasteZoneInput($('addPasteZone')));
 
 $('pasteZone').addEventListener('blur', ()=>setTimeout(()=>{ if(document.activeElement!==$('pasteZone') && !$('pasteZone').querySelector('img')) closePasteZone(); }, 400));
