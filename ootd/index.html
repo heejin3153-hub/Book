@@ -76,6 +76,9 @@
   .day.sun .dn{ color:var(--sun); }
   .day.sat .dn{ color:var(--sat); }
   .day.has .dn{ color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.55); }
+  .drop-on{ outline:3px dashed var(--accent) !important; outline-offset:2px; border-radius:12px; background:var(--accent-soft) !important; }
+  .day.drop-on{ outline-offset:-3px; }
+  .kbd{ display:inline-block; font-size:11px; font-weight:700; border:1px solid var(--border-2); border-bottom-width:2px; border-radius:5px; padding:0 5px; margin:0 1px; background:var(--bg); color:var(--text); }
   .nocover{ display:flex; align-items:center; gap:6px; margin-top:8px; font-size:13px; font-weight:600; cursor:pointer; }
   .nocover input{ width:18px; height:18px; accent-color:var(--accent); }
   .day .cam{ position:absolute; left:50%; bottom:6px; transform:translateX(-50%); font-size:10px; opacity:.7; white-space:nowrap; }
@@ -546,6 +549,15 @@
       <button class="btn ghost" id="importBtn" style="flex:1">⬆️ 백업 불러오기</button>
     </div>
 
+    <div class="sec-label" style="margin-top:22px"><span>키보드 · 아이패드 팁</span></div>
+    <div class="saved" style="line-height:2;color:var(--text)">
+      <span class="kbd">⌘</span><span class="kbd">Enter</span> 다음 날 · <span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">Enter</span> 전날<br>
+      <span class="kbd">←</span><span class="kbd">→</span> 기록 있는 날 넘기기 (글 쓰는 중이 아닐 때)<br>
+      태그 칸이 비었을 때 <span class="kbd">Enter</span> → 일기 칸으로 · <span class="kbd">Esc</span> 입력 빠져나오기 / 닫기<br>
+      <span class="kbd">⌘</span><span class="kbd">V</span> 사진 붙여넣기 · 사진 크게 보기에서 <span class="kbd">⌫</span> 삭제<br>
+      사진 앱에서 사진을 <b>끌어다 놓으면</b> 바로 들어가요 (날짜 화면·캘린더 날짜 칸)
+    </div>
+
     <div class="sec-label" style="margin-top:22px"><span>계정</span></div>
     <div class="account" id="accountRow" style="justify-content:flex-start;margin-top:0"></div>
     <div class="sync" id="syncState" style="text-align:left;margin-top:4px"></div>
@@ -801,7 +813,7 @@ function renderCal(){
   for(let i=0;i<first;i++){ const e=document.createElement('div'); e.className='day empty'; g.appendChild(e); }
   for(let d=1; d<=days; d++){
     const key=`${y}-${pad(m+1)}-${pad(d)}`, list=pm[key]||[], e=entries[key], dow=(first+d-1)%7;
-    const cell=document.createElement('button');
+    const cell=document.createElement('button'); cell.dataset.date=key;
     const showCover=list.length && !noCover(key);
     cell.className='day'+(dow===0?' sun':'')+(dow===6?' sat':'')+(key===today?' today':'')+(showCover?' has':'');
     if(list.length||hasContent(e)) rec++;
@@ -1198,6 +1210,50 @@ document.addEventListener('keydown', e=>{
 }, true);
 $('hiddenPaste').addEventListener('input', ()=>{ const h=$('hiddenPaste'); if(h.querySelector('img')) onPasteZoneInput(h); else h.innerHTML=''; });
 
+/* ================= 키보드로 날짜 넘기기 =================
+   ⌘(Ctrl)+Enter → 다음 날, ⌘(Ctrl)+Shift+Enter → 전날 (기록 없는 날에도 감 — 일기를 하루씩 이어 쓰기 좋게) */
+function shiftDay(d, n){ const [y,m,dd]=d.split('-').map(Number); return ymd(new Date(y, m-1, dd+n)); }
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Enter' || !(e.metaKey||e.ctrlKey) || e.isComposing) return;
+  if(!$('daySheet').classList.contains('open') || !curDay || $('viewer').classList.contains('open')) return;
+  e.preventDefault();
+  flushDiary();
+  const to=shiftDay(curDay, e.shiftKey?-1:1), [yy,mm]=to.split('-').map(Number);
+  view={ y:yy, m:mm-1 }; renderCal(); openDay(to);
+  const sh=$('daySheet').querySelector('.sheet'); sh.scrollTop=0;
+  sh.classList.remove('slide-l','slide-r'); void sh.offsetWidth; sh.classList.add(e.shiftKey?'slide-r':'slide-l');
+  setTimeout(()=>$('diary').focus({ preventScroll:true }), 50);   // 바로 이어서 쓸 수 있게
+});
+
+/* ================= 사진 앱에서 끌어다 놓기 (아이패드 나란히 보기·PC) =================
+   날짜 화면에 놓으면 그 날짜, 캘린더 날짜 칸에 놓으면 그 날짜, 그 밖은 찍은 날짜로 */
+function dropTargetDay(target){
+  const cell=target.closest && target.closest('.day[data-date]');
+  if(cell && !$('daySheet').classList.contains('open')) return cell.dataset.date;
+  if($('daySheet').classList.contains('open')) return curDay;
+  return null;
+}
+let dragHl=null;
+function setDragHl(el){ if(dragHl===el) return; if(dragHl) dragHl.classList.remove('drop-on'); dragHl=el; if(el) el.classList.add('drop-on'); }
+const hasFiles=e=>[...(e.dataTransfer?.types||[])].includes('Files');
+document.addEventListener('dragover', e=>{
+  if(!user || !hasFiles(e)) return;
+  e.preventDefault(); e.dataTransfer.dropEffect='copy';
+  const cell=e.target.closest && e.target.closest('.day[data-date]');
+  setDragHl($('daySheet').classList.contains('open') ? $('dayPhotos') : (cell || null));
+  document.body.classList.add('dragging');
+});
+document.addEventListener('dragleave', e=>{ if(!e.relatedTarget){ setDragHl(null); document.body.classList.remove('dragging'); } });
+document.addEventListener('drop', e=>{
+  if(!user || !hasFiles(e)) return;
+  e.preventDefault();
+  setDragHl(null); document.body.classList.remove('dragging');
+  const files=[...(e.dataTransfer.files||[])].filter(f=>f.type.startsWith('image/')||/\.(hei[cf]|jpe?g|png|webp)$/i.test(f.name));
+  if(!files.length){ toast('사진 파일만 넣을 수 있어요'); return; }
+  const day=dropTargetDay(e.target);
+  addFiles(files, day||undefined);
+});
+
 /* ================= 이미 올린 사진의 썸네일을 선명하게 다시 만들기 =================
    예전(320px) 썸네일을 큰 사진에서 480px로 다시 만듦. 앱을 열면 뒤에서 조금씩 진행하고,
    다 끝나면 이 기기에서는 다시 하지 않음 (새로 올리는 사진은 처음부터 선명함) */
@@ -1288,7 +1344,8 @@ $('tagInput').addEventListener('keydown', e=>{
     if(e.isComposing) return;
     e.preventDefault();
     const v = (isOpen && sugIdx>=0) ? sugItems[sugIdx] : $('tagInput').value;
-    if(normTag(v)) addTags(v);
+    if(!normTag(v)){ hideSuggest(); $('diary').focus(); return; }   // 빈 칸에서 Enter → 일기 쓰기로
+    addTags(v);
     $('tagInput').value=''; updateSuggest();
   }
   if(e.key==='Backspace' && !$('tagInput').value){
@@ -2074,6 +2131,8 @@ document.addEventListener('keydown', e=>{
      && !e.target.closest('input,textarea')){ gotoDay(e.key==='ArrowLeft'?-1:1); return; }
   if(e.key!=='Escape') return;
   if($('viewer').classList.contains('open')) return closeViewer();
+  const a=document.activeElement;
+  if($('daySheet').classList.contains('open') && a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.closest('#daySheet')){ a.blur(); return; }   // 글 쓰는 중이면 입력만 빠져나옴
   for(const id of ['addSheet','toTagSheet','searchSheet','menuSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
 let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms); }
