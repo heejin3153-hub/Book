@@ -484,6 +484,7 @@
     </div>
     <input class="search" id="diarySearch" type="search" placeholder="일기 내용·옷 태그로 검색 (예: 커피, 코트)" autocomplete="off" enterkeyhint="search" style="margin-bottom:6px">
     <div class="saved" id="srCount" style="margin:0 2px 8px"></div>
+    <button class="btn ghost hidden" id="srToTag" style="width:100%;margin-bottom:10px"></button>
     <div id="srList"></div>
   </div>
 </div>
@@ -2059,7 +2060,7 @@ function snippet(text, words, len=90){
 let srTimer;
 function renderSearch(){
   const words=srWords($('diarySearch').value), box=$('srList');
-  if(!words.length){ $('srCount').textContent=''; box.innerHTML='<div class="empty-msg">찾고 싶은 단어를 입력하세요<br>여러 단어를 띄어 쓰면 모두 들어간 날만 찾아요</div>'; return; }
+  if(!words.length){ $('srCount').textContent=''; $('srToTag').classList.add('hidden'); box.innerHTML='<div class="empty-msg">찾고 싶은 단어를 입력하세요<br>여러 단어를 띄어 쓰면 모두 들어간 날만 찾아요</div>'; return; }
   const hits=Object.keys(entries).sort().reverse().filter(d=>{
     const e=entries[d], hay=((e.text||'')+' '+(e.tags||[]).join(' ')).toLowerCase(), flat=hay.replace(/_/g,'');
     return words.every(w=>hay.includes(w) || flat.includes(w));
@@ -2080,8 +2081,58 @@ function renderSearch(){
       </div></div>`;
   }).join('') + (hits.length>300?'<div class="empty-msg">최근 300개까지만 보여요. 단어를 더 넣어 좁혀보세요</div>':'');
   // 보고 있지 않은 달의 대표 사진은 화면에 보일 때 불러옴
-  box.querySelectorAll('.sr-th:empty').forEach(el=>lazy($('searchSheet').querySelector('.sheet'), el, async x=>{ const t=await thumbForDay(x.dataset.d); if(t) x.innerHTML=`<img src="${t}" alt="">`; }));
+  box.querySelectorAll('.sr-th:empty').forEach(el=>lazy($('searchSheet').querySelector('.sheet'), el, async x=>{ const t=await thumbForDay(x.dataset.d); if(t) x.innerHTML=`<img src="${t}" alt="">`; else x.remove(); }));
+  updateToTagBtn();
 }
+/* ---- 본문의 특정 글자를 태그로 만들기 (본문에서는 지움) ----
+   단어가 따로 쓰인 경우만 바꿈 (예: "오빠반바지가" 처럼 붙어 있으면 그대로 둠) */
+const SEP='\\s,/+·|&';
+function phraseRe(ph){ return new RegExp(`(^|[${SEP}])${ph.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(?=$|[${SEP}])`, 'gim'); }
+function cleanText(text){
+  return text.split('\n').map(l=>l.replace(/[ \t]{2,}/g,' ').trim()
+      .replace(/([\/+,·|&])(\s*[\/+,·|&])+/g,'$1')            // 겹친 기호(+ +) 하나로
+      .replace(/^(\s*[\/+,·|&])+\s*/,'').replace(/(\s*[\/+,·|&])+\s*$/,'').trim())   // 앞뒤에 남은 기호 정리
+    .filter(l=>l && !/^[\/+,·|&\-~\s]+$/.test(l)).join('\n');
+}
+function toTagPlan(ph){
+  const re=phraseRe(ph), hits=[], partial=[];
+  for(const d of Object.keys(entries).sort()){
+    const t=entries[d].text||''; if(!t.toLowerCase().includes(ph.toLowerCase())) continue;
+    re.lastIndex=0;
+    if(re.test(t)) hits.push(d); else partial.push(d);
+  }
+  return { hits, partial };
+}
+function updateToTagBtn(){
+  const ph=$('diarySearch').value.trim().replace(/^#/,''), btn=$('srToTag');
+  if(!ph){ btn.classList.add('hidden'); return; }
+  const { hits }=toTagPlan(ph);
+  btn.classList.toggle('hidden', !hits.length);
+  btn.textContent=`🏷 '${ph}'를 태그로 만들기 (${hits.length}일)`;
+}
+$('srToTag').onclick=()=>{
+  const ph=$('diarySearch').value.trim().replace(/^#/,'');
+  const { hits, partial }=toTagPlan(ph); if(!hits.length) return;
+  const name=prompt(`본문의 '${ph}'를 태그로 바꿔요.\n태그 이름을 정하세요 (예: 오빠_반바지_Bottom)`, normTag(ph));
+  if(name===null) return;
+  const tag=normTag(name); if(!tag) return;
+  // 예시: 다른 글이 같이 있는 줄을 우선 보여줌
+  const lines=hits.flatMap(d=>entries[d].text.split('\n').filter(l=>phraseRe(ph).test(l)));
+  const exLine=(lines.find(l=>l.trim().length>ph.length+2) || lines[0] || '').slice(0,60);
+  const after=cleanText(exLine.replace(phraseRe(ph),'$1')) || '(빈 줄은 지워져요)';
+  if(!confirm(`${hits.length}일의 일기에서\n· #${tag} 태그를 붙이고\n· 본문의 '${ph}'를 지울까요?\n\n예) "${exLine}"\n → "${after}"${partial.length?`\n\n※ 다른 글자에 붙어 쓰인 ${partial.length}일은 그대로 둬요`:''}`)) return;
+  const changed=hits.map(d=>{
+    const e=entryOf(d);
+    e.text=cleanText(e.text.replace(phraseRe(ph),'$1'));
+    if(!e.tags.includes(tag)) e.tags.push(tag);
+    e.tags=sortTags(e.tags);
+    return e;
+  });
+  commitEntries(changed);
+  renderSearch();
+  toast(`${changed.length}일의 일기에 #${tag} 태그를 붙였어요`, 3000);
+};
+
 $('searchBtn').onclick=()=>{ renderSearch(); openSheet('searchSheet'); setTimeout(()=>$('diarySearch').focus(), 50); };
 $('diarySearch').addEventListener('input', ()=>{ clearTimeout(srTimer); srTimer=setTimeout(renderSearch, 150); });
 $('srList').addEventListener('click', e=>{
