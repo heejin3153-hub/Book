@@ -214,6 +214,20 @@
   .sr-tags{ font-size:11.5px; color:var(--text-muted); margin-top:4px; word-break:break-all; }
   mark{ background:#ffe066; color:#18181b; border-radius:3px; padding:0 1px; }
   html[data-theme="dark"] mark{ background:#f2c94c; }
+  /* 과거의 오늘 */
+  .otd{ border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:10px; background:var(--bg); }
+  .otd-h{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer; }
+  .otd-h b{ font-size:13px; }
+  .otd-h .ago{ font-size:11px; font-weight:800; color:#fff; background:var(--accent); border-radius:6px; padding:1px 7px; margin-right:6px; }
+  .otd-h .go{ font-size:12px; color:var(--accent); font-weight:700; white-space:nowrap; }
+  .otd-body{ display:flex; gap:10px; }
+  .otd-th{ width:64px; height:85px; border-radius:9px; overflow:hidden; flex-shrink:0; background:var(--surface); border:1px solid var(--border); cursor:pointer; }
+  .otd-th img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .otd-text{ flex:1; min-width:0; font-size:13.5px; line-height:1.6; white-space:pre-wrap; word-break:break-all; }
+  .otd-text.clamp{ display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden; }
+  .otd-more{ background:none; border:none; color:var(--accent); font-size:12px; font-weight:700; padding:4px 0 0; cursor:pointer; font-family:inherit; }
+  .otd-tags{ display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+  .otd-tags span{ font-size:11px; font-weight:600; color:var(--accent-dark); background:var(--accent-soft); border-radius:6px; padding:2px 6px; }
   .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
   /* 모아보기 */
   .filter-chip{ background:var(--accent); color:#fff; }
@@ -422,6 +436,10 @@
     <div class="btn-row" style="margin-top:14px; justify-content:space-between">
       <button class="btn danger" id="delDayBtn">이 날 기록 삭제</button>
       <button class="btn primary" data-close>완료</button>
+    </div>
+    <div id="otdWrap" class="hidden" style="margin-top:28px">
+      <div class="sec-label"><span id="otdTitle">📅 과거의 오늘</span><span class="saved" id="otdCount"></span></div>
+      <div id="otdList"></div>
     </div>
   </div>
 </div>
@@ -944,6 +962,7 @@ function openDay(d){
   renderDayPhotos(); renderDayTags();
   $('diary').value=entryOf(d).text;
   requestAnimationFrame(fitDiary);
+  renderOnThisDay(d);
   $('savedMark').textContent='';
   $('tagInput').value=''; hideSuggest();
   openSheet('daySheet');
@@ -985,6 +1004,36 @@ $('dayNext').onclick=()=>gotoDay(1);
     if(Math.abs(dx)>70 && Math.abs(dx)>Math.abs(dy)*1.8) gotoDay(dx<0?1:-1);
   });
 })();
+/* ---- 과거의 오늘: 같은 월·일의 다른 해 기록 ---- */
+function renderOnThisDay(d){
+  const md=d.slice(5), y=+d.slice(0,4), pm=photosByDate();
+  const days=new Set(Object.keys(entries).filter(x=>x.slice(5)===md && x!==d && hasContent(entries[x])));
+  for(const x in pm) if(x.slice(5)===md && x!==d) days.add(x);
+  const list=[...days].sort().reverse();
+  $('otdWrap').classList.toggle('hidden', !list.length);
+  $('otdCount').textContent = list.length ? `${list.length}개의 기록` : '';
+  $('otdTitle').textContent = list.some(x=>x>d) ? '📅 다른 해의 오늘' : '📅 과거의 오늘';   // 예전 날짜를 볼 때는 이후 해도 같이 보여줌
+  const box=$('otdList'); box.innerHTML='';
+  const root=$('daySheet').querySelector('.sheet');
+  for(const x of list){
+    const e=entries[x]||{tags:[],text:''}, diff=y-+x.slice(0,4);
+    const card=document.createElement('div'); card.className='otd';
+    card.innerHTML=`<div class="otd-h"><div><span class="ago">${diff>0?diff+'년 전':Math.abs(diff)+'년 후'}</span><b>${fmtKo(x)}</b></div><span class="go">이 날 보기 ›</span></div>
+      <div class="otd-body"><div class="otd-th"></div><div style="flex:1;min-width:0">
+        <div class="otd-text clamp">${e.text?esc(e.text):'<span class="saved">일기 없음</span>'}</div>
+        <button class="otd-more hidden">더보기</button>
+        ${(e.tags||[]).length?`<div class="otd-tags">${sortTags(e.tags).map(t=>`<span>#${esc(t)}</span>`).join('')}</div>`:''}
+      </div></div>`;
+    const go=()=>{ flushDiary(); const [yy,mm]=x.split('-').map(Number); view={ y:yy, m:mm-1 }; renderCal(); openDay(x); root.scrollTop=0; };
+    card.querySelector('.otd-h').onclick=go;
+    card.querySelector('.otd-th').onclick=go;
+    const txt=card.querySelector('.otd-text'), more=card.querySelector('.otd-more');
+    more.onclick=()=>{ const open=txt.classList.toggle('clamp'); more.textContent=open?'더보기':'접기'; };
+    box.appendChild(card);
+    requestAnimationFrame(()=>{ if(txt.scrollHeight>txt.clientHeight+2) more.classList.remove('hidden'); });
+    lazy(root, card.querySelector('.otd-th'), async el=>{ const t=await thumbForDay(x); if(t) el.innerHTML=`<img src="${t}" alt="">`; else el.remove(); });   // 사진 없는 날은 칸 없앰
+  }
+}
 function renderDayPhotos(){
   const box=$('dayPhotos'); box.innerHTML='';
   const list=photosByDate()[curDay]||[];
