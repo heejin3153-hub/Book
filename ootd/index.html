@@ -76,6 +76,9 @@
   .day.sun .dn{ color:var(--sun); }
   .day.sat .dn{ color:var(--sat); }
   .day.has .dn{ color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.55); }
+  .nocover{ display:flex; align-items:center; gap:6px; margin-top:8px; font-size:13px; font-weight:600; cursor:pointer; }
+  .nocover input{ width:18px; height:18px; accent-color:var(--accent); }
+  .day .cam{ position:absolute; left:50%; bottom:6px; transform:translateX(-50%); font-size:10px; opacity:.7; white-space:nowrap; }
   .day.today{ border:2px solid var(--accent); }
   .day .cnt{ position:absolute; right:4px; bottom:4px; z-index:1; background:rgba(0,0,0,0.55); color:#fff; font-size:10px; font-weight:700; border-radius:8px; padding:1px 5px; }
   .day .note-dot{ position:absolute; left:50%; bottom:8px; transform:translateX(-50%); width:6px; height:6px; border-radius:50%; background:var(--accent); }
@@ -427,6 +430,7 @@
     </div>
     <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn" id="photoOrdBtn">순서</button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
     <div class="photos" id="dayPhotos"></div>
+    <label class="nocover hidden" id="noCoverRow"><input type="checkbox" id="noCoverChk"> OOTD 안 찍은 날 <span class="saved">(캘린더·옷장에 사진 안 보이기)</span></label>
     <div class="sec-label"><span>옷 태그 <span style="font-weight:500">· 누르면 이름 수정(모든 기록에 반영), ✕는 이 날에서만 빼기</span></span><span class="saved" id="savedMark"></span></div>
     <div class="tags" id="dayTags"></div>
     <div class="tag-input-wrap">
@@ -798,9 +802,12 @@ function renderCal(){
   for(let d=1; d<=days; d++){
     const key=`${y}-${pad(m+1)}-${pad(d)}`, list=pm[key]||[], e=entries[key], dow=(first+d-1)%7;
     const cell=document.createElement('button');
-    cell.className='day'+(dow===0?' sun':'')+(dow===6?' sat':'')+(key===today?' today':'')+(list.length?' has':'');
+    const showCover=list.length && !noCover(key);
+    cell.className='day'+(dow===0?' sun':'')+(dow===6?' sat':'')+(key===today?' today':'')+(showCover?' has':'');
     if(list.length||hasContent(e)) rec++;
-    if(list.length){
+    if(list.length && !showCover){   // OOTD 안 찍은 날: 사진 대신 작은 표시만
+      const c=document.createElement('span'); c.className='cam'; c.textContent='📷'+(list.length>1?list.length:''); cell.appendChild(c);
+    } else if(list.length){
       const im=document.createElement('img'); im.src=list[0].thumb; im.alt=''; im.loading='lazy'; cell.appendChild(im);
       if(list.length>1){ const c=document.createElement('span'); c.className='cnt'; c.textContent=list.length; cell.appendChild(c); }
     } else if(hasContent(e)){ const dot=document.createElement('span'); dot.className='note-dot'; cell.appendChild(dot); }
@@ -972,7 +979,15 @@ function askPhotoDates(files){
 }
 
 /* ================= 하루 기록 시트 ================= */
-function entryOf(d){ const e=entries[d]; return e ? { date:d, tags:[...(e.tags||[])], text:e.text||'' } : { date:d, tags:[], text:'' }; }
+function entryOf(d){
+  const e=entries[d];
+  if(!e) return { date:d, tags:[], text:'' };
+  const o={ date:d, tags:[...(e.tags||[])], text:e.text||'' };
+  if(e.noCover) o.noCover=true;   // OOTD 안 찍은 날 (캘린더·옷장에 사진 안 보임)
+  return o;
+}
+const keepEntry=e=> hasContent(e) || !!e.noCover;
+const noCover=d=> !!(entries[d] && entries[d].noCover);
 // 일기 태그 순서: 아우터 → 탑 → 니트 → 셔츠 → 보텀 → 슈즈 → 백 → 액세서리 → (분류 없는 태그)
 const TAG_ORDER={ outer:0, top:1, knit:2, shirts:3, shirt:3, bottom:4, shoes:5, sneakers:5, boots:5, bag:6, acc:7 };
 function sortTags(tags){
@@ -981,7 +996,7 @@ function sortTags(tags){
 }
 function saveEntry(e){
   e.tags=sortTags(e.tags);
-  if(hasContent(e)){ entries[e.date]=e; save(col(C_ENTRY).doc(e.date).set(e)); }
+  if(keepEntry(e)){ entries[e.date]=e; save(col(C_ENTRY).doc(e.date).set(e)); }
   else if(entries[e.date]){ delete entries[e.date]; save(col(C_ENTRY).doc(e.date).delete()); }
   $('savedMark').textContent='저장됨 ✓';
   renderCal();
@@ -1070,13 +1085,15 @@ function renderDayPhotos(){
   const list=photosByDate()[curDay]||[];
   if(daySel) for(const id of [...daySel]) if(!list.some(p=>p.id===id)) daySel.delete(id);
   $('photoOrdBtn').classList.toggle('hidden', list.length<2 || !!daySel);
+  $('noCoverRow').classList.toggle('hidden', !list.length || !!daySel || dayOrd);
+  $('noCoverChk').checked = noCover(curDay);
   // 복사한 사진 붙여넣기 (아이폰은 이 버튼을 눌러야 붙여넣기가 허용됨, PC는 Ctrl+V도 됨)
   $('photoOrdBtn').textContent = dayOrd ? '완료' : '순서';
   $('photoSelBtn').classList.toggle('hidden', !list.length || dayOrd);
   if(dayOrd){
     list.forEach((p,i)=>{
       const b=document.createElement('div'); b.className='ph ord';
-      b.innerHTML=`<img alt=""><span class="ord-no">${i===0?'⭐ 대표':i+1}</span>
+      b.innerHTML=`<img alt=""><span class="ord-no">${i===0&&!noCover(curDay)?'⭐ 대표':i+1}</span>
         <div class="ord-bar"><button aria-label="앞으로" ${i===0?'disabled':''}>‹</button><button aria-label="뒤로" ${i===list.length-1?'disabled':''}>›</button></div>`;
       sharpen(b.querySelector('img'), p);
       const [l,r]=b.querySelectorAll('.ord-bar button');
@@ -1123,7 +1140,8 @@ $('viewerCover').onclick=async ()=>{
   const p=viewerPhoto; if(!p) return;
   const list=[...await photosForDay(p.date)];
   const i=list.findIndex(x=>x.id===p.id);
-  if(i===0){ toast('이미 대표 사진이에요'); return; }
+  if(noCover(p.date)){ flushDiary(); const e=entryOf(p.date); delete e.noCover; saveEntry(e); }   // 대표를 고르면 'OOTD 안 찍은 날' 해제
+  if(i===0){ renderCal(); if($('daySheet').classList.contains('open')) renderDayPhotos(); toast('대표 사진으로 정했어요 — 캘린더에 이 사진이 보여요', 2500); return; }
   if(i>0){ list.splice(i,1); list.unshift(p); } else list.unshift(p);
   saveOrder(list);
   if($('daySheet').classList.contains('open')) renderDayPhotos();
@@ -1208,6 +1226,12 @@ async function upgradeThumbs(){
   thumbJob=false; setSync();
 }
 
+$('noCoverChk').onchange=()=>{
+  const e=entryOf(curDay); e.text=$('diary').value;
+  if($('noCoverChk').checked) e.noCover=true; else delete e.noCover;
+  saveEntry(e); renderDayPhotos();
+  toast($('noCoverChk').checked ? '캘린더에 이 날 사진이 안 보여요' : '캘린더에 대표 사진이 다시 보여요', 2000);
+};
 function renderDayTags(){
   const box=$('dayTags'); box.innerHTML='';
   const e=entryOf(curDay);
@@ -1534,7 +1558,7 @@ async function photosForDay(d){
     dayPhotosCache.set(d,l); return l;
   }catch(e){ console.error(e); return []; }
 }
-async function thumbForDay(d){ const l=await photosForDay(d); return l.length ? l[0].thumb : null; }
+async function thumbForDay(d){ if(noCover(d)) return null; const l=await photosForDay(d); return l.length ? l[0].thumb : null; }
 // 화면에 보일 때만 불러오기
 function lazy(root, el, fn){
   const io=new IntersectionObserver(es=>es.forEach(en=>{ if(en.isIntersecting){ io.disconnect(); fn(el); } }), { root, rootMargin:'400px' });
@@ -1909,7 +1933,7 @@ async function commitEntries(list){
     const b=fdb.batch();
     for(const e of list.slice(i,i+450)){
       const ref=col(C_ENTRY).doc(e.date);
-      if(hasContent(e)){ entries[e.date]=e; b.set(ref,e); } else { delete entries[e.date]; b.delete(ref); }
+      if(keepEntry(e)){ entries[e.date]=e; b.set(ref,e); } else { delete entries[e.date]; b.delete(ref); }
     }
     save(b.commit());
   }
@@ -2136,7 +2160,7 @@ function renderSearch(){
     const e=entries[d], text=e.text||'';
     const inText=words.some(w=>text.toLowerCase().includes(w));
     const tagHits=(e.tags||[]).filter(t=>words.some(w=>t.toLowerCase().includes(w)||t.toLowerCase().replace(/_/g,'').includes(w)));
-    const th=(pm[d]||[])[0];
+    const th=noCover(d) ? null : (pm[d]||[])[0];
     return `<div class="sr-row" data-d="${d}">
       <div class="sr-th" data-d="${d}">${th?`<img src="${th.thumb}" alt="">`:''}</div>
       <div class="sr-body"><div class="sr-date">${fmtKo(d)}</div>
