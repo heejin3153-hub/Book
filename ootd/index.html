@@ -893,12 +893,14 @@ async function addFiles(files, forced){
   if(!files.length) return;
   toast(`사진 ${files.length}장 처리 중…`, 60000);
   let ok=0, failed=0, dup=0, skipped=0; const dates=new Set(), pending=[], noDate=[];
+  // 선택한 순서 그대로 쌓이게: 올린 시각을 '지금 + 선택 순번'으로 저장 (맨 처음 고른 사진이 앞)
+  const base=Date.now(), orderOf=new Map(files.map((f,i)=>[f,i]));
   // 사진 한 장 저장 (중복이면 건너뜀)
-  const upload=async (im, date, source)=>{
+  const upload=async (im, date, source, f)=>{
     const sig=photoSig(im);
     if(await isDuplicate(date, sig, pending)){ dup++; return; }
     const id=newId(), full=shrinkFull(im), thumb=shrink(im,...THUMB);
-    const meta={ id, date, thumb, thumbV:2, sig, source, addedAt:Date.now() };
+    const meta={ id, date, thumb, thumbV:2, sig, source, addedAt: base + (orderOf.get(f) ?? 0) };
     fullCache.set(id, full); pending.push(meta);
     const b=fdb.batch();
     b.set(col(C_PHOTO).doc(id), meta);
@@ -910,7 +912,7 @@ async function addFiles(files, forced){
     try{
       const ex=forced?null:await readExifDate(f);
       if(!forced && !ex){ noDate.push(f); continue; }   // 촬영일 없는 사진은 나중에 하나씩 물어봄
-      await upload(await loadImage(f), forced||ex, forced?'manual':'exif');
+      await upload(await loadImage(f), forced||ex, forced?'manual':'exif', f);
     }catch(e){ console.error(e); failed++; }
   }
   // 촬영일 정보가 없는 사진: 한 장씩 어떻게 할지 물어보기
@@ -921,7 +923,7 @@ async function addFiles(files, forced){
     for(let i=0;i<noDate.length;i++){
       const a=answers[i];
       if(!a){ skipped++; continue; }
-      try{ await upload(await loadImage(noDate[i]), a.date, a.source); }catch(e){ console.error(e); failed++; }
+      try{ await upload(await loadImage(noDate[i]), a.date, a.source, noDate[i]); }catch(e){ console.error(e); failed++; }
     }
   }
   for(const d of dates) dayPhotosCache.delete(d);
