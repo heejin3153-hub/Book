@@ -318,6 +318,43 @@
   .account{ display:flex; align-items:center; justify-content:center; gap:8px; margin-top:18px; font-size:12px; color:var(--text-muted); }
   .account img{ width:22px; height:22px; border-radius:50%; }
   .sync{ font-size:11px; color:var(--text-muted); text-align:center; margin-top:6px; }
+
+  /* ===== 넓은 화면 (아이패드 가로 등, 폭 1000px 이상): 전체적으로 크게 + 날짜 화면 2단 ===== */
+  @media (min-width:1000px){
+    .wrap{ max-width:1160px; padding:34px 28px 0; }
+    h1.title{ font-size:30px; }
+    .subtitle{ font-size:15px; }
+    .icon-sq{ width:42px; height:42px; font-size:18px; }
+    .tabs{ padding:5px; }
+    .tab{ font-size:16px; padding:12px 8px; }
+    .ym select{ font-size:24px; }
+    .nav-btn{ width:44px; height:44px; font-size:20px; }
+    .month-meta{ font-size:14px; }
+    .weekdays div{ font-size:13px; }
+    .day .dn{ font-size:15px; top:6px; left:8px; }
+    .day .cnt{ font-size:12px; padding:2px 7px; }
+    .day .heart{ font-size:14px; top:5px; right:7px; }
+    .fab{ width:68px; height:68px; font-size:34px; }
+    .search, .tag-input{ font-size:17px; padding:12px 14px; }
+    .sel{ font-size:13.5px; }
+    .tl-name{ font-size:15px; } .tl-sub{ font-size:12.5px; }
+    .closet-item .nm{ font-size:13.5px; }
+    .rank-row .nm{ font-size:15px; }
+    .mt-tag{ font-size:14px; }
+    /* 시트(날짜 화면 등)도 넓게 */
+    .sheet{ max-width:1080px; padding:24px 30px calc(30px + var(--safe-b)); max-height:94vh; max-height:94dvh; }
+    .sheet-h .t{ font-size:22px; }
+    .sec-label{ font-size:12.5px; }
+    .tag{ font-size:15px; padding:7px 11px; }
+    .diary{ font-size:18px; line-height:1.85; padding:16px 18px; }
+    /* 날짜 화면 2단: 왼쪽 사진, 오른쪽 옷 태그·일기 */
+    #daySheet .day-cols{ display:grid; grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr); gap:28px; align-items:start; }
+    #daySheet .day-left{ position:sticky; top:0; }
+    #daySheet .day-left .photos{ grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+    #daySheet .day-tags-label{ margin-top:0; }
+    #daySheet .diary{ min-height:max(320px, 46vh); }
+    .sr-text, .otd-text{ font-size:15px; }
+  }
 </style>
 </head>
 <body>
@@ -468,10 +505,12 @@
         <button class="icon-sq" data-close aria-label="닫기">✕</button>
       </div>
     </div>
+    <div class="day-cols"><div class="day-left">
     <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn" id="photoOrdBtn">순서</button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
     <div class="photos" id="dayPhotos"></div>
     <label class="nocover hidden" id="noCoverRow"><input type="checkbox" id="noCoverChk"> OOTD 안 찍은 날</label>
-    <div class="sec-label"><span>옷 태그</span><span class="saved" id="savedMark"></span></div>
+    </div><div class="day-right">
+    <div class="sec-label day-tags-label"><span>옷 태그</span><span class="saved" id="savedMark"></span></div>
     <div class="tags" id="dayTags"></div>
     <div class="tag-input-wrap">
       <input class="tag-input" id="tagInput" placeholder="#태그 입력 후 엔터 (예: Prada_부츠)" autocomplete="off" autocapitalize="off" enterkeyhint="done">
@@ -479,6 +518,7 @@
     </div>
     <div class="sec-label"><span>일기</span></div>
     <textarea class="diary" id="diary" placeholder="오늘은 어땠나요?"></textarea>
+    </div></div>
     <div id="otdWrap" class="hidden" style="margin-top:28px">
       <div class="sec-label"><span id="otdTitle">📅 과거의 오늘</span><span class="saved" id="otdCount"></span></div>
       <div id="otdList"></div>
