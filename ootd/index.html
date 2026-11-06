@@ -265,6 +265,16 @@
   .crop-box i[data-h="tr"]{ right:-5px; top:-5px; border-left:none; border-bottom:none; cursor:nesw-resize; }
   .crop-box i[data-h="bl"]{ left:-5px; bottom:-5px; border-right:none; border-top:none; cursor:nesw-resize; }
   .crop-box i[data-h="br"]{ right:-5px; bottom:-5px; border-left:none; border-top:none; cursor:nwse-resize; }
+  .crop-mode{ display:flex; background:#222; border-radius:18px; padding:2px; }
+  .crop-mode button{ background:none; border:none; color:#aaa; font-size:13px; font-weight:700; padding:6px 12px; border-radius:16px; cursor:pointer; font-family:inherit; }
+  .crop-mode button.on{ background:#fff; color:#000; }
+  .zoom-view{ position:relative; overflow:hidden; outline:2px solid #fff; box-shadow:0 0 0 9999px rgba(0,0,0,.55); touch-action:none; cursor:grab; }
+  .zoom-view img{ position:absolute; left:0; top:0; max-width:none; max-height:none; transform-origin:0 0; user-select:none; -webkit-user-select:none; pointer-events:none; }
+  .zoom-view::after{ content:''; position:absolute; inset:0; pointer-events:none; background:
+      linear-gradient(to right, transparent 33.2%, rgba(255,255,255,.35) 33.3%, transparent 33.5%, transparent 66.5%, rgba(255,255,255,.35) 66.6%, transparent 66.8%),
+      linear-gradient(to bottom, transparent 33.2%, rgba(255,255,255,.35) 33.3%, transparent 33.5%, transparent 66.5%, rgba(255,255,255,.35) 66.6%, transparent 66.8%); }
+  .zoom-bar{ position:relative; z-index:2; background:#000; display:flex; align-items:center; gap:10px; justify-content:center; padding:4px 20px 0; color:#aaa; font-weight:800; }
+  .zoom-bar input{ width:min(320px, 70vw); accent-color:#fff; }
   .crop-ratios{ display:flex; justify-content:center; gap:6px; padding:10px 12px calc(16px + var(--safe-b)); flex-wrap:wrap; }
   .crop-ratios button{ background:#222; color:#ddd; border:1px solid #444; border-radius:18px; padding:7px 13px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
   .crop-ratios button.on{ background:#fff; color:#000; }
@@ -627,13 +637,17 @@
 
 <!-- 사진 자르기 -->
 <div class="cropper" id="cropper">
-  <div class="crop-top"><button class="btn ghost" id="cropCancel">취소</button><b>사진 자르기</b><button class="btn primary" id="cropSave">저장</button></div>
+  <div class="crop-top"><button class="btn ghost" id="cropCancel">취소</button>
+    <div class="crop-mode" id="cropMode"><button data-m="zoom" class="on">사진 확대</button><button data-m="frame">틀 조절</button></div>
+    <button class="btn primary" id="cropSave">저장</button></div>
   <div class="crop-stage" id="cropStage">
+    <div class="zoom-view hidden" id="zoomView"><img id="zoomImg" alt="" draggable="false"></div>
     <div class="crop-wrap" id="cropWrap">
       <img id="cropImg" alt="" draggable="false">
       <div class="crop-box" id="cropBox"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i></div>
     </div>
   </div>
+  <div class="zoom-bar hidden" id="zoomBar"><span>－</span><input type="range" id="zoomRange" min="1" max="5" step="0.01" value="1"><span>＋</span></div>
   <div class="crop-ratios" id="cropRatios">
     <button data-r="orig" class="on">원본</button><button data-r="free">자유</button><button data-r="0.75">3:4</button><button data-r="0.8">4:5</button><button data-r="1">1:1</button><button data-r="0.5625">9:16</button>
   </div>
@@ -1451,10 +1465,11 @@ $('viewerCrop').onclick=async ()=>{
   await $('cropImg').decode().catch(()=>{});
   const natW=$('cropImg').naturalWidth, natH=$('cropImg').naturalHeight;
   // 기본: 원래 사진 비율 그대로 고정 (가로·세로를 같은 비율로 줄인 틀이라 원본 비율이 유지됨)
-  crop={ p, x:0.05, y:0.05, w:0.9, h:0.9, ratio:natW/natH, natW, natH };
+  crop={ p, x:0, y:0, w:1, h:1, ratio:natW/natH, natW, natH };
   [...$('cropRatios').children].forEach(b=>b.classList.toggle('on', b.dataset.r==='orig'));
+  $('zoomImg').src=$('cropImg').src;
   $('cropper').classList.add('open');
-  requestAnimationFrame(drawCrop);
+  setCropMode('zoom');
 };
 function drawCrop(){
   if(!crop) return;
@@ -1476,9 +1491,82 @@ $('cropRatios').addEventListener('click', e=>{
   const b=e.target.closest('[data-r]'); if(!b||!crop) return;
   [...$('cropRatios').children].forEach(x=>x.classList.toggle('on',x===b));
   crop.ratio = b.dataset.r==='free' ? null : b.dataset.r==='orig' ? crop.natW/crop.natH : +b.dataset.r;
+  if(cropMode==='zoom'){ reframe(); return; }
   if(crop.ratio){ crop.w=0.9; applyRatio(); }
   drawCrop();
 });
+
+/* ---- 사진 확대 모드: 틀은 고정, 사진을 확대·이동해서 맞춤 ---- */
+let cropMode='zoom';
+function frameFr(){ return crop.ratio ? crop.ratio*crop.natH/crop.natW : crop.w/crop.h; }   // 틀 비율 (0~1 단위의 w/h)
+function maxWH(){ const fr=frameFr(); let w=1, h=w/fr; if(h>1){ h=1; w=h*fr; } return { w, h }; }
+function curZoom(){ return maxWH().w/crop.w; }
+// 틀 비율이 바뀌어도 보고 있던 곳(가운데)과 확대 정도를 유지
+function reframe(z){
+  const cx=crop.x+crop.w/2, cy=crop.y+crop.h/2;
+  z = z || Math.max(1, maxWH().w ? (crop.w ? Math.min(maxWH().w/crop.w, maxWH().h/crop.h) : 1) : 1);
+  const { w:mw, h:mh }=maxWH();
+  crop.w=mw/Math.max(1,z); crop.h=mh/Math.max(1,z); crop.x=cx-crop.w/2; crop.y=cy-crop.h/2; clampCrop(); renderZoom();
+}
+function fitMax(){ const { w, h }=maxWH(), cx=crop.x+crop.w/2, cy=crop.y+crop.h/2; crop.w=w; crop.h=h; crop.x=cx-w/2; crop.y=cy-h/2; clampCrop(); }
+function clampCrop(){ crop.x=Math.min(Math.max(crop.x,0),1-crop.w); crop.y=Math.min(Math.max(crop.y,0),1-crop.h); }
+// z배 확대 (ax, ay = 틀 안에서 기준점 0~1, 그 지점이 그대로 있게)
+function setZoom(z, ax=0.5, ay=0.5){
+  z=Math.min(Math.max(z,1),5);
+  const { w:mw, h:mh }=maxWH(), px=crop.x+ax*crop.w, py=crop.y+ay*crop.h;
+  crop.w=mw/z; crop.h=mh/z; crop.x=px-ax*crop.w; crop.y=py-ay*crop.h; clampCrop();
+  renderZoom();
+}
+function renderZoom(){
+  if(!crop || cropMode!=='zoom') return;
+  const st=$('cropStage'), sw=st.clientWidth-32, sh=st.clientHeight-32;
+  const A=(crop.w*crop.natW)/(crop.h*crop.natH);
+  let fw=Math.min(sw, sh*A), fh=fw/A;
+  const v=$('zoomView'); v.style.width=fw+'px'; v.style.height=fh+'px';
+  const k=fw/(crop.w*crop.natW), im=$('zoomImg');
+  im.style.width=crop.natW*k+'px'; im.style.height=crop.natH*k+'px';
+  im.style.transform=`translate(${-crop.x*crop.natW*k}px, ${-crop.y*crop.natH*k}px)`;
+  $('zoomRange').value=curZoom().toFixed(2);
+}
+function setCropMode(m){
+  cropMode=m;
+  [...$('cropMode').children].forEach(b=>b.classList.toggle('on', b.dataset.m===m));
+  $('zoomView').classList.toggle('hidden', m!=='zoom'); $('zoomBar').classList.toggle('hidden', m!=='zoom');
+  $('cropWrap').classList.toggle('hidden', m==='zoom');
+  if(m==='zoom'){ requestAnimationFrame(()=>reframe()); }
+  else requestAnimationFrame(drawCrop);
+}
+$('cropMode').addEventListener('click', e=>{ const b=e.target.closest('[data-m]'); if(b && crop) setCropMode(b.dataset.m); });
+$('zoomRange').addEventListener('input', ()=>setZoom(+$('zoomRange').value));
+window.addEventListener('resize', ()=>{ if(crop) cropMode==='zoom' ? renderZoom() : drawCrop(); });
+(()=>{ // 끌어서 이동 · 두 손가락으로 확대 · 휠(트랙패드)로 확대
+  const v=$('zoomView'), pts=new Map(); let start=null;
+  const rel=(x,y)=>{ const r=v.getBoundingClientRect(); return [(x-r.left)/r.width, (y-r.top)/r.height]; };
+  v.addEventListener('pointerdown', e=>{
+    if(!crop) return; e.preventDefault(); try{ v.setPointerCapture(e.pointerId); }catch(err){}
+    pts.set(e.pointerId,{ x:e.clientX, y:e.clientY });
+    const P=[...pts.values()], r=v.getBoundingClientRect();
+    start={ o:{...crop}, fw:r.width, z:curZoom(),
+      d: P.length>1 ? Math.hypot(P[0].x-P[1].x, P[0].y-P[1].y) : 0,
+      mid: P.length>1 ? rel((P[0].x+P[1].x)/2, (P[0].y+P[1].y)/2) : null, sx:e.clientX, sy:e.clientY };
+  });
+  v.addEventListener('pointermove', e=>{
+    if(!start || !pts.has(e.pointerId)) return;
+    pts.set(e.pointerId,{ x:e.clientX, y:e.clientY });
+    const P=[...pts.values()];
+    if(P.length>1 && start.d){   // 두 손가락: 확대
+      const d=Math.hypot(P[0].x-P[1].x, P[0].y-P[1].y);
+      Object.assign(crop, start.o); setZoom(start.z*d/start.d, start.mid[0], start.mid[1]);
+    } else if(P.length===1){      // 한 손가락: 이동
+      const per=start.o.w/start.fw;   // 화면 1px = 사진의 몇 (0~1 단위)
+      crop.x=start.o.x-(e.clientX-start.sx)*per; crop.y=start.o.y-(e.clientY-start.sy)*per*crop.natW/crop.natH;
+      clampCrop(); renderZoom();
+    }
+  });
+  const up=e=>{ pts.delete(e.pointerId); start=null; if(pts.size===1){ const [id,pt]=[...pts.entries()][0]; start={ o:{...crop}, fw:v.getBoundingClientRect().width, z:curZoom(), d:0, sx:pt.x, sy:pt.y }; } };
+  v.addEventListener('pointerup', up); v.addEventListener('pointercancel', up);
+  v.addEventListener('wheel', e=>{ if(!crop) return; e.preventDefault(); const [ax,ay]=rel(e.clientX,e.clientY); setZoom(curZoom()*Math.exp(-e.deltaY*0.003), ax, ay); }, { passive:false });
+})();
 (()=>{ // 끌기 (손가락·마우스 공통)
   let drag=null;
   $('cropBox').addEventListener('pointerdown', e=>{
