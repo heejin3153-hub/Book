@@ -1543,7 +1543,8 @@ window.addEventListener('resize', ()=>{ if(crop) cropMode==='zoom' ? renderZoom(
   const v=$('zoomView'), pts=new Map(); let start=null;
   const rel=(x,y)=>{ const r=v.getBoundingClientRect(); return [(x-r.left)/r.width, (y-r.top)/r.height]; };
   v.addEventListener('pointerdown', e=>{
-    if(!crop) return; e.preventDefault(); try{ v.setPointerCapture(e.pointerId); }catch(err){}
+    if(!crop || e.pointerType==='touch') return;   // 손가락은 아래 터치 처리에서
+    e.preventDefault(); try{ v.setPointerCapture(e.pointerId); }catch(err){}
     pts.set(e.pointerId,{ x:e.clientX, y:e.clientY });
     const P=[...pts.values()], r=v.getBoundingClientRect();
     start={ o:{...crop}, fw:r.width, z:curZoom(),
@@ -1566,6 +1567,40 @@ window.addEventListener('resize', ()=>{ if(crop) cropMode==='zoom' ? renderZoom(
   const up=e=>{ pts.delete(e.pointerId); start=null; if(pts.size===1){ const [id,pt]=[...pts.entries()][0]; start={ o:{...crop}, fw:v.getBoundingClientRect().width, z:curZoom(), d:0, sx:pt.x, sy:pt.y }; } };
   v.addEventListener('pointerup', up); v.addEventListener('pointercancel', up);
   v.addEventListener('wheel', e=>{ if(!crop) return; e.preventDefault(); const [ax,ay]=rel(e.clientX,e.clientY); setZoom(curZoom()*Math.exp(-e.deltaY*0.003), ax, ay); }, { passive:false });
+
+  // ---- 손가락 (아이폰·아이패드): 한 손가락 이동, 두 손가락 벌리기/오므리기로 확대 ----
+  // 틀 바깥(어두운 부분)에 손가락을 대도 되게 사진 영역 전체에서 받음
+  const stage=$('cropStage'); let t0=null;
+  const begin=touches=>{
+    const T=[...touches];
+    if(!T.length){ t0=null; return; }
+    t0={ o:{...crop}, fw:v.getBoundingClientRect().width, z:curZoom(), n:T.length,
+      sx:T[0].clientX, sy:T[0].clientY,
+      d: T.length>1 ? Math.hypot(T[0].clientX-T[1].clientX, T[0].clientY-T[1].clientY) : 0,
+      mid: T.length>1 ? rel((T[0].clientX+T[1].clientX)/2, (T[0].clientY+T[1].clientY)/2) : null,
+      mx: T.length>1 ? (T[0].clientX+T[1].clientX)/2 : 0, my: T.length>1 ? (T[0].clientY+T[1].clientY)/2 : 0 };
+  };
+  stage.addEventListener('touchstart', e=>{ if(!crop || cropMode!=='zoom') return; e.preventDefault(); begin(e.touches); }, { passive:false });
+  stage.addEventListener('touchmove', e=>{
+    if(!crop || cropMode!=='zoom' || !t0) return; e.preventDefault();
+    const T=[...e.touches];
+    if(T.length>1 && t0.n>1 && t0.d){
+      const d=Math.hypot(T[0].clientX-T[1].clientX, T[0].clientY-T[1].clientY);
+      const mx=(T[0].clientX+T[1].clientX)/2, my=(T[0].clientY+T[1].clientY)/2;
+      Object.assign(crop, t0.o);
+      setZoom(t0.z*d/t0.d, t0.mid[0], t0.mid[1]);
+      // 두 손가락을 함께 움직이면 이동도 같이
+      const per=crop.w/t0.fw; crop.x-= (mx-t0.mx)*per; crop.y-= (my-t0.my)*per*crop.natW/crop.natH; clampCrop(); renderZoom();
+    } else if(T.length===1){
+      const per=t0.o.w/t0.fw;
+      crop.x=t0.o.x-(T[0].clientX-t0.sx)*per; crop.y=t0.o.y-(T[0].clientY-t0.sy)*per*crop.natW/crop.natH;
+      clampCrop(); renderZoom();
+    }
+  }, { passive:false });
+  const tend=e=>{ if(!crop || cropMode!=='zoom') return; begin(e.touches); };   // 손가락 수가 바뀌면 그 상태에서 다시 시작
+  stage.addEventListener('touchend', tend); stage.addEventListener('touchcancel', tend);
+  // 사파리가 두 손가락 동작을 화면 전체 확대로 가져가지 않게
+  ['gesturestart','gesturechange','gestureend'].forEach(t=>document.addEventListener(t, e=>{ if(crop) e.preventDefault(); }, { passive:false }));
 })();
 (()=>{ // 끌기 (손가락·마우스 공통)
   let drag=null;
