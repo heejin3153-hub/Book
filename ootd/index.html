@@ -635,7 +635,7 @@
     </div>
   </div>
   <div class="crop-ratios" id="cropRatios">
-    <button data-r="free" class="on">자유</button><button data-r="0.75">3:4</button><button data-r="0.8">4:5</button><button data-r="1">1:1</button><button data-r="0.5625">9:16</button>
+    <button data-r="orig" class="on">원본</button><button data-r="free">자유</button><button data-r="0.75">3:4</button><button data-r="0.8">4:5</button><button data-r="1">1:1</button><button data-r="0.5625">9:16</button>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -1449,8 +1449,10 @@ $('viewerCrop').onclick=async ()=>{
   const data=await getFull(p.id) || p.thumb;
   $('cropImg').src=data;
   await $('cropImg').decode().catch(()=>{});
-  crop={ p, x:0.05, y:0.05, w:0.9, h:0.9, ratio:null, natW:$('cropImg').naturalWidth, natH:$('cropImg').naturalHeight };
-  [...$('cropRatios').children].forEach(b=>b.classList.toggle('on', b.dataset.r==='free'));
+  const natW=$('cropImg').naturalWidth, natH=$('cropImg').naturalHeight;
+  // 기본: 원래 사진 비율 그대로 고정 (가로·세로를 같은 비율로 줄인 틀이라 원본 비율이 유지됨)
+  crop={ p, x:0.05, y:0.05, w:0.9, h:0.9, ratio:natW/natH, natW, natH };
+  [...$('cropRatios').children].forEach(b=>b.classList.toggle('on', b.dataset.r==='orig'));
   $('cropper').classList.add('open');
   requestAnimationFrame(drawCrop);
 };
@@ -1473,7 +1475,7 @@ function applyRatio(){
 $('cropRatios').addEventListener('click', e=>{
   const b=e.target.closest('[data-r]'); if(!b||!crop) return;
   [...$('cropRatios').children].forEach(x=>x.classList.toggle('on',x===b));
-  crop.ratio = b.dataset.r==='free' ? null : +b.dataset.r;
+  crop.ratio = b.dataset.r==='free' ? null : b.dataset.r==='orig' ? crop.natW/crop.natH : +b.dataset.r;
   if(crop.ratio){ crop.w=0.9; applyRatio(); }
   drawCrop();
 });
