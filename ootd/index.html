@@ -926,7 +926,7 @@ function renderCal(){
     const dn=document.createElement('span'); dn.className='dn'; dn.textContent=d; cell.appendChild(dn);
     if(isLiked(key)){ const h=document.createElement('span'); h.className='heart'; h.textContent='♥'; cell.appendChild(h); }
     cell.setAttribute('aria-label', `${m+1}월 ${d}일${list.length?`, 사진 ${list.length}장`:''}`);
-    cell.onclick=()=>openDay(key);
+    cell.onclick=()=>{ navStack.length=0; openDay(key); };   // 캘린더에서 연 날은 닫으면 캘린더로
     g.appendChild(cell);
   }
   $('monthMeta').innerHTML=`이번 달 <b>${rec}</b>일 기록`;
@@ -1156,7 +1156,7 @@ function renderOnThisDay(d){
         <button class="otd-more hidden">더보기</button>
         ${(e.tags||[]).length?`<div class="otd-tags">${sortTags(e.tags).map(t=>`<span>#${esc(t)}</span>`).join('')}</div>`:''}
       </div></div>`;
-    const go=()=>{ flushDiary(); const [yy,mm]=x.split('-').map(Number); view={ y:yy, m:mm-1 }; renderCal(); openDay(x); root.scrollTop=0; };
+    const go=()=>jumpToDay(x);   // 닫으면 지금 보던 일기로 돌아옴
     card.querySelector('.otd-h').onclick=go;
     card.querySelector('.otd-th').onclick=go;
     const txt=card.querySelector('.otd-text'), more=card.querySelector('.otd-more');
@@ -1987,7 +1987,7 @@ function renderLook(){
   for(const d of dates){
     const sec=document.createElement('div'); sec.className='look-day';
     const h=document.createElement('button'); h.className='look-date'; h.textContent=fmtKo(d)+' ›';
-    h.onclick=()=>{ closeSheet('tagSheet'); openDay(d); };
+    h.onclick=()=>jumpToDay(d);   // 닫으면 모아보기로 돌아옴
     const grid=document.createElement('div'); grid.className='photos';
     sec.append(h, grid); g.appendChild(sec);
     lookIOs.push(lazy(root, grid, async el=>{
@@ -2404,6 +2404,28 @@ $('importInput').onchange=async e=>{
 
 /* ================= 공통 UI ================= */
 function openSheet(id){ $(id).classList.add('open'); }
+/* ---- 다른 날짜로 이동했다가 닫으면 원래 보던 곳으로 돌아오기 ----
+   이 날 보기(과거의 오늘) · 검색 결과 · 모아보기 날짜 → 닫으면 이전 일기/검색/모아보기로 */
+const navStack=[];
+function jumpToDay(d){
+  const sh=id=>$(id).querySelector('.sheet').scrollTop;
+  let from=null;
+  if($('daySheet').classList.contains('open') && curDay){ flushDiary(); from={ type:'day', d:curDay, view:{...view}, scroll:sh('daySheet') }; }
+  else if($('tagSheet').classList.contains('open')){ from={ type:'sheet', id:'tagSheet', view:{...view}, scroll:sh('tagSheet') }; closeSheet('tagSheet'); }
+  else if($('searchSheet').classList.contains('open')){ from={ type:'sheet', id:'searchSheet', view:{...view}, scroll:sh('searchSheet') }; closeSheet('searchSheet'); }
+  if(from) navStack.push(from);
+  const [yy,mm]=d.split('-').map(Number); view={ y:yy, m:mm-1 }; renderCal();
+  openDay(d); $('daySheet').querySelector('.sheet').scrollTop=0;
+}
+function navBack(){
+  const n=navStack.pop(); if(!n) return;
+  view={...n.view}; renderCal();
+  if(n.type==='day') openDay(n.d);
+  else if(n.id==='tagSheet'){ renderLook(); openSheet('tagSheet'); }
+  else if(n.id==='searchSheet'){ renderSearch(); openSheet('searchSheet'); }
+  const el=$(n.type==='day'?'daySheet':n.id).querySelector('.sheet');
+  requestAnimationFrame(()=>{ el.scrollTop=n.scroll||0; });
+}
 function closeSheet(id){
   if(id==='daySheet'){ flushDiary(); curDay=null; daySel=null; hideSuggest(); }
   if(id==='tagSheet'){ lookIOs.forEach(io=>io.disconnect()); lookIOs=[]; hideLookSuggest(); }
@@ -2411,6 +2433,7 @@ function closeSheet(id){
   if(!$('statsView').classList.contains('hidden')) renderStats();
   if(!$('closetView').classList.contains('hidden')) renderCloset();
   if(!$('tagsView').classList.contains('hidden')) renderTagList();
+  if(id==='daySheet' && navStack.length) navBack();   // 이동해 온 날이면 원래 보던 곳으로
 }
 document.querySelectorAll('.sheet-bg').forEach(bg=>{
   if(bg.id==='askDateSheet') return;   // 날짜 묻기 창은 버튼으로만 닫힘
@@ -2616,8 +2639,7 @@ $('srLiked').onclick=()=>{ srLikedOnly=!srLikedOnly; renderSearch(); };
 $('diarySearch').addEventListener('input', ()=>{ clearTimeout(srTimer); srTimer=setTimeout(renderSearch, 150); });
 $('srList').addEventListener('click', e=>{
   const r=e.target.closest('.sr-row'); if(!r) return;
-  const d=r.dataset.d, [yy,mm]=d.split('-').map(Number); view={ y:yy, m:mm-1 };
-  closeSheet('searchSheet'); renderCal(); openDay(d);
+  jumpToDay(r.dataset.d);   // 닫으면 검색 결과로 돌아옴
 });
 
 $('menuBtn').onclick=()=>{
@@ -2681,7 +2703,7 @@ function initFirebase(){
   fbAuth.onAuthStateChanged(u=>{
     unsubs.forEach(f=>f()); unsubs=[];
     for(const st of months.values()) if(st.unsub) st.unsub();
-    months.clear(); dayPhotosCache.clear();
+    months.clear(); dayPhotosCache.clear(); navStack.length=0;
     user=u; entries={}; fullCache.clear();
     if(!u){ ['daySheet','tagSheet'].forEach(id=>$(id).classList.remove('open')); closeViewer(); showOnly('loginView'); return; }
     showOnly('loadingView'); renderAccount(); startListening(); loadCustomCats(); loadTitle();
