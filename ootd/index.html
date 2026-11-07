@@ -307,7 +307,7 @@
   .viewer .src{ width:100%; text-align:center; color:#aaa; font-size:12px; }
   .viewer .x{ position:absolute; top:calc(14px + env(safe-area-inset-top,0px)); right:14px; background:rgba(255,255,255,.15); color:#fff; border:none; width:38px; height:38px; border-radius:50%; font-size:18px; cursor:pointer; }
 
-  .toast{ position:fixed; left:50%; transform:translateX(-50%); top:calc(14px + env(safe-area-inset-top, 0px)); background:var(--text); color:var(--bg); padding:10px 16px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .2s; z-index:90; max-width:calc(100% - 32px); text-align:center; }
+  .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(100px + var(--safe-b)); background:var(--text); color:var(--bg); padding:10px 16px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .2s; z-index:90; max-width:calc(100% - 32px); text-align:center; }
   .toast.show{ opacity:1; }
   .toast{ box-shadow:0 6px 20px rgba(0,0,0,.25); z-index:95; }
 
@@ -2449,7 +2449,13 @@ document.addEventListener('keydown', e=>{
   if($('daySheet').classList.contains('open') && a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.closest('#daySheet')){ a.blur(); return; }   // 글 쓰는 중이면 입력만 빠져나옴
   for(const id of ['addSheet','toTagSheet','searchSheet','menuSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
-let tt; function toast(m, ms=2200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms); }
+let tt; function toast(m, ms=2200){
+  const t=$('toast'); t.textContent=m;
+  // 사진 크게 보기에서는 사진 아래쪽, 버튼 줄 바로 위에 / 그 밖에는 화면 아래쪽(＋ 버튼보다 위)
+  const bar=$('viewer').classList.contains('open') ? $('viewer').querySelector('.bar') : null;
+  t.style.bottom = bar ? (innerHeight - bar.getBoundingClientRect().top + 12)+'px' : '';
+  t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),ms);
+}
 
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
