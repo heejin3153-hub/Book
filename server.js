@@ -7,27 +7,20 @@ const { Jimp } = require('jimp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-// 알라딘 OpenAPI가 2026-10-30부로 완전히 종료되어(errorCode 999) 네이버 책검색 API(검색)와
-// 국립중앙도서관 서지정보 API(seoji, 페이지 수 조회)로 교체함. 둘 다 Aladin만큼 정보가
-// 풍부하진 않아서(표지가 없거나, 카테고리/부제/줄거리/책속에서/실측 책 크기(mm) 정보가 없음)
-// 관련 기능은 값이 없으면 조용히 생략되도록 처리되어 있음.
-const NAVER_CLIENT_ID = process.env.NAVER_CLIENT_ID;
-const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET;
+// 알라딘 OpenAPI가 2026-10-30부로 완전히 종료되어(errorCode 999) 대체 API로 교체함.
+// 네이버 책검색도 2026-07-31부로 신규 발급이 끊겨서(개발자센터에 '검색' 메뉴 자체가
+// 사라짐 - 쇼핑/책/전문자료 검색은 API HUB로도 이관 안 되고 그냥 종료됨) 책 검색은
+// 카카오 책검색 API로, 페이지 수 조회는 국립중앙도서관 서지정보 API(seoji)로 교체함.
+// 둘 다 Aladin만큼 정보가 풍부하진 않아서(카테고리/부제/줄거리/책속에서/실측 책 크기(mm)
+// 정보가 없음) 관련 기능은 값이 없으면 조용히 생략되도록 처리되어 있음.
+const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY;
 const SEOJI_CERT_KEY = process.env.SEOJI_CERT_KEY;
 const YES24_API_KEY = process.env.YES24_API_KEY;
-
-// 네이버 검색 결과 title/author 등에 섞여 오는 <b>강조</b> 태그와 HTML 엔티티 제거
-function stripNaverHtml(s) {
-  return (s || '')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .trim();
-}
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// 책 검색 API (네이버 책검색)
+// 책 검색 API (카카오 책검색)
 app.get('/api/search', async (req, res) => {
   const { query } = req.query;
 
@@ -35,42 +28,39 @@ app.get('/api/search', async (req, res) => {
     return res.status(400).json({ error: '검색어를 입력해주세요.' });
   }
 
-  if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
+  if (!KAKAO_REST_API_KEY) {
     return res.status(500).json({
-      error: 'NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다. .env 파일을 확인해주세요.'
+      error: 'KAKAO_REST_API_KEY가 설정되지 않았습니다. .env 파일을 확인해주세요.'
     });
   }
 
   try {
-    const url = `https://openapi.naver.com/v1/search/book.json?query=${encodeURIComponent(query)}&display=20`;
+    const url = `https://dapi.kakao.com/v3/search/book?query=${encodeURIComponent(query)}&size=20`;
     const response = await fetch(url, {
-      headers: {
-        'X-Naver-Client-Id': NAVER_CLIENT_ID,
-        'X-Naver-Client-Secret': NAVER_CLIENT_SECRET
-      }
+      headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` }
     });
     const data = await response.json();
 
-    if (data.errorMessage) {
-      console.error('네이버 검색 API 오류:', data.errorCode, data.errorMessage);
-      return res.status(502).json({ error: `네이버 API 오류(${data.errorCode}): ${data.errorMessage}` });
+    if (data.errorType) {
+      console.error('카카오 검색 API 오류:', data.errorType, data.message);
+      return res.status(502).json({ error: `카카오 API 오류: ${data.message || data.errorType}` });
     }
 
-    if (!data.items) {
+    if (!data.documents) {
       return res.json({ books: [] });
     }
 
     // ISBN이 있어야 이후 상세조회(페이지 수 등)가 가능해서, ISBN 없는 결과는 제외
-    const books = data.items.map(item => {
+    const books = data.documents.map(item => {
       const isbns = (item.isbn || '').trim().split(/\s+/).filter(Boolean);
       const isbn13 = isbns.find(n => n.length === 13) || isbns[isbns.length - 1] || '';
       return {
-        title: stripNaverHtml(item.title),
-        author: stripNaverHtml(item.author).replace(/\^/g, ', '),
+        title: item.title,
+        author: (item.authors || []).join(', '),
         isbn: isbn13,
         publisher: item.publisher,
-        pubDate: item.pubdate,
-        cover: item.image,
+        pubDate: (item.datetime || '').slice(0, 10),
+        cover: item.thumbnail,
         itemId: isbn13,
         categoryName: ''
       };
@@ -269,8 +259,8 @@ app.get('/api/image-proxy', async (req, res) => {
   try {
     const parsed = new URL(url);
     const allowedHosts = ['image.aladin.co.kr', 'www.aladin.co.kr', 'image1.aladin.co.kr', 'image2.aladin.co.kr', 'image3.aladin.co.kr', 'image4.aladin.co.kr', 'image.yes24.com'];
-    // bookthumb-phinf.pstatic.net 등 네이버 책검색 표지 이미지 CDN
-    const isAllowed = allowedHosts.some(h => parsed.hostname === h) || parsed.hostname.endsWith('.aladin.co.kr') || parsed.hostname.endsWith('.yes24.com') || parsed.hostname.endsWith('.pstatic.net');
+    // search1.daumcdn.net / search1.kakaocdn.net 등 카카오 책검색 표지 이미지 CDN
+    const isAllowed = allowedHosts.some(h => parsed.hostname === h) || parsed.hostname.endsWith('.aladin.co.kr') || parsed.hostname.endsWith('.yes24.com') || parsed.hostname.endsWith('.daumcdn.net') || parsed.hostname.endsWith('.kakaocdn.net');
     if (!isAllowed) return res.status(400).send('허용되지 않은 도메인입니다.');
 
     const imgRes = await fetch(url);
