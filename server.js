@@ -10,11 +10,12 @@ const PORT = process.env.PORT || 3000;
 // 알라딘 OpenAPI가 2026-10-30부로 완전히 종료되어(errorCode 999) 대체 API로 교체함.
 // 네이버 책검색도 2026-07-31부로 신규 발급이 끊겨서(개발자센터에 '검색' 메뉴 자체가
 // 사라짐 - 쇼핑/책/전문자료 검색은 API HUB로도 이관 안 되고 그냥 종료됨) 책 검색은
-// 카카오 책검색 API로, 페이지 수 조회는 국립중앙도서관 서지정보 API(seoji)로 교체함.
-// 둘 다 Aladin만큼 정보가 풍부하진 않아서(카테고리/부제/줄거리/책속에서/실측 책 크기(mm)
+// 카카오 책검색 API로 교체함. 페이지 수 조회는 국립중앙도서관 쪽 API들(소장자료 검색
+// Open API, 서지정보유통지원시스템 seoji)이 가입 절차가 복잡하거나 원하는 필드(PAGE)가
+// 없거나 해서, 가입 없이 바로 쓸 수 있는 Google Books API(ISBN 조회)로 교체함.
+// 다들 Aladin만큼 정보가 풍부하진 않아서(카테고리/부제/줄거리/책속에서/실측 책 크기(mm)
 // 정보가 없음) 관련 기능은 값이 없으면 조용히 생략되도록 처리되어 있음.
 const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY;
-const SEOJI_CERT_KEY = process.env.SEOJI_CERT_KEY;
 const YES24_API_KEY = process.env.YES24_API_KEY;
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -73,16 +74,10 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// 책 상세 정보(주로 페이지 수) 조회 API - 국립중앙도서관 서지정보(seoji) API, ISBN으로 조회
+// 책 상세 정보(주로 페이지 수) 조회 API - Google Books API, ISBN으로 조회 (가입/키 불필요)
 // :itemId 자리에는 /api/search가 돌려준 isbn13이 들어옴(예전 알라딘 itemId와 이름만 같음)
 app.get('/api/detail/:itemId', async (req, res) => {
   const isbn = req.params.itemId;
-
-  if (!SEOJI_CERT_KEY) {
-    return res.status(500).json({
-      error: 'SEOJI_CERT_KEY가 설정되지 않았습니다.'
-    });
-  }
 
   const empty = {
     pages: 0, cover: '', isbn, publisher: '', categoryName: '',
@@ -91,31 +86,31 @@ app.get('/api/detail/:itemId', async (req, res) => {
   };
 
   try {
-    const url = `https://www.nl.go.kr/seoji/SearchApi.do?cert_key=${SEOJI_CERT_KEY}&result_style=json&page_no=1&page_size=1&isbn=${encodeURIComponent(isbn)}`;
+    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}`;
 
     const response = await fetch(url);
     const data = await response.json();
-    const docs = data.docs || [];
+    const item = (data.items || [])[0];
 
-    if (docs.length === 0) {
-      // 서지정보가 없어도 치명적이진 않음 - 검색 결과에서 가져온 기본 정보로 책을 추가할 순 있어서 빈 값으로 응답
+    if (!item) {
+      // 못 찾아도 치명적이진 않음 - 검색 결과에서 가져온 기본 정보로 책을 추가할 순 있어서 빈 값으로 응답
       return res.json(empty);
     }
 
-    const book = docs[0];
-    // PAGE 필드가 "215" 처럼 숫자만 오거나 "215 p." 처럼 단위가 붙어 오기도 해서 숫자만 추출
-    const pageMatch = (book.PAGE || '').match(/\d+/);
+    const info = item.volumeInfo || {};
 
     res.json({
       ...empty,
-      title: book.TITLE || '',
-      author: book.AUTHOR || '',
-      pages: pageMatch ? Number(pageMatch[0]) : 0,
-      cover: book.TITLE_URL || '',
-      isbn: book.EA_ISBN || isbn,
-      publisher: book.PUBLISHER || '',
-      // 국립중앙도서관 API는 실측 책 두께(mm)·카테고리·부제/원제/줄거리/책속에서를 제공하지 않음
-      fullDescription: (book.BOOK_INTRODUCTION || '').replace(/<[^>]*>/g, '').trim()
+      title: info.title || '',
+      author: (info.authors || []).join(', '),
+      pages: info.pageCount || 0,
+      // 표지는 일부러 비워둠 - 구글북스 표지는 한국 책의 경우 품질이 떨어지거나 없는
+      // 경우가 많아서, 검색 결과(카카오)에서 이미 가져온 표지를 덮어쓰지 않게 함
+      cover: '',
+      isbn,
+      publisher: info.publisher || '',
+      // Google Books는 실측 책 두께(mm)·카테고리·부제/원제/줄거리/책속에서를 제공하지 않음
+      fullDescription: info.description || ''
     });
   } catch (error) {
     console.error('상세 조회 오류:', error);
