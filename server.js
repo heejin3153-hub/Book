@@ -7,13 +7,27 @@ const { Jimp } = require('jimp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const TTB_KEY = process.env.ALADIN_TTB_KEY;
+// 알라딘 OpenAPI가 2026-10-30부로 완전히 종료되어(errorCode 999) 네이버 책검색 API(검색)와
+// 국립중앙도서관 서지정보 API(seoji, 페이지 수 조회)로 교체함. 둘 다 Aladin만큼 정보가
+// 풍부하진 않아서(표지가 없거나, 카테고리/부제/줄거리/책속에서/실측 책 크기(mm) 정보가 없음)
+// 관련 기능은 값이 없으면 조용히 생략되도록 처리되어 있음.
+const NAVER_CLIENT_ID = process.env.NAVER_CLIENT_ID;
+const NAVER_CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET;
+const SEOJI_CERT_KEY = process.env.SEOJI_CERT_KEY;
 const YES24_API_KEY = process.env.YES24_API_KEY;
+
+// 네이버 검색 결과 title/author 등에 섞여 오는 <b>강조</b> 태그와 HTML 엔티티 제거
+function stripNaverHtml(s) {
+  return (s || '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .trim();
+}
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// 책 검색 API (국내도서만, e-book 제외)
+// 책 검색 API (네이버 책검색)
 app.get('/api/search', async (req, res) => {
   const { query } = req.query;
 
@@ -21,39 +35,46 @@ app.get('/api/search', async (req, res) => {
     return res.status(400).json({ error: '검색어를 입력해주세요.' });
   }
 
-  if (!TTB_KEY) {
+  if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
     return res.status(500).json({
-      error: 'ALADIN_TTB_KEY가 설정되지 않았습니다. .env 파일을 확인해주세요.'
+      error: 'NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다. .env 파일을 확인해주세요.'
     });
   }
 
   try {
-    // SearchTarget=Book -> 국내도서만 검색 (eBook, Foreign 제외)
-    const url = `https://www.aladin.co.kr/ttb/api/ItemSearch.aspx?ttbkey=${TTB_KEY}&Query=${encodeURIComponent(query)}&QueryType=Title&MaxResults=10&start=1&SearchTarget=Book&output=js&Version=20131101`;
-
-    const response = await fetch(url);
+    const url = `https://openapi.naver.com/v1/search/book.json?query=${encodeURIComponent(query)}&display=20`;
+    const response = await fetch(url, {
+      headers: {
+        'X-Naver-Client-Id': NAVER_CLIENT_ID,
+        'X-Naver-Client-Secret': NAVER_CLIENT_SECRET
+      }
+    });
     const data = await response.json();
 
-    if (data.errorCode) {
-      console.error('알라딘 검색 API 오류:', data.errorCode, data.errorMessage);
-      return res.status(502).json({ error: `알라딘 API 오류(${data.errorCode}): ${data.errorMessage || '알 수 없는 오류'}` });
+    if (data.errorMessage) {
+      console.error('네이버 검색 API 오류:', data.errorCode, data.errorMessage);
+      return res.status(502).json({ error: `네이버 API 오류(${data.errorCode}): ${data.errorMessage}` });
     }
 
-    if (!data.item) {
+    if (!data.items) {
       return res.json({ books: [] });
     }
 
-    // 필요한 정보만 추려서 반환
-    const books = data.item.map(book => ({
-      title: book.title,
-      author: book.author,
-      isbn: book.isbn13 || book.isbn,
-      publisher: book.publisher,
-      pubDate: book.pubDate,
-      cover: book.cover,
-      itemId: book.itemId,
-      categoryName: book.categoryName || ''
-    }));
+    // ISBN이 있어야 이후 상세조회(페이지 수 등)가 가능해서, ISBN 없는 결과는 제외
+    const books = data.items.map(item => {
+      const isbns = (item.isbn || '').trim().split(/\s+/).filter(Boolean);
+      const isbn13 = isbns.find(n => n.length === 13) || isbns[isbns.length - 1] || '';
+      return {
+        title: stripNaverHtml(item.title),
+        author: stripNaverHtml(item.author).replace(/\^/g, ', '),
+        isbn: isbn13,
+        publisher: item.publisher,
+        pubDate: item.pubdate,
+        cover: item.image,
+        itemId: isbn13,
+        categoryName: ''
+      };
+    }).filter(b => b.isbn);
 
     res.json({ books });
   } catch (error) {
@@ -62,62 +83,53 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// 책 상세 정보 (페이지 수 포함) 조회 API
+// 책 상세 정보(주로 페이지 수) 조회 API - 국립중앙도서관 서지정보(seoji) API, ISBN으로 조회
+// :itemId 자리에는 /api/search가 돌려준 isbn13이 들어옴(예전 알라딘 itemId와 이름만 같음)
 app.get('/api/detail/:itemId', async (req, res) => {
-  const { itemId } = req.params;
+  const isbn = req.params.itemId;
 
-  if (!TTB_KEY) {
+  if (!SEOJI_CERT_KEY) {
     return res.status(500).json({
-      error: 'ALADIN_TTB_KEY가 설정되지 않았습니다.'
+      error: 'SEOJI_CERT_KEY가 설정되지 않았습니다.'
     });
   }
 
+  const empty = {
+    pages: 0, cover: '', isbn, publisher: '', categoryName: '',
+    depthMm: null, heightMm: null, widthMm: null,
+    subTitle: '', originalTitle: '', fullDescription: '', story: '', phraseList: []
+  };
+
   try {
-    const url = `https://www.aladin.co.kr/ttb/api/ItemLookUp.aspx?ttbkey=${TTB_KEY}&itemId=${itemId}&itemIdType=ItemId&output=js&Version=20131101&OptResult=packing,fullDescription,story,phraseList`;
+    const url = `https://www.nl.go.kr/seoji/SearchApi.do?cert_key=${SEOJI_CERT_KEY}&result_style=json&page_no=1&page_size=1&isbn=${encodeURIComponent(isbn)}`;
 
     const response = await fetch(url);
     const data = await response.json();
+    const docs = data.docs || [];
 
-    if (data.errorCode) {
-      console.error('알라딘 상세조회 API 오류:', data.errorCode, data.errorMessage);
-      return res.status(502).json({ error: `알라딘 API 오류(${data.errorCode}): ${data.errorMessage || '알 수 없는 오류'}` });
+    if (docs.length === 0) {
+      // 서지정보가 없어도 치명적이진 않음 - 검색 결과에서 가져온 기본 정보로 책을 추가할 순 있어서 빈 값으로 응답
+      return res.json(empty);
     }
 
-    if (!data.item || data.item.length === 0) {
-      return res.status(404).json({ error: '책을 찾을 수 없습니다.' });
-    }
-
-    const book = data.item[0];
-    const subInfo = book.subInfo || {};
-    // subInfo.itemPage에 페이지 수가 들어있음
-    const pages = subInfo.itemPage ? subInfo.itemPage : 0;
-    // subInfo.packing에 실제 책 크기(mm)가 들어있음 - 없는 책도 있음
-    const packing = subInfo.packing || null;
-    // 책속에서(인용구) 코너 - 페이지 번호 + 문구
-    const phraseList = Array.isArray(subInfo.phraseList)
-      ? subInfo.phraseList.map(p => ({ pageNo: p.pageNo || '', phrase: (p.phrase || '').replace(/<[^>]*>/g, '').trim() })).filter(p => p.phrase)
-      : [];
+    const book = docs[0];
+    // PAGE 필드가 "215" 처럼 숫자만 오거나 "215 p." 처럼 단위가 붙어 오기도 해서 숫자만 추출
+    const pageMatch = (book.PAGE || '').match(/\d+/);
 
     res.json({
-      title: book.title,
-      author: book.author,
-      pages: pages,
-      cover: book.cover,
-      isbn: book.isbn13 || book.isbn || '',
-      publisher: book.publisher,
-      categoryName: book.categoryName || '',
-      depthMm: packing && packing.sizeDepth ? Number(packing.sizeDepth) : null,   // 두께
-      heightMm: packing && packing.sizeHeight ? Number(packing.sizeHeight) : null, // 세로(책등 길이)
-      widthMm: packing && packing.sizeWidth ? Number(packing.sizeWidth) : null,    // 가로
-      subTitle: subInfo.subTitle || '',
-      originalTitle: subInfo.originalTitle || '',
-      fullDescription: book.fullDescription || book.description || '',
-      story: subInfo.story || '',
-      phraseList
+      ...empty,
+      title: book.TITLE || '',
+      author: book.AUTHOR || '',
+      pages: pageMatch ? Number(pageMatch[0]) : 0,
+      cover: book.TITLE_URL || '',
+      isbn: book.EA_ISBN || isbn,
+      publisher: book.PUBLISHER || '',
+      // 국립중앙도서관 API는 실측 책 두께(mm)·카테고리·부제/원제/줄거리/책속에서를 제공하지 않음
+      fullDescription: (book.BOOK_INTRODUCTION || '').replace(/<[^>]*>/g, '').trim()
     });
   } catch (error) {
     console.error('상세 조회 오류:', error);
-    res.status(500).json({ error: '상세 정보 조회 중 오류가 발생했습니다.' });
+    res.json(empty);
   }
 });
 
@@ -257,7 +269,8 @@ app.get('/api/image-proxy', async (req, res) => {
   try {
     const parsed = new URL(url);
     const allowedHosts = ['image.aladin.co.kr', 'www.aladin.co.kr', 'image1.aladin.co.kr', 'image2.aladin.co.kr', 'image3.aladin.co.kr', 'image4.aladin.co.kr', 'image.yes24.com'];
-    const isAllowed = allowedHosts.some(h => parsed.hostname === h) || parsed.hostname.endsWith('.aladin.co.kr') || parsed.hostname.endsWith('.yes24.com');
+    // bookthumb-phinf.pstatic.net 등 네이버 책검색 표지 이미지 CDN
+    const isAllowed = allowedHosts.some(h => parsed.hostname === h) || parsed.hostname.endsWith('.aladin.co.kr') || parsed.hostname.endsWith('.yes24.com') || parsed.hostname.endsWith('.pstatic.net');
     if (!isAllowed) return res.status(400).send('허용되지 않은 도메인입니다.');
 
     const imgRes = await fetch(url);
