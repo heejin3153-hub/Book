@@ -34,6 +34,11 @@ app.get('/api/search', async (req, res) => {
     const response = await fetch(url);
     const data = await response.json();
 
+    if (data.errorCode) {
+      console.error('알라딘 검색 API 오류:', data.errorCode, data.errorMessage);
+      return res.status(502).json({ error: `알라딘 API 오류(${data.errorCode}): ${data.errorMessage || '알 수 없는 오류'}` });
+    }
+
     if (!data.item) {
       return res.json({ books: [] });
     }
@@ -72,6 +77,11 @@ app.get('/api/detail/:itemId', async (req, res) => {
 
     const response = await fetch(url);
     const data = await response.json();
+
+    if (data.errorCode) {
+      console.error('알라딘 상세조회 API 오류:', data.errorCode, data.errorMessage);
+      return res.status(502).json({ error: `알라딘 API 오류(${data.errorCode}): ${data.errorMessage || '알 수 없는 오류'}` });
+    }
 
     if (!data.item || data.item.length === 0) {
       return res.status(404).json({ error: '책을 찾을 수 없습니다.' });
