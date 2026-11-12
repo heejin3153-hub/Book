@@ -146,9 +146,9 @@
      나눠 책을 세워서 꽂음. 단 사이 선반은 배경 그라데이션으로만 표현해서(실제 DOM을
      여러 단으로 안 나눠도 됨) 책이 늘어나면 flex-wrap이 알아서 다음 단으로 넘김 */
   .bookcase{ background:var(--case-frame); border-radius:14px; padding:10px; box-sizing:border-box; }
-  /* 최신 책이 각 단의 오른쪽 끝에 쌓이도록 행 방향을 뒤집음(최신순으로 넣은 배열의
-     맨 앞이 그 줄의 오른쪽 끝에 옴) - 줄바꿈 방향(위→아래)은 그대로 유지됨 */
-  .bookcase-books{ display:flex; flex-direction:row-reverse; flex-wrap:wrap; align-items:flex-end; align-content:flex-start; border-radius:6px; }
+  /* 맨 아래 칸부터 왼쪽에서 오른쪽으로 채우고, 그 칸이 차면 바로 위 칸으로 넘어가도록
+     줄바꿈 방향을 뒤집음(wrap-reverse) - 가로 방향은 그대로 왼쪽→오른쪽 */
+  .bookcase-books{ display:flex; flex-wrap:wrap-reverse; align-items:flex-end; align-content:flex-start; border-radius:6px; }
   /* 책마다 키가 달라도 줄(단) 높이 자체는 항상 고정되도록 감싸는 칸 - 책은 바닥에 붙임 */
   .case-slot{ display:inline-flex; align-items:flex-end; flex-shrink:0; }
   /* 책장에 꽂기는 한 단에 책이 훨씬 여러 권 붙어있어서, 책 쌓기와 같은 두께의 블러
@@ -1713,9 +1713,9 @@ function renderBookcaseHtml(sorted, minTiers){
   const boardsBg = `repeating-linear-gradient(to bottom, transparent 0px, transparent ${tierH}px, var(--case-board) ${tierH}px, var(--case-board) ${period}px)`;
   let html = `<div class="bookcase"><div class="bookcase-books" style="min-height:${minTiers*period}px;gap:${boardH}px 2px;background-image:${boardsBg};background-size:100% ${period}px;background-repeat:repeat-y;background-position:top left;">`;
   sorted.forEach((book,i)=>{
-    // 배열은 항상 최신순(앞쪽이 최신)으로 받고, .bookcase-books가 row-reverse라
-    // 맨 앞(최신) 책이 매 줄 오른쪽 끝에 놓임 - 그 책만 왼쪽 이웃에 기대듯 기울임
-    const isLast = i===0;
+    // 배열은 항상 오래된순(뒤쪽이 최신)으로 받음 - 맨 마지막(최신) 책만 왼쪽 이웃에
+    // 기대듯 기울임(그 책이 놓인 줄에서 가장 오른쪽 끝이라 오른쪽은 비어있음)
+    const isLast = i===sorted.length-1;
     // 책마다 키를 다르게(실측 세로 길이가 있으면 그 비율로, 없으면 대충 그럴듯하게
     // 흩어지도록) 해서 실제 책장처럼 보이게 함 - 단 자체 높이(tierH)는 그대로 두고
     // 책 개별 높이만 그 안에서 줄임(바닥엔 항상 붙어 있음, align-items:flex-end)
@@ -1798,9 +1798,7 @@ function renderShelf(){
   if(filtered.length===0){
     html += `<div class="empty-shelf">${completed.length===0 ? '아직 쌓은 책이 없어요.<br/>오른쪽 아래 + 버튼으로 첫 책을 올려보세요.' : '이 조건에 해당하는 책이 없어요.'}</div>`;
   }else if(shelfLayout==='case'){
-    // 책장보기는 최신 책이 맨 위 칸 오른쪽에 쌓이도록 최신순으로 뒤집어서 넣음
-    // ("쌓아보기"는 sorted를 그대로 써서 영향 없음)
-    html += renderBookcaseHtml([...sorted].reverse(), 5);
+    html += renderBookcaseHtml(sorted, 5);
   }else{
     // 책을 "세워서 나란히" 놓은 모습을 그대로 만든 다음, 통째로 90도 돌려서 눕힘.
     // 개별 이미지마다 회전/크롭을 계산하지 않아도 되니 잘림/여백/사파리 버그가 아예 생길 수 없음.
@@ -2275,8 +2273,8 @@ function renderWishlist(){
   if(wishlist.length===0){
     html += `<div class="empty-shelf">읽고 싶은 책을 미리 등록해보세요.<br/>오른쪽 아래 + 버튼으로 추가할 수 있어요.</div>`;
   }else if(layout==='case'){
-    // 최근 등록한 책이 맨 위 칸 오른쪽에 오도록 최신순으로 정렬, 그 한 권만 기대듯 기울임
-    const sorted = [...wishlist].sort((a,b)=> b.id-a.id);
+    // 등록한 순서(오래된 것부터)대로 꽂고, 가장 최근에 추가한 한 권만 기대듯 기울임
+    const sorted = [...wishlist].sort((a,b)=> a.id-b.id);
     html += renderBookcaseHtml(sorted, 3);
   }else{
     wishlist.forEach(book=>{
