@@ -23,6 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#fafafa; --surface:#ffffff; --border:#ececec; --border-2:#e2e2e2;
@@ -504,6 +505,9 @@
       <button class="btn-secondary" onclick="document.getElementById('importFile').click()">⬆ 가져오기</button>
     </div>
     <input type="file" id="importFile" accept="application/json" class="hidden" onchange="importData(event)">
+    <div class="settings-row" style="margin-top:8px">
+      <button class="btn-secondary" onclick="exportBookmoryXlsx()">📊 책꽂힘용 엑셀데이터 내보내기</button>
+    </div>
 
     <div class="card-divider"></div>
     <div class="field"><label>클라우드 동기화</label></div>
@@ -974,6 +978,96 @@ function exportData(){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+/* ---------------- 책꽂힘용 엑셀데이터 내보내기 ----------------
+   "책꽂힘" 앱에서 내보낸 샘플 파일(책 목록 시트 + 인용문 있는 책마다 노트(책제목) 시트)
+   구조를 그대로 따라서 만듦. 저자 role(지은이/옮긴이 등) 표시는 떼고 이름만 남기고,
+   우리 쪽에 없는 정보(출판사/ISBN/책유형 세부/실측 두께 등)는 비워두거나 합리적인
+   기본값("종이책" 등 실제 샘플에서 항상 같은 값이었던 것)만 채움. */
+function cleanAuthorForExport(s){
+  if(!s) return '';
+  return s.split(',').map(p=>p.replace(/\s*\([^)]*\)\s*$/,'').trim()).filter(Boolean).join(',');
+}
+function normPageForExport(p){
+  if(!p) return '';
+  const m = String(p).match(/\d+(?:-\d+)?/);
+  return m ? `p. ${m[0]}` : '';
+}
+function formatDotDate(dateStr){
+  if(!dateStr) return '';
+  const [y,m,d] = dateStr.split('-').map(Number);
+  if(!y||!m||!d) return '';
+  return `${y}. ${m}. ${d}.`;
+}
+function safeNoteSheetName(title, used){
+  const prefix = '노트 (', suffix = ')';
+  const cleaned = (title||'').replace(/[\\/?*[\]:]/g,'').trim();
+  const maxLen = 31 - prefix.length - suffix.length;
+  let base = cleaned.length > maxLen ? cleaned.slice(0, maxLen-1)+'…' : cleaned;
+  let name = `${prefix}${base}${suffix}`;
+  let i = 2;
+  while(used.has(name)){
+    const trimmed = base.length > maxLen-3 ? base.slice(0, maxLen-3) : base;
+    name = `${prefix}${trimmed}~${i}${suffix}`;
+    i++;
+  }
+  used.add(name);
+  return name;
+}
+function exportBookmoryXlsx(){
+  if(typeof XLSX==='undefined'){ alert('엑셀 내보내기 기능을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 시도해주세요.'); return; }
+  const STATUS_MAP = { completed:'다 읽었어요!', reading:'읽는 중', wishlist:'읽을 예정' };
+  const header1 = ['책 정보','','','','','','','','','','','','','','','','1 회차 읽은 기록','','',''];
+  const header2 = ['책 제목','저자','역자','일러스트레이터','나레이터','출판사','출판일','언어','ISBN','책 유형','전체 페이지 수','사용 중인 태그들','컬렉션','구매하고 싶은 책','다시 읽을 예정','읽기 상태','읽은 기간','별점','의견','읽은 시간'];
+  const rows = [header1, header2];
+  books.forEach(b=>{
+    const pages = b.pages ? `p. ${Number(b.pages).toLocaleString()}` : '';
+    const tags = (b.tags||[]).map(t=>'#'+String(t).replace(/\s+/g,'')).join(' ');
+    let period = '';
+    if(b.status==='completed'){
+      const start = b.startDate || b.completedDate;
+      const end = b.completedDate || b.startDate;
+      if(start && end) period = `${formatDotDate(start)} ~ ${formatDotDate(end)}`;
+    }
+    const rating = (b.status==='completed' && b.rating>0) ? Number(b.rating).toFixed(1) : '';
+    const comment = (b.review || b.wishComment || '').trim();
+    rows.push([
+      b.title||'', cleanAuthorForExport(b.author), '', '', '', '', '', '', '',
+      '종이책', pages, tags, '', '아니오', '아니오',
+      STATUS_MAP[b.status]||'', period, rating, comment, ''
+    ]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!merges'] = [
+    {s:{r:0,c:0}, e:{r:0,c:15}},
+    {s:{r:0,c:16}, e:{r:0,c:19}}
+  ];
+  ws['!cols'] = header2.map(()=>({wch:18}));
+  XLSX.utils.book_append_sheet(wb, ws, '책 목록');
+
+  const used = new Set(['책 목록']);
+  books.filter(b=>(b.quotes||[]).some(q=>q.text && q.text.trim())).forEach(b=>{
+    const name = safeNoteSheetName(b.title, used);
+    const nRows = [
+      ['노트 정보','','','','노트에 대한 생각 #1'],
+      ['날짜','페이지','노트 타입','내용','생각 1']
+    ];
+    b.quotes.forEach(q=>{
+      const text = (q.text||'').trim();
+      if(!text) return;
+      nRows.push(['', normPageForExport(q.page), '책 속 문장', text, (q.myThought||'').trim()]);
+    });
+    const nws = XLSX.utils.aoa_to_sheet(nRows);
+    nws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:3}}];
+    nws['!cols'] = [{wch:20},{wch:10},{wch:12},{wch:70},{wch:40}];
+    XLSX.utils.book_append_sheet(wb, nws, name);
+  });
+
+  XLSX.writeFile(wb, `책꽂힘용-엑셀데이터-${toLocalDateStr(new Date())}.xlsx`);
+}
+
 function importData(event){
   const file = event.target.files[0];
   if(!file) return;
