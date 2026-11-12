@@ -315,9 +315,7 @@
   .quote-entry{ background:var(--bg); border:1px solid var(--border-2); border-radius:10px; padding:10px; margin-bottom:8px; }
   .quote-entry input{ width:100%; border:none; background:transparent; font-size:12px; font-weight:600; color:var(--text-muted); padding:0; outline:none; }
   .quote-page-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
-  .quote-photo-row{ margin-bottom:6px; }
-  .quote-photo-btn{ width:100%; font-size:12.5px; padding:7px; }
-  .quote-photo-preview{ margin-bottom:8px; border:1px solid var(--border-2); border-radius:8px; padding:6px; background:var(--surface); }
+  .quote-photo-preview{ margin:8px 0; border:1px solid var(--border-2); border-radius:8px; padding:6px; background:var(--surface); }
   .quote-photo-preview img{ display:block; width:100%; max-height:280px; object-fit:contain; border-radius:6px; background:#000; }
   .quote-photo-hint{ font-size:11px; color:var(--text-muted); text-align:center; margin-top:6px; }
   .quote-photo-close{ width:100%; margin-top:6px; background:none; border:none; color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; padding:4px 0; }
@@ -452,11 +450,11 @@
     </div>
     <div class="field" id="reviewField"><label>한줄 리뷰</label><textarea id="reviewInput" placeholder="이 책에 대한 생각을 남겨보세요 (선택)"></textarea></div>
     <div class="field" id="quotesField">
-      <label>인상 깊은 문구</label>
-      <div class="quote-photo-row">
-        <button type="button" class="btn-secondary quote-photo-btn" onclick="document.getElementById('quotePhotoInput').click()">📷 사진에서 텍스트 가져오기</button>
-        <input type="file" accept="image/*" id="quotePhotoInput" class="hidden" onchange="onQuotePhotoSelected(event)">
-      </div>
+      <label style="display:flex; align-items:center; justify-content:space-between">
+        <span>인상 깊은 문구</span>
+        <button type="button" class="icon-sq-btn" style="width:30px; height:30px; font-size:14px; border-radius:8px" onclick="document.getElementById('quotePhotoInput').click()" title="사진에서 텍스트 가져오기">📷</button>
+      </label>
+      <input type="file" accept="image/*" id="quotePhotoInput" class="hidden" onchange="onQuotePhotoSelected(event)">
       <div id="quotePhotoPreviewArea"></div>
       <div id="quotesContainer"></div>
       <div class="settings-row">
