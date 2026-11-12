@@ -313,6 +313,12 @@
   .quote-entry{ background:var(--bg); border:1px solid var(--border-2); border-radius:10px; padding:10px; margin-bottom:8px; }
   .quote-entry input{ width:100%; border:none; background:transparent; font-size:12px; font-weight:600; color:var(--text-muted); padding:0; outline:none; }
   .quote-page-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .quote-photo-row{ margin-bottom:6px; }
+  .quote-photo-btn{ width:100%; font-size:12.5px; padding:7px; }
+  .quote-photo-preview{ margin-bottom:8px; border:1px solid var(--border-2); border-radius:8px; padding:6px; background:var(--surface); }
+  .quote-photo-preview img{ display:block; width:100%; max-height:280px; object-fit:contain; border-radius:6px; background:#000; }
+  .quote-photo-hint{ font-size:11px; color:var(--text-muted); text-align:center; margin-top:6px; }
+  .quote-photo-close{ width:100%; margin-top:6px; background:none; border:none; color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; padding:4px 0; }
   .quote-page-row input{ flex:1; min-width:0; }
   .p-insert-btn{ flex-shrink:0; width:26px; height:26px; border-radius:6px; border:1px solid var(--border-2); background:var(--surface); color:var(--text-muted); font-size:12px; font-weight:700; font-style:italic; cursor:pointer; padding:0; }
   .quote-entry textarea{ width:100%; border:none; background:transparent; font-size:14px; color:var(--text); padding:0; outline:none; resize:none; overflow:hidden; min-height:60px; font-family:'Inter',sans-serif; line-height:1.5; -webkit-appearance:none; appearance:none; }
@@ -622,6 +628,9 @@ function unlockBodyScroll(){
   }
 }
 let currentQuotes = [];
+// 인용문 칸 옆에 잠깐 띄워두는 사진 미리보기(저장 안 됨) - 인덱스가 바뀌면(삭제/순서
+// 바꾸기) 꼬일 수 있어서 그런 조작이 있을 때는 전부 비움
+let quotePhotoPreviews = {};
 let expandedBooks = new Set();
 let startDateManuallyEdited = false;
 let activeTags = [];
@@ -1126,7 +1135,17 @@ function renderQuotesContainer(){
         <input type="text" inputmode="numeric" id="quotePage${i}" placeholder="페이지 또는 챕터 (예: p.152, 3장)" value="${(q.page||'').replace(/"/g,'&quot;')}" oninput="updateQuote(${i},'page',this.value)">
         <button type="button" class="p-insert-btn" onclick="insertPageP(${i})" title="p 입력">p</button>
       </div>
-      <textarea placeholder="인상 깊었던 문장을 적어보세요 (사진 찍어 텍스트 선택 후 붙여넣기 가능)" oninput="updateQuote(${i},'text',this.value); autoGrowQuote(this)" onpaste="handleQuoteTextPaste(event,${i})">${(q.text||'')}</textarea>
+      <div class="quote-photo-row">
+        <button type="button" class="btn-secondary quote-photo-btn" onclick="document.getElementById('quotePhotoInput${i}').click()">📷 사진에서 텍스트 가져오기</button>
+        <input type="file" accept="image/*" capture="environment" id="quotePhotoInput${i}" class="hidden" onchange="onQuotePhotoSelected(event,${i})">
+      </div>
+      ${quotePhotoPreviews[i] ? `
+      <div class="quote-photo-preview">
+        <img src="${quotePhotoPreviews[i]}" alt="인용문 사진">
+        <div class="quote-photo-hint">사진을 길게 눌러 텍스트 선택 → 복사 → 아래 칸에 붙여넣기</div>
+        <button type="button" class="quote-photo-close" onclick="closeQuotePhoto(${i})">✕ 사진 닫기</button>
+      </div>` : ''}
+      <textarea placeholder="인상 깊었던 문장을 적어보세요 (사진에서 텍스트 선택 후 붙여넣기 가능)" oninput="updateQuote(${i},'text',this.value); autoGrowQuote(this)" onpaste="handleQuoteTextPaste(event,${i})">${(q.text||'')}</textarea>
       <textarea class="quote-mythought" placeholder="이 문구에 대한 내 생각 (선택)" oninput="updateQuote(${i},'myThought',this.value); autoGrowQuote(this)">${(q.myThought||'')}</textarea>
       <div class="quote-actions">
         <button type="button" class="quote-move" onclick="moveQuote(${i},-1)" ${i===0?'disabled':''}>▲ 위로</button>
@@ -1141,6 +1160,17 @@ function renderQuotesContainer(){
 }
 function addQuoteField(){ currentQuotes.push({page:'', text:'', myThought:''}); renderQuotesContainer(); }
 function updateQuote(i, field, val){ if(currentQuotes[i]) currentQuotes[i][field]=val; }
+// 책 페이지를 찍은 사진을 그 자리에서 바로 보여줘서, 사파리의 Live Text로 길게 눌러
+// 텍스트를 선택·복사한 뒤 바로 아래 문구 칸에 붙여넣을 수 있게 함(사진 앱을 따로
+// 열 필요 없음). 사진 자체는 저장하지 않고 화면에 잠깐 띄워두는 용도일 뿐임
+function onQuotePhotoSelected(e, i){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{ quotePhotoPreviews[i] = reader.result; renderQuotesContainer(); };
+  reader.readAsDataURL(file);
+}
+function closeQuotePhoto(i){ delete quotePhotoPreviews[i]; renderQuotesContainer(); }
 // 글을 많이 쓸수록 칸이 늘어나도록 - 일단 auto로 줄였다가 실제 내용 높이(scrollHeight)만큼
 // 다시 늘림(줄였다 늘리지 않으면 글을 지웠을 때 칸이 줄지 않고 그대로 남아있게 됨)
 function autoGrowQuote(el){
@@ -1188,11 +1218,12 @@ function insertPageP(i){
   const pos = start+1;
   input.setSelectionRange(pos, pos);
 }
-function removeQuote(i){ if(!confirm('이 문구를 삭제할까요?')) return; currentQuotes.splice(i,1); renderQuotesContainer(); }
+function removeQuote(i){ if(!confirm('이 문구를 삭제할까요?')) return; currentQuotes.splice(i,1); quotePhotoPreviews={}; renderQuotesContainer(); }
 function moveQuote(i, dir){
   const j = i+dir;
   if(j<0 || j>=currentQuotes.length) return;
   [currentQuotes[i], currentQuotes[j]] = [currentQuotes[j], currentQuotes[i]];
+  quotePhotoPreviews={};
   renderQuotesContainer();
 }
 // 페이지 입력칸은 자유 텍스트("p.152", "3장" 등)라 숫자만 뽑아서 정렬함 - 숫자가
@@ -1269,7 +1300,7 @@ function resetModalFields(){
 function openAddModal(defaultStatus){
   editingId=null; selectedCover=null; selectedDepthMm=null; selectedSpineMm=null; currentRating=0;
   selectedAuthor=''; selectedAladinItemId=null; selectedExtraInfo=null;
-  currentQuotes=[];
+  currentQuotes=[]; quotePhotoPreviews={};
   startDateManuallyEdited=false;
   document.getElementById('modalTitle').textContent='책 기록하기';
   document.getElementById('modalSubtitle').textContent='제목을 검색하면 페이지 수를 자동으로 채워드려요';
@@ -1313,6 +1344,7 @@ function openEditModal(id){
   currentRating=book.rating||0;
   selectedAuthor=book.author||''; selectedAladinItemId=book.aladinItemId||null; selectedExtraInfo=null;
   currentQuotes=(book.quotes||[]).map(q=>({...q}));
+  quotePhotoPreviews={};
   startDateManuallyEdited=false;
   document.getElementById('modalTitle').textContent='책 수정하기';
   document.getElementById('modalSubtitle').textContent='내용을 고치거나 삭제할 수 있어요';
@@ -1346,7 +1378,7 @@ function closeAddModal(){
   resetModalFields();
   selectedCover=null; selectedDepthMm=null; selectedSpineMm=null; currentRating=0; editingId=null;
   selectedAuthor=''; selectedAladinItemId=null; selectedExtraInfo=null; selectedSpineImage=null; spineImageLoaded=false;
-  currentQuotes=[];
+  currentQuotes=[]; quotePhotoPreviews={};
   unlockBodyScroll();
 }
 
