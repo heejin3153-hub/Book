@@ -1137,7 +1137,7 @@ function renderQuotesContainer(){
       </div>
       <div class="quote-photo-row">
         <button type="button" class="btn-secondary quote-photo-btn" onclick="document.getElementById('quotePhotoInput${i}').click()">📷 사진에서 텍스트 가져오기</button>
-        <input type="file" accept="image/*" capture="environment" id="quotePhotoInput${i}" class="hidden" onchange="onQuotePhotoSelected(event,${i})">
+        <input type="file" accept="image/*" id="quotePhotoInput${i}" class="hidden" onchange="onQuotePhotoSelected(event,${i})">
       </div>
       ${quotePhotoPreviews[i] ? `
       <div class="quote-photo-preview">
