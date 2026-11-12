@@ -16,6 +16,7 @@ const PORT = process.env.PORT || 3000;
 // 다들 Aladin만큼 정보가 풍부하진 않아서(카테고리/부제/줄거리/책속에서/실측 책 크기(mm)
 // 정보가 없음) 관련 기능은 값이 없으면 조용히 생략되도록 처리되어 있음.
 const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY;
+const GOOGLE_BOOKS_API_KEY = process.env.GOOGLE_BOOKS_API_KEY;
 const YES24_API_KEY = process.env.YES24_API_KEY;
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -74,8 +75,11 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// 책 상세 정보(주로 페이지 수) 조회 API - Google Books API, ISBN으로 조회 (가입/키 불필요)
+// 책 상세 정보(주로 페이지 수) 조회 API - Google Books API, ISBN으로 조회
 // :itemId 자리에는 /api/search가 돌려준 isbn13이 들어옴(예전 알라딘 itemId와 이름만 같음)
+// 키 없이 호출하면 일일 할당량이 0이라 전부 429로 막힘(책이 있고 없고와 무관하게 전멸)
+// - GOOGLE_BOOKS_API_KEY 필수. 또한 서버가 있는 지역을 구글이 특정 못 하면
+// "Cannot determine user location" 403이 나서 country=KR을 같이 넘겨줌
 app.get('/api/detail/:itemId', async (req, res) => {
   const isbn = req.params.itemId;
 
@@ -85,11 +89,22 @@ app.get('/api/detail/:itemId', async (req, res) => {
     subTitle: '', originalTitle: '', fullDescription: '', story: '', phraseList: []
   };
 
+  if (!GOOGLE_BOOKS_API_KEY) {
+    console.error('GOOGLE_BOOKS_API_KEY가 설정되지 않았습니다 - 페이지 수 조회가 항상 실패합니다.');
+    return res.json(empty);
+  }
+
   try {
-    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}`;
+    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}&country=KR&key=${GOOGLE_BOOKS_API_KEY}`;
 
     const response = await fetch(url);
     const data = await response.json();
+
+    if (data.error) {
+      console.error('구글북스 API 오류:', data.error.code, data.error.message);
+      return res.json(empty);
+    }
+
     const item = (data.items || [])[0];
 
     if (!item) {
