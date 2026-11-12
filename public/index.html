@@ -1708,11 +1708,11 @@ function renderBookcaseHtml(sorted){
   const tierH = Math.round(168 * panelScale);
   const boardH = Math.max(6, Math.round(10 * panelScale));
   const period = tierH + boardH;
-  // 책장 높이는 항상 실제 내용(줄 수)만큼만 - 억지로 빈 칸을 더 넣지 않음.
-  // 맨 아래 줄부터 채워지므로(wrap-reverse) 배경 무늬도 아래를 기준으로 맞춤 -
-  // 그래야 줄 수가 몇 개든 선반 경계선이 항상 줄 사이에 정확히 들어맞음
+  // 책장 높이는 항상 실제 내용(줄 수)만큼만 - 억지로 빈 칸을 더 넣지 않음. 그래서
+  // 줄 수가 몇 개든 높이는 정확히 (줄 수*tierH + (줄 수-1)*boardH)가 되고, 선반
+  // 무늬를 맨 위 기준으로 반복해도 매 줄 사이의 경계선과 항상 딱 들어맞음
   const boardsBg = `repeating-linear-gradient(to bottom, transparent 0px, transparent ${tierH}px, var(--case-board) ${tierH}px, var(--case-board) ${period}px)`;
-  let html = `<div class="bookcase"><div class="bookcase-books" style="gap:${boardH}px 2px;background-image:${boardsBg};background-size:100% ${period}px;background-repeat:repeat-y;background-position:bottom left;">`;
+  let html = `<div class="bookcase"><div class="bookcase-books" style="gap:${boardH}px 2px;background-image:${boardsBg};background-size:100% ${period}px;background-repeat:repeat-y;background-position:top left;">`;
   sorted.forEach((book,i)=>{
     // 배열은 항상 오래된순(뒤쪽이 최신)으로 받음 - 맨 마지막(최신) 책만 왼쪽 이웃에
     // 기대듯 기울임(그 책이 놓인 줄에서 가장 오른쪽 끝이라 오른쪽은 비어있음)
