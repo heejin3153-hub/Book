@@ -38,7 +38,7 @@
     --text:#eeeef0; --text-muted:#9494a0;
     --accent:#8080e8; --accent-soft:#26264a; --accent-dark:#a0a0f0;
     --danger:#f27272; --star:#f5bb45; --green:#57c397;
-    --case-frame:#3a342a; --case-board:#241f18;
+    --case-frame:#19171a; --case-board:#a1744a;
   }
   html[data-theme="light"]{ color-scheme: light; }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -150,7 +150,7 @@
   .case-slot{ display:inline-flex; align-items:flex-end; flex-shrink:0; }
   /* 책장에 꽂기는 한 단에 책이 훨씬 여러 권 붙어있어서, 책 쌓기와 같은 두께의 블러
      테두리를 쓰면 여백이 누적되어 훨씬 두꺼워 보임 - 좌우 여백을 더 줄임 */
-  .bookcase-books .shelf-spine{ padding:0 1px; }
+  .bookcase-books .shelf-spine{ padding:0 1px; box-shadow: inset -3px 0 6px -3px rgba(0,0,0,0.4); }
   /* 책등 이미지가 없는 책(색+제목 막대)의 폭이 책 쌓기보다 좁아진 만큼, 볼드체라 크기를
      줄여도 잘 읽혀서 글씨 크기도 같이 줄임 */
   .bookcase-books .shelf-title{ font-size:10px; }
