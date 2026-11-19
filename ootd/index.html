@@ -412,7 +412,7 @@
         <span class="seg cal-mode" id="calMode"><button data-v="ootd">OOTD만</button><button data-v="all">전체 사진</button></span></div>
       <div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
       <div class="grid" id="grid"></div>
-      <div class="cal-legend hidden" id="calLegend"><span><i class="lg no-text"></i>사진만 있고 일기 없음</span><span><i class="lg no-record"></i>기록 없음</span></div>
+      <div class="cal-legend hidden" id="calLegend"><span><i class="lg no-text"></i>사진 있고 일기 글 없음</span><span><i class="lg no-record"></i>사진·일기 글 없음</span></div>
     </div>
 
   </section>
@@ -931,8 +931,8 @@ function renderCal(){
     const showCover=list.length && (calShowAll || !noCover(key));   // '전체 사진'이면 OOTD 안 찍은 날도 사진 보임
     cell.className='day'+(dow===0?' sun':'')+(dow===6?' sat':'')+(key===today?' today':'')+(showCover?' has':'');
     if(list.length||hasContent(e)) rec++;
-    // 일기 안 쓴 날: 사진만 있고 내용(일기·옷 태그) 없음 → 빨간 실선 / 사진도 내용도 없음 → 빨간 점선
-    if(canMark && key>=firstRec && key<today && !hasContent(e)){
+    // 일기 글을 안 쓴 날 (옷 태그가 있어도 글이 없으면 표시): 사진 있음 → 빨간 실선 / 사진 없음 → 빨간 점선
+    if(canMark && key>=firstRec && key<today && !((e && e.text) || '').trim()){
       cell.classList.add(list.length ? 'no-text' : 'no-record'); marked++;
     }
     if(list.length && !showCover){   // OOTD 안 찍은 날: 사진 대신 작은 표시만
