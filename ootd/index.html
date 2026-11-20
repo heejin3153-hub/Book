@@ -1183,8 +1183,8 @@ function renderOnThisDay(d){
     more.onclick=()=>{ const open=txt.classList.toggle('clamp'); more.textContent=open?'더보기':'접기'; };
     box.appendChild(card);
     requestAnimationFrame(()=>{ if(txt.scrollHeight>txt.clientHeight+2) more.classList.remove('hidden'); });
-    // 캘린더가 '전체 사진' 보기면 OOTD 안 찍은 날로 표시한 날도 사진을 보여줌
-    lazy(root, card.querySelector('.otd-th'), async el=>{ const t=await thumbForDay(x, calShowAll); if(t) el.innerHTML=`<img src="${t}" alt="">`; else el.remove(); });   // 사진 없는 날은 칸 없앰
+    // 'OOTD 안 찍은 날' 표시는 캘린더·옷장에서만 사진을 숨김 → 과거의 오늘 카드는 항상 사진을 보여줌
+    lazy(root, card.querySelector('.otd-th'), async el=>{ const t=await thumbForDay(x, true); if(t) el.innerHTML=`<img src="${t}" alt="">`; else el.remove(); });   // 사진 없는 날은 칸 없앰
   }
 }
 function renderDayPhotos(){
