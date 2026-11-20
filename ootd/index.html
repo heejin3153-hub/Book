@@ -289,6 +289,11 @@
   .crop-ratios button{ background:#222; color:#ddd; border:1px solid #444; border-radius:18px; padding:7px 13px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
   .crop-ratios button.on{ background:#fff; color:#000; }
   /* 일기 글 불러오기(검토) */
+  .tz{ position:fixed; inset:0; z-index:90; background:#000; display:none; touch-action:none; overflow:hidden; }
+  .tz.open{ display:block; }
+  .tz img{ position:absolute; left:0; top:0; transform-origin:0 0; max-width:none; user-select:none; -webkit-user-drag:none; will-change:transform; }
+  .tz .x{ position:absolute; top:calc(12px + env(safe-area-inset-top,0px)); right:12px; z-index:2; background:rgba(255,255,255,.2); color:#fff; border:none; width:42px; height:42px; border-radius:50%; font-size:20px; }
+  .tz .hint{ position:absolute; bottom:calc(14px + env(safe-area-inset-bottom,0px)); left:0; right:0; text-align:center; color:#bbb; font-size:12px; pointer-events:none; }
   .ti-card{ border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:14px; background:var(--bg); }
   .ti-card.done{ opacity:.55; }
   .ti-photo{ margin-bottom:10px; text-align:center; }
@@ -699,7 +704,7 @@
     <div class="sec-label" style="margin-top:22px"><span>계정</span></div>
     <div class="account" id="accountRow" style="justify-content:flex-start;margin-top:0"></div>
     <div class="sync" id="syncState" style="text-align:left;margin-top:4px"></div>
-    <div class="saved" style="margin-top:18px;text-align:center">버전 2026-11-20 01:55</div>
+    <div class="saved" style="margin-top:18px;text-align:center">버전 2026-11-20 03:10</div>
   </div>
 </div>
 
@@ -2365,7 +2370,7 @@ function tiCard(it,i){
     <div class="ti-body"><div class="ti-top"><input type="date" class="ti-date">${one?'':'<label><input type="checkbox" class="ti-on"> 적용</label>'}<span class="ti-bd"></span></div>
     <textarea class="ti-text" placeholder="글 내용"></textarea>
     </div>`;
-  const img=card.querySelector('img'); img.src=it.img||''; img.onclick=()=>img.classList.toggle('big');
+  const img=card.querySelector('img'); img.src=it.img||''; img.onclick=()=>tiZoom(it.img);
   card.querySelector('.nm').textContent=it.name||'';
   const dt=card.querySelector('.ti-date'), on=card.querySelector('.ti-on'), ta=card.querySelector('.ti-text'), bd=card.querySelector('.ti-bd');
   dt.value=it.date||''; ta.value=it.text||''; bd.innerHTML=tiBadgesHtml(it);
@@ -2374,6 +2379,42 @@ function tiCard(it,i){
   if(on){ on.checked=it.on!==false; on.onchange=()=>{ it.on=on.checked; upd(); }; }
   ta.oninput=()=>{ it.text=ta.value; growTa(ta); upd(); };
   return card;
+}
+
+// 사진 확대 보기: 핀치/휠 확대, 드래그 이동, 더블탭 2.5배
+let tzEl=null;
+function tiZoom(src){
+  if(!src) return;
+  if(!tzEl){
+    tzEl=document.createElement('div'); tzEl.className='tz';
+    tzEl.innerHTML='<button class="x">✕</button><img alt=""><div class="hint">두 손가락으로 확대 · 드래그로 이동 · 두 번 탭하면 확대/원래대로</div>';
+    document.body.appendChild(tzEl);
+    const im=tzEl.querySelector('img'); const st={s:1,x:0,y:0,fit:1};
+    tzEl._st=st; tzEl._im=im;
+    const apply=()=>{ im.style.transform=`translate(${st.x}px,${st.y}px) scale(${st.s})`; };
+    const clamp=()=>{ const W=tzEl.clientWidth,H=tzEl.clientHeight,w=im.naturalWidth*st.s,h=im.naturalHeight*st.s;
+      st.x = w<=W ? (W-w)/2 : Math.min(0,Math.max(W-w,st.x)); st.y = h<=H ? (H-h)/2 : Math.min(0,Math.max(H-h,st.y)); };
+    const zoomAt=(cx,cy,ns)=>{ ns=Math.min(Math.max(ns,st.fit),st.fit*8); const k=ns/st.s; st.x=cx-(cx-st.x)*k; st.y=cy-(cy-st.y)*k; st.s=ns; clamp(); apply(); };
+    tzEl._reset=()=>{ const W=tzEl.clientWidth,H=tzEl.clientHeight; st.fit=Math.min(W/im.naturalWidth,H/im.naturalHeight); st.s=st.fit; clamp(); apply(); };
+    tzEl.querySelector('.x').onclick=()=>tzEl.classList.remove('open');
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape' && tzEl.classList.contains('open')){ tzEl.classList.remove('open'); e.stopPropagation(); } },true);
+    tzEl.addEventListener('wheel',e=>{ e.preventDefault(); zoomAt(e.clientX,e.clientY,st.s*(e.deltaY<0?1.15:1/1.15)); },{passive:false});
+    const pts=new Map(); let lastD=0,lastTap=0,moved=false;
+    tzEl.addEventListener('pointerdown',e=>{ if(e.target.closest('.x')) return; tzEl.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); lastD=0; moved=false; });
+    tzEl.addEventListener('pointermove',e=>{
+      const p=pts.get(e.pointerId); if(!p) return;
+      const ox=p.x,oy=p.y; p.x=e.clientX; p.y=e.clientY;
+      if(pts.size===1){ if(Math.abs(p.x-ox)+Math.abs(p.y-oy)>0) moved=true; st.x+=p.x-ox; st.y+=p.y-oy; clamp(); apply(); }
+      else if(pts.size===2){ moved=true; const [a,b]=[...pts.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); if(lastD) zoomAt((a.x+b.x)/2,(a.y+b.y)/2,st.s*d/lastD); lastD=d; }
+    });
+    const up=e=>{ const had=pts.delete(e.pointerId); lastD=0;
+      if(had && !moved && pts.size===0 && !e.target.closest('.x')){ const now=Date.now();
+        if(now-lastTap<350){ zoomAt(e.clientX,e.clientY, st.s>st.fit*1.2? st.fit : st.fit*2.5); lastTap=0; } else lastTap=now; } };
+    tzEl.addEventListener('pointerup',up); tzEl.addEventListener('pointercancel',up);
+    window.addEventListener('resize',()=>{ if(tzEl.classList.contains('open')) tzEl._reset(); });
+  }
+  const im=tzEl._im; tzEl.classList.add('open');
+  im.onload=()=>tzEl._reset(); im.src=src; if(im.complete&&im.naturalWidth) tzEl._reset();
 }
 function tiFirstTodo(from=0){ for(let k=from;k<tiItems.length;k++) if(!tiItems[k].done) return k; for(let k=0;k<from;k++) if(!tiItems[k].done) return k; return -1; }
 function tiGo(i){ tiPos=Math.min(Math.max(i,0),Math.max(0,tiItems.length-1)); renderTi(); $('textImportSheet').querySelector('.sheet').scrollTop=0; }
