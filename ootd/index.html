@@ -704,7 +704,7 @@
     <div class="sec-label" style="margin-top:22px"><span>계정</span></div>
     <div class="account" id="accountRow" style="justify-content:flex-start;margin-top:0"></div>
     <div class="sync" id="syncState" style="text-align:left;margin-top:4px"></div>
-    <div class="saved" style="margin-top:18px;text-align:center">버전 2026-11-20 03:10</div>
+    <div class="saved" style="margin-top:18px;text-align:center">버전 2026-11-20 04:20</div>
   </div>
 </div>
 
@@ -2338,7 +2338,15 @@ function tiSave(now){
   if(now) return run(); tiTimer=setTimeout(run, 600);
 }
 const tiHasQ=t=>/\(\?\)|（\?）/.test(t||'');
-function growTa(t){ t.style.height='auto'; t.style.height=(t.scrollHeight+2)+'px'; }
+function growTa(t){
+  // 높이를 잠깐 auto로 줄이면 스크롤 위치가 튀므로, 필요할 때만 늘리고 스크롤 위치는 그대로 유지
+  const sh=t.closest('.sheet'), top=sh?sh.scrollTop:0, need=t.scrollHeight+2;
+  if(Math.abs(parseFloat(t.style.height||0)-need)>1){
+    const h=t.offsetHeight; t.style.height=h+'px';
+    if(need<h){ t.style.height='auto'; t.style.height=(t.scrollHeight+2)+'px'; } else t.style.height=need+'px';
+  }
+  if(sh && sh.scrollTop!==top) sh.scrollTop=top;
+}
 function tiBadgesHtml(it){
   const b=[];
   if(it.done) b.push('<span class="ti-badge ok">✓ 적용됨</span>');
