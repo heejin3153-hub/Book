@@ -292,7 +292,7 @@
   .ti-card{ border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:14px; background:var(--bg); }
   .ti-card.done{ opacity:.55; }
   .ti-photo{ margin-bottom:10px; text-align:center; }
-  .ti-photo img{ max-width:100%; max-height:60vh; border-radius:10px; cursor:zoom-in; }
+  .ti-photo img{ max-width:100%; max-height:52vh; border-radius:10px; cursor:zoom-in; }
   .ti-photo img.big{ max-height:none; cursor:zoom-out; }
   .ti-photo .nm{ font-size:11px; color:var(--text-muted); margin-top:4px; word-break:break-all; }
   .ti-top{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
@@ -304,6 +304,10 @@
   html[data-theme="dark"] .ti-badge.warn{ background:#4a2323; color:#ff9b9b; } html[data-theme="dark"] .ti-badge.over{ background:#4a3a14; color:#ffd27a; }
   .ti-text{ width:100%; min-height:140px; border:1.5px solid var(--border-2); border-radius:10px; background:var(--surface); padding:12px; font-size:15.5px; line-height:1.7; color:var(--text); font-family:inherit; outline:none; resize:none; overflow:hidden; }
   .ti-text:focus{ border-color:var(--accent); }
+  .ti-nav{ position:sticky; top:-1px; z-index:3; background:var(--surface); display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0 10px; font-size:14px; font-weight:800; }
+  .ti-nav .btn{ padding:8px 14px; }
+  .ti-one-actions{ display:flex; gap:8px; position:sticky; bottom:0; z-index:2; background:var(--surface); padding:10px 0 4px; border-top:1px solid var(--border); }
+  .ti-one-actions .btn{ flex:1; padding:13px; font-size:15px; }
   .ti-apply{ position:sticky; bottom:0; background:var(--surface); display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 0 4px; border-top:1px solid var(--border); font-size:12.5px; font-weight:600; color:var(--text-muted); }
   @media (min-width:1000px){ .ti-card{ display:grid; grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr); gap:18px; } .ti-photo{ margin:0; } .ti-photo img{ max-height:none; } .ti-text{ font-size:17px; min-height:240px; } }
   .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
@@ -640,11 +644,17 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <button class="btn ghost" id="tiPick">📂 파일 선택</button>
+      <button class="btn ghost" id="tiMode">목록으로 보기</button>
       <button class="btn ghost" id="tiHideDone">적용한 것 숨기기</button>
       <button class="btn ghost" id="tiClear" style="margin-left:auto;color:var(--danger)">목록 비우기</button>
     </div>
+    <div class="ti-nav hidden" id="tiNav">
+      <button class="btn ghost" id="tiPrev" aria-label="이전">‹ 이전</button>
+      <span id="tiPos"></span>
+      <button class="btn ghost" id="tiNext" aria-label="다음">다음 ›</button>
+    </div>
     <div id="tiList"></div>
-    <div class="ti-apply"><span id="tiSummary"></span><button class="btn primary" id="tiApply">적용</button></div>
+    <div class="ti-apply" id="tiBulk"><span id="tiSummary"></span><button class="btn primary" id="tiApply">적용</button></div>
   </div>
 </div>
 <input type="file" id="tiInput" accept="application/json,.json" hidden>
@@ -2347,29 +2357,74 @@ function tiRefreshSummary(){
   $('tiApply').textContent = st.ready.length ? `${st.ready.length}개 적용` : '적용';
   $('tiHideDone').textContent = tiHideDone ? '적용한 것 보이기' : '적용한 것 숨기기';
 }
+let tiMode=(()=>{ try{ return localStorage.getItem('ootd-ti-mode')||'one'; }catch(e){ return 'one'; } })(), tiPos=0;
+function tiCard(it,i){
+  const one=tiMode==='one';
+  const card=document.createElement('div'); card.className='ti-card'+(it.done?' done':''); card.dataset.i=i;
+  card.innerHTML=`<div class="ti-photo"><img alt=""><div class="nm"></div></div>
+    <div class="ti-body"><div class="ti-top"><input type="date" class="ti-date">${one?'':'<label><input type="checkbox" class="ti-on"> 적용</label>'}<span class="ti-bd"></span></div>
+    <textarea class="ti-text" placeholder="글 내용"></textarea>
+    </div>`;
+  const img=card.querySelector('img'); img.src=it.img||''; img.onclick=()=>img.classList.toggle('big');
+  card.querySelector('.nm').textContent=it.name||'';
+  const dt=card.querySelector('.ti-date'), on=card.querySelector('.ti-on'), ta=card.querySelector('.ti-text'), bd=card.querySelector('.ti-bd');
+  dt.value=it.date||''; ta.value=it.text||''; bd.innerHTML=tiBadgesHtml(it);
+  const upd=()=>{ bd.innerHTML=tiBadgesHtml(it); tiRefreshSummary(); tiSave(); };
+  dt.onchange=()=>{ it.date=dt.value; upd(); };
+  if(on){ on.checked=it.on!==false; on.onchange=()=>{ it.on=on.checked; upd(); }; }
+  ta.oninput=()=>{ it.text=ta.value; growTa(ta); upd(); };
+  return card;
+}
+function tiFirstTodo(from=0){ for(let k=from;k<tiItems.length;k++) if(!tiItems[k].done) return k; for(let k=0;k<from;k++) if(!tiItems[k].done) return k; return -1; }
+function tiGo(i){ tiPos=Math.min(Math.max(i,0),Math.max(0,tiItems.length-1)); renderTi(); $('textImportSheet').querySelector('.sheet').scrollTop=0; }
+function tiApplyOne(i){
+  const it=tiItems[i]; if(!it) return;
+  if(!it.date){ toast('날짜를 먼저 골라주세요', 2200); return; }
+  if(!(it.text||'').trim()){ toast('글이 비어 있어요', 2200); return; }
+  if(tiHasQ(it.text) && !confirm('(?) 표시가 남아 있어요.\n그대로 저장할까요?')) return;
+  const e=entryOf(it.date); e.text=it.text.trim();
+  commitEntries([e]); it.done=true; tiSave(true); refresh();
+  const nx=tiFirstTodo(i+1);
+  toast(nx<0 ? '모두 적용했어요 🎉' : `${fmtKo(it.date,false)} 저장했어요`, 1800);
+  tiGo(nx<0 ? i : nx);
+}
 function renderTi(){
   const box=$('tiList'); box.innerHTML='';
+  const one=tiMode==='one' && tiItems.length>0;
+  $('tiMode').textContent = tiMode==='one' ? '목록으로 보기' : '한 장씩 보기';
+  $('tiHideDone').classList.toggle('hidden', one);
+  $('tiNav').classList.toggle('hidden', !one);
+  $('tiBulk').classList.toggle('hidden', one);   // 한 장씩 보기에서는 '적용하고 다음' 버튼만 (화면 아래에 항상 붙어 있음)
   if(!tiItems.length){ box.innerHTML='<div class="empty-msg">사진을 글로 옮긴 파일(.json)을 선택하세요<br>사진과 글을 나란히 보면서 고칠 수 있어요</div>'; tiRefreshSummary(); return; }
-  tiItems.forEach((it,i)=>{
-    if(it.done && tiHideDone) return;
-    const card=document.createElement('div'); card.className='ti-card'+(it.done?' done':''); card.dataset.i=i;
-    card.innerHTML=`<div class="ti-photo"><img alt=""><div class="nm"></div></div>
-      <div class="ti-body"><div class="ti-top"><input type="date" class="ti-date"><label><input type="checkbox" class="ti-on"> 적용</label><span class="ti-bd"></span></div>
-      <textarea class="ti-text" placeholder="글 내용"></textarea></div>`;
-    const img=card.querySelector('img'); img.src=it.img||''; img.onclick=()=>img.classList.toggle('big');
-    card.querySelector('.nm').textContent=it.name||'';
-    const dt=card.querySelector('.ti-date'), on=card.querySelector('.ti-on'), ta=card.querySelector('.ti-text'), bd=card.querySelector('.ti-bd');
-    dt.value=it.date||''; on.checked=it.on!==false; ta.value=it.text||''; bd.innerHTML=tiBadgesHtml(it);
-    const upd=()=>{ bd.innerHTML=tiBadgesHtml(it); tiRefreshSummary(); tiSave(); };
-    dt.onchange=()=>{ it.date=dt.value; upd(); };
-    on.onchange=()=>{ it.on=on.checked; upd(); };
-    ta.oninput=()=>{ it.text=ta.value; growTa(ta); upd(); };
-    box.appendChild(card);
-  });
+  if(one){
+    tiPos=Math.min(Math.max(tiPos,0),tiItems.length-1);
+    const it=tiItems[tiPos];
+    box.appendChild(tiCard(it,tiPos));
+    // 버튼은 카드 바깥에 둬서 사진이 커도 항상 화면 아래에 붙어 있음
+    const act=document.createElement('div'); act.className='ti-one-actions';
+    act.innerHTML=`<button class="btn ghost ti-skip">건너뛰기</button><button class="btn primary ti-go">${it.done?'다시 적용':'적용하고 다음'}</button>`;
+    act.querySelector('.ti-skip').onclick=()=>tiGo(tiPos+1);
+    act.querySelector('.ti-go').onclick=()=>tiApplyOne(tiPos);
+    box.appendChild(act);
+    const done=tiItems.filter(i=>i.done).length;
+    $('tiPos').textContent=`${tiPos+1} / ${tiItems.length} · 남은 ${tiItems.length-done}개`;
+    $('tiPrev').disabled=tiPos===0; $('tiNext').disabled=tiPos>=tiItems.length-1;
+  } else {
+    tiItems.forEach((it,i)=>{ if(it.done && tiHideDone) return; box.appendChild(tiCard(it,i)); });
+  }
   requestAnimationFrame(()=>box.querySelectorAll('.ti-text').forEach(growTa));
   tiRefreshSummary();
 }
-$('tiOpen').onclick=async ()=>{ closeSheet('menuSheet'); tiItems=await tiLoad(); renderTi(); openSheet('textImportSheet'); };
+$('tiPrev').onclick=()=>tiGo(tiPos-1);
+$('tiNext').onclick=()=>tiGo(tiPos+1);
+$('tiMode').onclick=()=>{ tiMode=tiMode==='one'?'list':'one'; try{ localStorage.setItem('ootd-ti-mode',tiMode); }catch(e){} renderTi(); };
+// 키보드: 검토 화면에서 ← → 로 이전/다음 (글 쓰는 중이 아닐 때)
+document.addEventListener('keydown', e=>{
+  if(!$('textImportSheet').classList.contains('open') || tiMode!=='one') return;
+  if(e.target.closest('input,textarea')) return;
+  if(e.key==='ArrowLeft'){ e.preventDefault(); tiGo(tiPos-1); } if(e.key==='ArrowRight'){ e.preventDefault(); tiGo(tiPos+1); }
+});
+$('tiOpen').onclick=async ()=>{ closeSheet('menuSheet'); tiItems=await tiLoad(); tiPos=Math.max(0,tiFirstTodo(0)); renderTi(); openSheet('textImportSheet'); };
 $('tiPick').onclick=()=>$('tiInput').click();
 $('tiHideDone').onclick=()=>{ tiHideDone=!tiHideDone; renderTi(); };
 $('tiClear').onclick=()=>{
@@ -2387,7 +2442,7 @@ $('tiInput').onchange=async e=>{
       if(!x || have.has(x.id)) continue;
       tiItems.push({ id:x.id||('t'+Math.random().toString(36).slice(2)), name:x.name||'', date:/^\d{4}-\d{2}-\d{2}$/.test(x.date||'')?x.date:'', text:x.text||'', img:x.img||'', on:true, done:false }); n++;
     }
-    tiSave(true); renderTi(); toast(n ? `${n}개를 불러왔어요` : '이미 불러온 파일이에요', 2500);
+    tiSave(true); if(n) tiPos=Math.max(0,tiFirstTodo(0)); renderTi(); toast(n ? `${n}개를 불러왔어요` : '이미 불러온 파일이에요', 2500);
   }catch(err){ console.error(err); toast('올바른 파일이 아니에요'); }
 };
 $('tiApply').onclick=async ()=>{
