@@ -288,6 +288,24 @@
   .crop-ratios{ display:flex; justify-content:center; gap:6px; padding:10px 12px calc(16px + var(--safe-b)); flex-wrap:wrap; }
   .crop-ratios button{ background:#222; color:#ddd; border:1px solid #444; border-radius:18px; padding:7px 13px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
   .crop-ratios button.on{ background:#fff; color:#000; }
+  /* 일기 글 불러오기(검토) */
+  .ti-card{ border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:14px; background:var(--bg); }
+  .ti-card.done{ opacity:.55; }
+  .ti-photo{ margin-bottom:10px; text-align:center; }
+  .ti-photo img{ max-width:100%; max-height:60vh; border-radius:10px; cursor:zoom-in; }
+  .ti-photo img.big{ max-height:none; cursor:zoom-out; }
+  .ti-photo .nm{ font-size:11px; color:var(--text-muted); margin-top:4px; word-break:break-all; }
+  .ti-top{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  .ti-top input[type=date]{ border:1.5px solid var(--border-2); border-radius:9px; background:var(--surface); padding:7px 9px; font-size:15px; color:var(--text); font-family:inherit; }
+  .ti-top label{ display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:700; }
+  .ti-top label input{ width:18px; height:18px; accent-color:var(--accent); }
+  .ti-badge{ font-size:11px; font-weight:800; border-radius:6px; padding:2px 7px; }
+  .ti-badge.warn{ background:#fde8e8; color:#c0392b; } .ti-badge.over{ background:#fff3d6; color:#8a5a00; } .ti-badge.ok{ background:var(--accent-soft); color:var(--accent-dark); }
+  html[data-theme="dark"] .ti-badge.warn{ background:#4a2323; color:#ff9b9b; } html[data-theme="dark"] .ti-badge.over{ background:#4a3a14; color:#ffd27a; }
+  .ti-text{ width:100%; min-height:140px; border:1.5px solid var(--border-2); border-radius:10px; background:var(--surface); padding:12px; font-size:15.5px; line-height:1.7; color:var(--text); font-family:inherit; outline:none; resize:none; overflow:hidden; }
+  .ti-text:focus{ border-color:var(--accent); }
+  .ti-apply{ position:sticky; bottom:0; background:var(--surface); display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 0 4px; border-top:1px solid var(--border); font-size:12.5px; font-weight:600; color:var(--text-muted); }
+  @media (min-width:1000px){ .ti-card{ display:grid; grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr); gap:18px; } .ti-photo{ margin:0; } .ti-photo img{ max-height:none; } .ti-text{ font-size:17px; min-height:240px; } }
   .count-label{ font-size:12px; color:var(--text-muted); font-weight:600; align-self:center; margin-left:auto; }
   /* 모아보기 */
   .filter-chip{ background:var(--accent); color:#fff; }
@@ -613,6 +631,24 @@
   </div>
 </div>
 
+<!-- 일기 글 불러오기: 사진형 일기를 글로 옮긴 파일을 사진과 나란히 검토하고 날짜에 덮어쓰기 -->
+<div class="sheet-bg" id="textImportSheet" style="z-index:57">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h">
+      <div><div class="t">📝 일기 글 불러오기</div><div class="saved" id="tiSub" style="margin-top:2px"></div></div>
+      <button class="icon-sq" data-close aria-label="닫기">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn ghost" id="tiPick">📂 파일 선택</button>
+      <button class="btn ghost" id="tiHideDone">적용한 것 숨기기</button>
+      <button class="btn ghost" id="tiClear" style="margin-left:auto;color:var(--danger)">목록 비우기</button>
+    </div>
+    <div id="tiList"></div>
+    <div class="ti-apply"><span id="tiSummary"></span><button class="btn primary" id="tiApply">적용</button></div>
+  </div>
+</div>
+<input type="file" id="tiInput" accept="application/json,.json" hidden>
+
 <!-- 설정 (⋯) -->
 <div class="sheet-bg" id="menuSheet">
   <div class="sheet" role="dialog" aria-modal="true">
@@ -639,6 +675,7 @@
       <button class="btn ghost" id="exportBtn" style="flex:1">⬇️ 백업 내보내기</button>
       <button class="btn ghost" id="importBtn" style="flex:1">⬆️ 백업 불러오기</button>
     </div>
+    <button class="btn ghost" id="tiOpen" style="width:100%;margin-top:8px">📝 일기 글 불러오기 (사진 → 글 검토)</button>
 
     <div class="sec-label" style="margin-top:22px"><span>키보드 · 아이패드 팁</span></div>
     <div class="saved" style="line-height:2;color:var(--text)">
@@ -2272,6 +2309,102 @@ $('tagList').addEventListener('click', e=>{
 });
 $('tlSearch').oninput=renderTagList; $('tlSort').onchange=renderTagList; $('tlOwn').onchange=renderTagList; $('tlCat').onchange=renderTagList;
 
+/* ================= 일기 글 불러오기 (사진형 일기 → 글) =================
+   파일 형식: { app:'ootd-diary-text', items:[{ id, name, date:'YYYY-MM-DD'|'', text, img:'data:image/jpeg;base64,…' }] }
+   사진과 글을 나란히 놓고 고친 뒤 적용하면 해당 날짜의 일기 글을 덮어씀 (옷 태그·사진·좋아요는 그대로).
+   검토 중인 목록은 이 기기에 저장돼서 앱을 닫았다 열어도 이어서 할 수 있음 */
+let tiItems=[], tiHideDone=false, tiTimer=null;
+function tiDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open('ootd-textimport',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+const tiKey=()=>'items-'+(user?user.uid:'');
+async function tiLoad(){ try{ const db=await tiDB(); return await new Promise(res=>{ const q=db.transaction('kv').objectStore('kv').get(tiKey()); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>res([]); }); }catch(e){ return []; } }
+function tiSave(now){
+  clearTimeout(tiTimer);
+  const run=async()=>{ try{ const db=await tiDB(); db.transaction('kv','readwrite').objectStore('kv').put(tiItems, tiKey()); }catch(e){ console.error(e); } };
+  if(now) return run(); tiTimer=setTimeout(run, 600);
+}
+const tiHasQ=t=>/\(\?\)|（\?）/.test(t||'');
+function growTa(t){ t.style.height='auto'; t.style.height=(t.scrollHeight+2)+'px'; }
+function tiBadgesHtml(it){
+  const b=[];
+  if(it.done) b.push('<span class="ti-badge ok">✓ 적용됨</span>');
+  else{
+    if(!it.date) b.push('<span class="ti-badge warn">날짜 필요</span>');
+    else if((entries[it.date]?.text||'').trim()) b.push('<span class="ti-badge over">기존 글 있음 · 덮어씀</span>');
+    if(tiHasQ(it.text)) b.push('<span class="ti-badge warn">확인 필요 (?)</span>');
+  }
+  return b.join(' ');
+}
+function tiStats(){
+  const todo=tiItems.filter(i=>!i.done);
+  const ready=todo.filter(i=>i.on && i.date && (i.text||'').trim());
+  return { total:tiItems.length, done:tiItems.length-todo.length, ready, noDate:todo.filter(i=>!i.date).length, q:todo.filter(i=>tiHasQ(i.text)).length };
+}
+function tiRefreshSummary(){
+  const st=tiStats();
+  $('tiSub').textContent = st.total ? `${st.total}개 중 ${st.done}개 적용함` : '검토할 글이 없어요';
+  $('tiSummary').textContent = st.total ? `적용 가능 ${st.ready.length}개 · 날짜 필요 ${st.noDate}개 · 확인 필요 ${st.q}개` : '';
+  $('tiApply').disabled=!st.ready.length; $('tiApply').style.opacity=st.ready.length?1:.4;
+  $('tiApply').textContent = st.ready.length ? `${st.ready.length}개 적용` : '적용';
+  $('tiHideDone').textContent = tiHideDone ? '적용한 것 보이기' : '적용한 것 숨기기';
+}
+function renderTi(){
+  const box=$('tiList'); box.innerHTML='';
+  if(!tiItems.length){ box.innerHTML='<div class="empty-msg">사진을 글로 옮긴 파일(.json)을 선택하세요<br>사진과 글을 나란히 보면서 고칠 수 있어요</div>'; tiRefreshSummary(); return; }
+  tiItems.forEach((it,i)=>{
+    if(it.done && tiHideDone) return;
+    const card=document.createElement('div'); card.className='ti-card'+(it.done?' done':''); card.dataset.i=i;
+    card.innerHTML=`<div class="ti-photo"><img alt=""><div class="nm"></div></div>
+      <div class="ti-body"><div class="ti-top"><input type="date" class="ti-date"><label><input type="checkbox" class="ti-on"> 적용</label><span class="ti-bd"></span></div>
+      <textarea class="ti-text" placeholder="글 내용"></textarea></div>`;
+    const img=card.querySelector('img'); img.src=it.img||''; img.onclick=()=>img.classList.toggle('big');
+    card.querySelector('.nm').textContent=it.name||'';
+    const dt=card.querySelector('.ti-date'), on=card.querySelector('.ti-on'), ta=card.querySelector('.ti-text'), bd=card.querySelector('.ti-bd');
+    dt.value=it.date||''; on.checked=it.on!==false; ta.value=it.text||''; bd.innerHTML=tiBadgesHtml(it);
+    const upd=()=>{ bd.innerHTML=tiBadgesHtml(it); tiRefreshSummary(); tiSave(); };
+    dt.onchange=()=>{ it.date=dt.value; upd(); };
+    on.onchange=()=>{ it.on=on.checked; upd(); };
+    ta.oninput=()=>{ it.text=ta.value; growTa(ta); upd(); };
+    box.appendChild(card);
+  });
+  requestAnimationFrame(()=>box.querySelectorAll('.ti-text').forEach(growTa));
+  tiRefreshSummary();
+}
+$('tiOpen').onclick=async ()=>{ closeSheet('menuSheet'); tiItems=await tiLoad(); renderTi(); openSheet('textImportSheet'); };
+$('tiPick').onclick=()=>$('tiInput').click();
+$('tiHideDone').onclick=()=>{ tiHideDone=!tiHideDone; renderTi(); };
+$('tiClear').onclick=()=>{
+  if(!tiItems.length) return;
+  if(!confirm(`검토 목록 ${tiItems.length}개를 모두 비울까요?\n(이미 적용한 일기 글은 그대로예요)`)) return;
+  tiItems=[]; tiSave(true); renderTi();
+};
+$('tiInput').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(data.app!=='ootd-diary-text' || !Array.isArray(data.items)) throw 0;
+    const have=new Set(tiItems.map(i=>i.id)); let n=0;
+    for(const x of data.items){
+      if(!x || have.has(x.id)) continue;
+      tiItems.push({ id:x.id||('t'+Math.random().toString(36).slice(2)), name:x.name||'', date:/^\d{4}-\d{2}-\d{2}$/.test(x.date||'')?x.date:'', text:x.text||'', img:x.img||'', on:true, done:false }); n++;
+    }
+    tiSave(true); renderTi(); toast(n ? `${n}개를 불러왔어요` : '이미 불러온 파일이에요', 2500);
+  }catch(err){ console.error(err); toast('올바른 파일이 아니에요'); }
+};
+$('tiApply').onclick=async ()=>{
+  const st=tiStats(); if(!st.ready.length) return;
+  const byDate={}; for(const it of st.ready) (byDate[it.date] ||= []).push(it);
+  const dates=Object.keys(byDate).sort();
+  const over=dates.filter(d=>(entries[d]?.text||'').trim()).length, dup=dates.filter(d=>byDate[d].length>1).length, q=st.ready.filter(i=>tiHasQ(i.text)).length;
+  const msg=`${dates.length}일의 일기 글을 저장할까요?\n· 기존 글이 있어 덮어쓰는 날: ${over}일\n`
+    +(dup?`· 같은 날짜가 여러 개라 이어 붙이는 날: ${dup}일\n`:'')+(q?`· (?)가 남아 있는 글: ${q}개\n`:'')+`\n옷 태그·사진·좋아요는 그대로 남아요.`;
+  if(!confirm(msg)) return;
+  const list=dates.map(d=>{ const e=entryOf(d); e.text=byDate[d].map(i=>i.text.trim()).join('\n\n'); return e; });
+  commitEntries(list);
+  for(const it of st.ready) it.done=true;
+  tiSave(true); renderTi(); refresh();
+  toast(`${dates.length}일의 일기 글을 저장했어요`, 3000);
+};
+
 /* ================= 옷장 ================= */
 let closetIOs=[];
 function renderCloset(){
@@ -2468,7 +2601,7 @@ document.addEventListener('keydown', e=>{
   if($('viewer').classList.contains('open')) return closeViewer();
   const a=document.activeElement;
   if($('daySheet').classList.contains('open') && a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.closest('#daySheet')){ a.blur(); return; }   // 글 쓰는 중이면 입력만 빠져나옴
-  for(const id of ['addSheet','toTagSheet','searchSheet','menuSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
+  for(const id of ['textImportSheet','addSheet','toTagSheet','searchSheet','menuSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
 let tt; function toast(m, ms=2200){
   const t=$('toast'); t.textContent=m;
