@@ -1183,7 +1183,8 @@ function renderOnThisDay(d){
     more.onclick=()=>{ const open=txt.classList.toggle('clamp'); more.textContent=open?'더보기':'접기'; };
     box.appendChild(card);
     requestAnimationFrame(()=>{ if(txt.scrollHeight>txt.clientHeight+2) more.classList.remove('hidden'); });
-    lazy(root, card.querySelector('.otd-th'), async el=>{ const t=await thumbForDay(x); if(t) el.innerHTML=`<img src="${t}" alt="">`; else el.remove(); });   // 사진 없는 날은 칸 없앰
+    // 캘린더가 '전체 사진' 보기면 OOTD 안 찍은 날로 표시한 날도 사진을 보여줌
+    lazy(root, card.querySelector('.otd-th'), async el=>{ const t=await thumbForDay(x, calShowAll); if(t) el.innerHTML=`<img src="${t}" alt="">`; else el.remove(); });   // 사진 없는 날은 칸 없앰
   }
 }
 function renderDayPhotos(){
@@ -1932,7 +1933,7 @@ async function photosForDay(d){
     dayPhotosCache.set(d,l); return l;
   }catch(e){ console.error(e); return []; }
 }
-async function thumbForDay(d){ if(noCover(d)) return null; const l=await photosForDay(d); return l.length ? l[0].thumb : null; }
+async function thumbForDay(d, ignoreNoCover){ if(!ignoreNoCover && noCover(d)) return null; const l=await photosForDay(d); return l.length ? l[0].thumb : null; }
 // 화면에 보일 때만 불러오기
 function lazy(root, el, fn){
   const io=new IntersectionObserver(es=>es.forEach(en=>{ if(en.isIntersecting){ io.disconnect(); fn(el); } }), { root, rootMargin:'400px' });
