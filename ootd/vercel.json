@@ -1,0 +1,4 @@
+{
+  "buildCommand": "node stamp.js",
+  "outputDirectory": "."
+}

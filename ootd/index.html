@@ -714,7 +714,7 @@
     <div class="sec-label" style="margin-top:22px"><span>계정</span></div>
     <div class="account" id="accountRow" style="justify-content:flex-start;margin-top:0"></div>
     <div class="sync" id="syncState" style="text-align:left;margin-top:4px"></div>
-    <div class="saved" style="margin-top:18px;text-align:center">버전 2026-11-23 11:40</div>
+    <div class="saved" style="margin-top:18px;text-align:center"><span id="verLabel">버전 __BUILD_TIME__</span></div>
   </div>
 </div>
 
@@ -3012,5 +3012,6 @@ function initFirebase(){
 }
 initFirebase();
 </script>
+<script>(function(){ var e=document.getElementById('verLabel'); if(e && e.textContent.indexOf('__BUILD')>-1) e.textContent='버전 (미배포 파일)'; else if(e) e.textContent=e.textContent+' (KST)'; })();</script>
 </body>
 </html>
