@@ -294,6 +294,14 @@
   .tz img{ position:absolute; left:0; top:0; transform-origin:0 0; max-width:none; user-select:none; -webkit-user-drag:none; will-change:transform; }
   .tz .x{ position:absolute; top:calc(12px + env(safe-area-inset-top,0px)); right:12px; z-index:2; background:rgba(255,255,255,.2); color:#fff; border:none; width:42px; height:42px; border-radius:50%; font-size:20px; }
   .tz .hint{ position:absolute; bottom:calc(14px + env(safe-area-inset-bottom,0px)); left:0; right:0; text-align:center; color:#bbb; font-size:12px; pointer-events:none; }
+  .tgdlg{ position:fixed; inset:0; z-index:95; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:20px; }
+  .tgdlg .box{ width:100%; max-width:420px; background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:18px; box-shadow:0 10px 40px rgba(0,0,0,.4); }
+  .tgdlg .ttl{ font-size:17px; font-weight:800; word-break:break-all; margin-bottom:6px; }
+  .tgdlg .hint{ font-size:12.5px; color:var(--text-muted); line-height:1.5; margin-bottom:10px; }
+  .tgdlg input{ width:100%; border:1.5px solid var(--border-2); border-radius:10px; background:var(--bg); color:var(--text); padding:12px; font-size:16px; font-family:inherit; margin-bottom:12px; }
+  .tgdlg .rm{ width:100%; padding:14px; font-size:15px; font-weight:800; margin-bottom:10px; background:#fde8e8; color:#c0392b; border:1.5px solid #f3b4b4; }
+  html[data-theme="dark"] .tgdlg .rm{ background:#4a2323; color:#ff9b9b; border-color:#7a3a3a; }
+  .tgdlg .row{ display:flex; gap:8px; } .tgdlg .row .btn{ flex:1; padding:13px; font-size:15px; }
   .ti-card{ border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:14px; background:var(--bg); }
   .ti-card.done{ opacity:.55; }
   .ti-photo{ margin-bottom:10px; text-align:center; }
@@ -704,7 +712,7 @@
     <div class="sec-label" style="margin-top:22px"><span>계정</span></div>
     <div class="account" id="accountRow" style="justify-content:flex-start;margin-top:0"></div>
     <div class="sync" id="syncState" style="text-align:left;margin-top:4px"></div>
-    <div class="saved" style="margin-top:18px;text-align:center">버전 2026-11-23 10:00</div>
+    <div class="saved" style="margin-top:18px;text-align:center">버전 2026-11-23 11:10</div>
   </div>
 </div>
 
@@ -1450,7 +1458,7 @@ function renderDayTags(){
   sortTags(e.tags).forEach(t=>{
     const s=document.createElement('span'); s.className='tag'; s.innerHTML=`<span class="tname" style="cursor:pointer">#${esc(t)}</span><button aria-label="이 날에서 태그 빼기">✕</button>`;
     s.querySelector('button').onclick=()=>{ const en=entryOf(curDay); en.text=$('diary').value; en.tags=en.tags.filter(x=>x!==t); saveEntry(en); renderDayTags(); };
-    s.querySelector('.tname').onclick=()=>{ flushDiary(); if(promptRenameTag(t)) renderDayTags(); };
+    s.querySelector('.tname').onclick=()=>{ flushDiary(); dayTagDialog(t); };
     box.appendChild(s);
   });
 }
@@ -2565,13 +2573,35 @@ function renameTagsEverywhere(mapFn){
   return changed.length;
 }
 // 태그 하나 이름 바꾸기 (예: Avinue_n_son_블랙티셔츠 → AvenueNSon_블랙티셔츠)
-function promptRenameTag(old){
-  const nv=prompt(`#${old}\n\n새 이름을 입력하세요. 이 태그가 달린 모든 기록에 반영돼요.\n(이미 있는 태그 이름이면 하나로 합쳐져요)`, old);
-  if(nv===null) return null;
+function applyRenameTag(old, nv){
   const t=normTag(nv); if(!t || t===old) return null;
   const n=renameTagsEverywhere(x=>x===old?t:x);
   toast(`${n}일의 기록에서 #${old} → #${t}(으)로 바꿨어요`, 3500);
   return t;
+}
+function promptRenameTag(old){
+  const nv=prompt(`#${old}\n\n새 이름을 입력하세요. 이 태그가 달린 모든 기록에 반영돼요.\n(이미 있는 태그 이름이면 하나로 합쳐져요)`, old);
+  if(nv===null) return null;
+  return applyRenameTag(old, nv);
+}
+// 날짜 화면에서 태그를 누르면: 이름 바꾸기 + 이 날에서 빼기(큰 버튼)
+function dayTagDialog(t){
+  const bg=document.createElement('div'); bg.className='tgdlg';
+  bg.innerHTML=`<div class="box"><div class="ttl"></div>
+    <div class="hint">새 이름을 입력하면 이 태그가 달린 모든 기록에 반영돼요.<br>(이미 있는 태그 이름이면 하나로 합쳐져요)</div>
+    <input type="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+    <button class="btn danger rm">이 날에서 태그 빼기</button>
+    <div class="row"><button class="btn ghost cc">취소</button><button class="btn primary ok">이름 바꾸기</button></div></div>`;
+  bg.querySelector('.ttl').textContent='#'+t;
+  const inp=bg.querySelector('input'); inp.value=t;
+  const close=()=>bg.remove();
+  bg.onclick=e=>{ if(e.target===bg) close(); };
+  bg.querySelector('.cc').onclick=close;
+  bg.querySelector('.rm').onclick=()=>{ close(); const en=entryOf(curDay); en.text=$('diary').value; en.tags=en.tags.filter(x=>x!==t); saveEntry(en); renderDayTags(); };
+  const go=()=>{ const nn=applyRenameTag(t, inp.value); close(); if(nn!==null) renderDayTags(); };
+  bg.querySelector('.ok').onclick=go;
+  inp.onkeydown=e=>{ if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); go(); } else if(e.key==='Escape') close(); };
+  document.body.appendChild(bg); inp.focus(); inp.select();
 }
 // 브랜드 이름 바꾸기 (예: Avinue_n_son → AvenueNSon, 그 브랜드의 모든 옷 태그 앞부분이 바뀜)
 function promptRenameBrand(old){
