@@ -907,7 +907,7 @@ async function isDuplicate(date, sig, pending, exceptId){
 
 /* ================= 상태 / 유틸 ================= */
 let entries={};
-let gapKeepMonth=null;
+let gapKeepMonth=null;   // 빈 날 탭에서 계속 받아 둘 달들 (배열)
 let view=(()=>{ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
 let curDay=null, viewerPhoto=null, viewerList=[], viewerIdx=0, pendingDay=null;
 let statGroup='item';
@@ -946,7 +946,7 @@ function syncMonths(){
   const center=mkey(view.y,view.m);
   const want=new Set([shiftMonth(center,-1), center, shiftMonth(center,1)]);
   if(curDay) want.add(monthOfDate(curDay));
-  if(gapKeepMonth) want.add(gapKeepMonth);
+  if(gapKeepMonth) for(const k of gapKeepMonth) want.add(k);
   for(const k of want) subscribeMonth(k);
   for(const [k,st] of months) if(!want.has(k) && st.unsub){ st.unsub(); st.unsub=null; }
 }
@@ -2778,23 +2778,22 @@ function renderGaps(){
   if(!first){ $('gapList').innerHTML='<div class="empty-msg">아직 기록이 없어요</div>'; $('gapCount').textContent=''; return; }
   // 기간 목록 (최근 달 먼저). 일기는 전체도 가능, 사진은 한 달씩
   const ms=[]; for(let k=curM; k>=first.slice(0,7); k=shiftMonth(k,-1)) ms.push(k);
-  if(gapMode==='photo' && gapPeriod==='all') gapPeriod=curM;
   if(gapPeriod!=='all' && !ms.includes(gapPeriod)) gapPeriod=curM;
-  const opts=(gapMode==='text'?['all']:[]).concat(ms);
+  const opts=['all'].concat(ms);
   const sig=gapMode+'|'+opts.length+'|'+opts[0];
   if($('gapPeriod').dataset.sig!==sig){
     $('gapPeriod').innerHTML=opts.map(k=>`<option value="${k}">${k==='all'?'전체 기간':k.replace('-','년 ')+'월'}</option>`).join('');
     $('gapPeriod').dataset.sig=sig;
   }
   $('gapPeriod').value=gapPeriod;
-  gapKeepMonth = (gapMode==='photo') ? gapPeriod : null;
+  const targets = gapPeriod==='all' ? ms : [gapPeriod];
+  gapKeepMonth = (gapMode==='photo') ? targets : null;
   syncMonths();
   const pm=photosByDate();
-  const targets = gapPeriod==='all' ? ms : [gapPeriod];
-  const box=$('gapList'); let html='', total=0, waiting=false;
+  const box=$('gapList'); let html='', total=0, waiting=false, pending=0;
   for(const mk of targets){
     const [y,m]=mk.split('-').map(Number), n=new Date(y,m,0).getDate(), st=months.get(mk), loaded=!!(st&&st.loaded);
-    if(gapMode==='photo' && !loaded){ waiting=true; continue; }
+    if(gapMode==='photo' && !loaded){ waiting=true; pending++; continue; }
     const rows=[];
     for(let d=n; d>=1; d--){
       const key=`${mk}-${pad(d)}`;
@@ -2810,11 +2809,12 @@ function renderGaps(){
     if(rows.length) html+=`<div class="saved" style="margin:12px 0 2px;font-weight:800">${y}년 ${m}월 · ${rows.length}일</div>`+rows.join('');
   }
   if(waiting && !total) html='<div class="empty-msg">사진을 불러오는 중이에요…</div>';
+  else if(waiting) html=`<div class="saved" style="margin:8px 0">${targets.length-pending}/${targets.length}달 불러옴 · 나머지는 불러오는 중이에요…</div>`+html;
   else if(!total) html=`<div class="empty-msg">${gapMode==='text'?'일기를 안 쓴 날이 없어요 🎉':'사진이 없는 날이 없어요 🎉'}</div>`;
   box.innerHTML=html;
-  $('gapCount').textContent = waiting ? '불러오는 중…' : `${total}일`;
+  $('gapCount').textContent = waiting ? `불러오는 중… (${total}일)` : `${total}일`;
 }
-$('gapMode').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; gapMode=b.dataset.m; renderGaps(); };
+$('gapMode').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; gapMode=b.dataset.m; renderGaps(); if(gapMode==='text') syncMonths(); };
 $('gapPeriod').onchange=()=>{ gapPeriod=$('gapPeriod').value; renderGaps(); };
 $('gapList').onclick=e=>{ const r=e.target.closest('[data-d]'); if(!r) return; navStack.length=0; openDay(r.dataset.d); };
 
@@ -2827,6 +2827,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   $('statsView').classList.toggle('hidden', t!=='stats');
   $('tagsView').classList.toggle('hidden', t!=='tags');
   $('gapsView').classList.toggle('hidden', t!=='gaps');
+  if(t!=='gaps') gapKeepMonth=null;   // 다른 탭으로 가면 빈 날용으로 받아 둔 달들은 놓아 줌
   $('addBtn').classList.toggle('hidden', t!=='cal');
   window.scrollTo(0,0);
   if(t==='stats') renderStats(); else if(t==='closet') renderCloset(); else if(t==='tags') renderTagList(); else if(t==='gaps') renderGaps(); else renderCal();
