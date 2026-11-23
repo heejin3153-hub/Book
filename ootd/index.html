@@ -704,7 +704,7 @@
     <div class="sec-label" style="margin-top:22px"><span>계정</span></div>
     <div class="account" id="accountRow" style="justify-content:flex-start;margin-top:0"></div>
     <div class="sync" id="syncState" style="text-align:left;margin-top:4px"></div>
-    <div class="saved" style="margin-top:18px;text-align:center">버전 2026-11-20 04:20</div>
+    <div class="saved" style="margin-top:18px;text-align:center">버전 2026-11-23 10:00</div>
   </div>
 </div>
 
@@ -1504,9 +1504,7 @@ $('tagInput').addEventListener('keydown', e=>{
     addTags(v);
     $('tagInput').value=''; hideSuggest();
   }
-  if(e.key==='Backspace' && !$('tagInput').value){
-    const en=entryOf(curDay); if(en.tags.length){ en.text=$('diary').value; en.tags.pop(); saveEntry(en); renderDayTags(); }
-  }
+  // 빈 칸에서 Backspace로 직전 태그가 지워지던 동작 제거 — 태그 삭제는 태그의 ✕ 버튼으로만
 });
 $('tagInput').addEventListener('paste', e=>{
   const t=(e.clipboardData||window.clipboardData).getData('text');
