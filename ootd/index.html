@@ -1241,7 +1241,7 @@ async function loadDayWx(city, force){
     if(!w){ $('wxMsg')&&( $('wxMsg').textContent='이 날 날씨 정보가 없어요'); return; }
     wxCache[d]=w;
     const e=entries[d];
-    if(e && keepEntry(e)){ const n=entryOf(d); n.wx=w; saveEntry(n); .textContent=''; }
+    if(e && keepEntry(e)){ const n=entryOf(d); n.wx=w; saveEntry(n); $('savedMark').textContent=''; }
     renderWx();
   }catch(err){
     console.error(err);
