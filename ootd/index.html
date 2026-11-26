@@ -728,6 +728,7 @@
     <div class="cg-opts">
       <span class="saved">장수</span><span class="seg" id="cgN"><button data-v="4">4</button><button data-v="6" class="on">6</button><button data-v="9">9</button></span>
       <span class="saved">모양</span><span class="seg" id="cgShape"><button data-v="free" class="on">자유형</button><button data-v="round">둥글게</button><button data-v="rect">사각</button></span>
+      <span class="saved">오리기</span><span class="seg" id="cgCut"><button data-v="off" class="on">끄기</button><button data-v="on">✂️ 사람만</button></span>
       <span class="saved">배경</span><span class="seg" id="cgBg"><button data-v="cream" class="on">크림</button><button data-v="grey">회색</button><button data-v="pink">핑크</button><button data-v="black">블랙</button></span>
     </div>
     <p class="saved" id="cgMsg" style="text-align:center;margin:8px 0"></p>
@@ -3073,7 +3074,76 @@ $('recapBody').onclick=e=>{ const r=e.target.closest('[data-d]'); if(!r) return;
 $('recapCollage').onclick=()=>{ closeSheet('recapSheet'); openCollage(rc.mode==='month' ? `${rc.y}-${pad(rc.m+1)}` : `${rc.y}-${pad(rc.m+1)}`); };
 
 /* ---- 4. OOTD 콜라주 (사진을 스티커처럼 오려 겹쳐 붙인 이미지) ---- */
-const cg={ mk:'', n:6, shape:'free', bg:'cream', seed:1, busy:false };
+const cg={ mk:'', n:6, shape:'free', bg:'cream', seed:1, busy:false, cut:false };
+/* ---- 사람만 오리기: 기기 안에서 돌아가는 MediaPipe 인물 분리 (사진이 밖으로 나가지 않음) ---- */
+const MP_VER='0.10.14';
+const MP_BASE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}`;
+const MP_MODEL='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
+let segPromise=null;
+function getSegmenter(){
+  if(segPromise) return segPromise;
+  segPromise=(async()=>{
+    const mod=await import(MP_BASE+'/vision_bundle.mjs');
+    const fileset=await mod.FilesetResolver.forVisionTasks(MP_BASE+'/wasm');
+    const make=delegate=>mod.ImageSegmenter.createFromOptions(fileset,{ baseOptions:{ modelAssetPath:MP_MODEL, delegate }, runningMode:'IMAGE', outputCategoryMask:false, outputConfidenceMasks:true });
+    try{ return await make('GPU'); }catch(e){ console.warn('GPU segmenter failed, CPU로 다시', e); return await make('CPU'); }
+  })();
+  segPromise.catch(()=>{ segPromise=null; });
+  return segPromise;
+}
+// canvas → {data:Float32Array(0~1 사람일 확률), w, h}
+async function segmentPerson(canvas){
+  if(window.__fakeSeg) return window.__fakeSeg(canvas);   // 시험용
+  const seg=await getSegmenter();
+  const res=seg.segment(canvas);
+  try{
+    const masks=res.confidenceMasks||[];
+    if(!masks.length) throw new Error('no mask');
+    const cand=masks.map(m=>({ data:Float32Array.from(m.getAsFloat32Array()), w:m.width, h:m.height }));
+    // 마스크가 2장(배경/사람)이면 사람 쪽을, 1장이면 가운데가 더 높은 쪽(사람)이 되도록 맞춤
+    const score=m=>{ let c=0,cn=0,b=0,bn=0; const {w,h,data}=m;
+      for(let y=0;y<h;y+=4) for(let x=0;x<w;x+=4){ const v=data[y*w+x], edge=(x<w*0.12||x>w*0.88||y<h*0.08||y>h*0.92); if(edge){ b+=v; bn++; } else if(x>w*0.3&&x<w*0.7&&y>h*0.25&&y<h*0.75){ c+=v; cn++; } }
+      return (c/(cn||1))-(b/(bn||1)); };
+    let best=cand[0]; for(const m of cand) if(score(m)>score(best)) best=m;
+    if(score(best)<0){ best={ ...best, data:best.data.map(v=>1-v) }; }
+    return best;
+  } finally { (res.confidenceMasks||[]).forEach(m=>{ try{ m.close(); }catch(e){} }); if(res.close) try{ res.close(); }catch(e){} }
+}
+const cutCache=new Map();   // 사진 id → 오려 낸 캔버스(없으면 null)
+async function getCutout(ph){
+  if(cutCache.has(ph.id)) return cutCache.get(ph.id);
+  const full=await getFull(ph.id).catch(()=>null);
+  const img=await loadImg(full||ph.thumb); if(!img) return null;
+  const k=Math.min(1, 1100/Math.max(img.width,img.height)), W=Math.round(img.width*k), H=Math.round(img.height*k);
+  const src=document.createElement('canvas'); src.width=W; src.height=H; src.getContext('2d').drawImage(img,0,0,W,H);
+  let out=null;
+  try{
+    const m=await segmentPerson(src);
+    // 마스크 → 알파 (경계를 부드럽게), 원본 크기로 키움
+    const mc=document.createElement('canvas'); mc.width=m.w; mc.height=m.h;
+    const mctx=mc.getContext('2d'), id=mctx.createImageData(m.w,m.h);
+    let area=0;
+    for(let i=0;i<m.data.length;i++){ const v=m.data[i], t=Math.max(0,Math.min(1,(v-0.35)/0.3)), a=t*t*(3-2*t); id.data[i*4+3]=Math.round(a*255); if(v>0.5) area++; }
+    if(area/m.data.length<0.03) { cutCache.set(ph.id,null); return null; }   // 사람이 안 보이는 사진
+    mctx.putImageData(id,0,0);
+    const cut=document.createElement('canvas'); cut.width=W; cut.height=H; const cctx=cut.getContext('2d');
+    cctx.drawImage(src,0,0);
+    cctx.globalCompositeOperation='destination-in'; cctx.imageSmoothingQuality='high'; cctx.drawImage(mc,0,0,W,H);
+    // 사람이 있는 부분만 잘라내기
+    const px=cctx.getImageData(0,0,W,H).data; let x0=W,y0=H,x1=0,y1=0;
+    for(let y=0;y<H;y+=2) for(let x=0;x<W;x+=2) if(px[(y*W+x)*4+3]>60){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+    if(x1<=x0||y1<=y0){ cutCache.set(ph.id,null); return null; }
+    const pad=24, bx=Math.max(0,x0-pad), by=Math.max(0,y0-pad), bw=Math.min(W,x1+pad)-bx, bh=Math.min(H,y1+pad)-by;
+    // 흰 스티커 테두리: 실루엣을 여러 방향으로 겹쳐 찍은 뒤 그 위에 사람
+    const R=14, o=document.createElement('canvas'); o.width=bw+R*2; o.height=bh+R*2; const octx=o.getContext('2d');
+    const sil=document.createElement('canvas'); sil.width=bw; sil.height=bh; const sctx=sil.getContext('2d');
+    sctx.drawImage(cut,bx,by,bw,bh,0,0,bw,bh); sctx.globalCompositeOperation='source-in'; sctx.fillStyle='#fff'; sctx.fillRect(0,0,bw,bh);
+    for(let a=0;a<24;a++){ const t=a/24*Math.PI*2; octx.drawImage(sil, R+Math.cos(t)*R, R+Math.sin(t)*R); }
+    octx.drawImage(cut,bx,by,bw,bh,R,R,bw,bh);
+    out=o;
+  }catch(err){ console.error('오리기 실패', err); throw err; }
+  cutCache.set(ph.id,out); return out;
+}
 function rng(seed){ let s=seed>>>0; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 function cgPath(ctx,w,h,shape,r){
   const rad = shape==='rect' ? [10,10,10,10] : shape==='round' ? [90,90,90,90] : [60+r()*190,60+r()*190,60+r()*190,60+r()*190];
@@ -3093,11 +3163,11 @@ function openCollage(mk){
   cg.mk=mk||mkey(view.y,view.m); cg.seed=(Math.random()*1e9)|0; cgKeep=cg.mk; openSheet('collageSheet'); drawCollage();
 }
 async function drawCollage(){
-  if(cg.busy) return; cg.busy=true;
+  if(cg.busy){ cg.again=true; return; } cg.busy=true;
   try{
     cgKeep=cg.mk; syncMonths();
     const [yy,mm]=cg.mk.split('-').map(Number); $('cgMonthLbl').textContent=`${yy}년 ${mm}월`;
-    [['cgN',cg.n],['cgShape',cg.shape],['cgBg',cg.bg]].forEach(([id,v])=>[...$(id).children].forEach(b=>b.classList.toggle('on', b.dataset.v===String(v))));
+    [['cgN',cg.n],['cgShape',cg.shape],['cgBg',cg.bg],['cgCut',cg.cut?'on':'off']].forEach(([id,v])=>[...$(id).children].forEach(b=>b.classList.toggle('on', b.dataset.v===String(v))));
     const st=months.get(cg.mk), cv=$('cgCanvas'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
     const pm=photosByDate();
     const days=Object.keys(pm).filter(d=>d.startsWith(cg.mk) && !noCover(d)).sort();
@@ -3117,19 +3187,26 @@ async function drawCollage(){
     const items=[];
     for(let i=0;i<pick.length;i++){
       const d=pick[i], ph=pm[d][0];
-      const full=await getFull(ph.id).catch(()=>null);
-      const img=await loadImg(full||ph.thumb); if(!img) continue;
-      const col=i%cols, row=(i/cols)|0, scale=0.98+r()*0.28;
+      let img=null, cut=false;
+      if(cg.cut){
+        $('cgMsg').textContent=`✂️ 사람만 오리는 중… ${i+1}/${pick.length}${segPromise?'':' (처음엔 모델을 내려받느라 오래 걸려요)'}`;
+        try{ const c=await getCutout(ph); if(c){ img=c; cut=true; } }
+        catch(err){ cg.cut=false; $('cgMsg').textContent='오리기를 못 했어요 (인터넷이 필요해요). 사진 그대로 붙여요'; await new Promise(r=>setTimeout(r,1200)); }
+      }
+      if(!img){ const full=await getFull(ph.id).catch(()=>null); img=await loadImg(full||ph.thumb); }
+      if(!img) continue;
+      const col=i%cols, row=(i/cols)|0, scale=(cut?1.05:0.98)+r()*0.28;
       const maxW=cw*scale, maxH=ch*scale*1.08, k=Math.min(maxW/img.width, maxH/img.height);
       const w=img.width*k, h=img.height*k;
       const cx=col*cw+cw/2+(r()-0.5)*cw*0.35 + (row%2? cw*0.08:-cw*0.08), cy=100+row*ch+ch/2+(r()-0.5)*ch*0.3;
-      items.push({d,img,w,h,cx:Math.max(w*0.35,Math.min(W-w*0.35,cx)),cy,rot:(r()<0.5?-1:1)*(0.04+r()*0.17),seed:(r()*1e9)|0});
+      items.push({d,img,cut,w,h,cx:Math.max(w*0.35,Math.min(W-w*0.35,cx)),cy,rot:(r()<0.5?-1:1)*(0.04+r()*0.17),seed:(r()*1e9)|0});
     }
     for(let i=items.length-1;i>0;i--){ const j=(r()*(i+1))|0; [items[i],items[j]]=[items[j],items[i]]; }   // 겹치는 순서
     for(const it of items){
       const pr=rng(it.seed);
       ctx.save(); ctx.translate(it.cx,it.cy); ctx.rotate(it.rot);
       ctx.shadowColor='rgba(0,0,0,.32)'; ctx.shadowBlur=34; ctx.shadowOffsetY=14;
+      if(it.cut){ ctx.drawImage(it.img,-it.w/2,-it.h/2,it.w,it.h); ctx.restore(); continue; }   // 오려 낸 사람: 모양·테두리는 이미 만들어 둠
       ctx.fillStyle='#fff'; cgPath(ctx,it.w+26,it.h+26,cg.shape,rng(it.seed)); ctx.fill();   // 스티커 흰 테두리
       ctx.shadowColor='transparent';
       cgPath(ctx,it.w,it.h,cg.shape,rng(it.seed)); ctx.clip();
@@ -3147,13 +3224,14 @@ async function drawCollage(){
     const season=[ '❄️','❄️','🌸','🌸','🌷','☀️','☀️','🌊','🍂','🍁','🍁','⛄' ][mm-1];
     ctx.save(); ctx.translate(W*(0.16+r()*0.1),H*(0.44+r()*0.1)); ctx.rotate(-0.25); ctx.font='170px serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(season,0,0); ctx.restore();
     cgPill(ctx,`OOTD · ${yy}.${pad(mm)}`,40,36,-0.03,{bg:dark?'#fff':'#111',fg:dark?'#111':'#fff',size:46});
-  } finally { cg.busy=false; }
+    $('cgMsg').textContent='';
+  } finally { cg.busy=false; if(cg.again){ cg.again=false; drawCollage(); } }
 }
 $('collageBtn').onclick=()=>openCollage(mkey(view.y,view.m));
 $('cgPrev').onclick=()=>{ cg.mk=shiftMonth(cg.mk,-1); drawCollage(); };
 $('cgNext').onclick=()=>{ cg.mk=shiftMonth(cg.mk,1); drawCollage(); };
 $('cgShuffle').onclick=()=>{ cg.seed=(Math.random()*1e9)|0; drawCollage(); };
-[['cgN','n',Number],['cgShape','shape',String],['cgBg','bg',String]].forEach(([id,key,cv])=>$(id).onclick=e=>{ const b=e.target.closest('button'); if(!b) return; cg[key]=cv(b.dataset.v); drawCollage(); });
+[['cgN','n',Number],['cgShape','shape',String],['cgBg','bg',String],['cgCut','cut',v=>v==='on']].forEach(([id,key,cv])=>$(id).onclick=e=>{ const b=e.target.closest('button'); if(!b) return; cg[key]=cv(b.dataset.v); drawCollage(); });
 $('cgSave').onclick=async()=>{
   const blob=await new Promise(res=>$('cgCanvas').toBlob(res,'image/png')); if(!blob){ toast('이미지를 만들지 못했어요'); return; }
   const file=new File([blob],`ootd-collage-${cg.mk}.png`,{type:'image/png'});
