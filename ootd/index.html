@@ -304,6 +304,11 @@
   .tgdlg .rm{ width:100%; padding:14px; font-size:15px; font-weight:800; margin-bottom:10px; background:#fde8e8; color:#c0392b; border:1.5px solid #f3b4b4; }
   html[data-theme="dark"] .tgdlg .rm{ background:#4a2323; color:#ff9b9b; border-color:#7a3a3a; }
   .tgdlg .row{ display:flex; gap:8px; } .tgdlg .row .btn{ flex:1; padding:13px; font-size:15px; }
+  .wx-line{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13.5px; font-weight:600; color:var(--text); padding:2px 2px 10px; }
+  .wx-line.hidden{ display:none; }
+  .wx-line .wx-sub{ color:var(--text-muted); font-weight:500; }
+  .wx-line select{ border:1.5px solid var(--border-2); border-radius:8px; background:var(--bg); color:var(--text); padding:4px 6px; font-size:12.5px; font-family:inherit; }
+  .wx-line .link-btn{ font-size:12.5px; }
   .ti-card{ border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:14px; background:var(--bg); }
   .ti-card.done{ opacity:.55; }
   .ti-photo{ margin-bottom:10px; text-align:center; }
@@ -566,6 +571,7 @@
         <button class="icon-sq" data-close aria-label="닫기">✕</button>
       </div>
     </div>
+    <div class="wx-line" id="wxLine"></div>
     <div class="day-cols"><div class="day-left">
     <div class="sec-label" style="margin-top:0"><span>사진</span><span><button class="link-btn hidden" id="photoDelBtn" style="color:var(--danger)"></button><button class="link-btn" id="photoOrdBtn">순서</button><button class="link-btn" id="photoSelBtn">선택</button></span></div>
     <div class="photos" id="dayPhotos"></div>
@@ -711,6 +717,7 @@
       <button class="btn ghost" id="exportBtn" style="flex:1">⬇️ 백업 내보내기</button>
       <button class="btn ghost" id="importBtn" style="flex:1">⬆️ 백업 불러오기</button>
     </div>
+    <button class="btn ghost" id="wxFillBtn" style="width:100%;margin-top:8px">🌤 지난 일기에 날씨 채우기</button>
     <button class="btn ghost" id="tiOpen" style="width:100%;margin-top:8px">📝 일기 글 불러오기 (사진 → 글 검토)</button>
 
     <div class="sec-label" style="margin-top:22px"><span>키보드 · 아이패드 팁</span></div>
@@ -1164,6 +1171,7 @@ function entryOf(d){
   const o={ date:d, tags:[...(e.tags||[])], text:e.text||'' };
   if(e.noCover) o.noCover=true;   // OOTD 안 찍은 날 (캘린더·옷장에 사진 안 보임)
   if(e.liked) o.liked=true;       // 좋아요한 일기
+  if(e.wx) o.wx={...e.wx};        // 그날 날씨 {c:날씨코드, lo:최저, hi:최고, city:도시}
   return o;
 }
 const keepEntry=e=> hasContent(e) || !!e.noCover || !!e.liked;
@@ -1177,17 +1185,99 @@ function sortTags(tags){
 }
 function saveEntry(e){
   e.tags=sortTags(e.tags);
+  if(!e.wx && wxCache[e.date]) e.wx={...wxCache[e.date]};   // 날씨는 일기 내용이 생기면 같이 저장됨
   if(keepEntry(e)){ entries[e.date]=e; save(col(C_ENTRY).doc(e.date).set(e)); }
   else if(entries[e.date]){ delete entries[e.date]; save(col(C_ENTRY).doc(e.date).delete()); }
   $('savedMark').textContent='저장됨 ✓';
   renderCal();
 }
+
+/* ================= 날씨 (최저·최고 기온 + 날씨) — Open-Meteo, 기본 서울 ================= */
+const WX_CITIES={ '서울':[37.5665,126.9780], '상해':[31.2304,121.4737], '대련':[38.9140,121.6147], '부산':[35.1796,129.0756] };
+const wxCache={};   // 일기 내용이 없는 날은 저장하지 않고 여기에만 담아 둠
+function wxInfo(c){
+  if(c===0) return ['☀️','맑음']; if(c===1) return ['🌤','대체로 맑음']; if(c===2) return ['⛅','구름 조금']; if(c===3) return ['☁️','흐림'];
+  if(c===45||c===48) return ['🌫','안개']; if(c>=51&&c<=57) return ['🌦','이슬비']; if(c>=61&&c<=67) return ['🌧','비'];
+  if(c>=71&&c<=77) return ['❄️','눈']; if(c>=80&&c<=82) return ['🌦','소나기']; if(c===85||c===86) return ['🌨','눈보라']; if(c>=95) return ['⛈','천둥번개'];
+  return ['🌡','날씨'];
+}
+// start~end(YYYY-MM-DD) 하루하루의 {c,lo,hi}를 가져옴. 최근 며칠은 예보 서버, 그 전은 과거 기록 서버
+async function fetchWxRange(start, end, city){
+  const [lat,lon]=WX_CITIES[city]||WX_CITIES['서울'];
+  const recent = new Date(Date.now()-8*864e5).toISOString().slice(0,10);
+  const out={};
+  const parts = end<recent ? [['https://archive-api.open-meteo.com/v1/archive',start,end]]
+    : start>=recent ? [['https://api.open-meteo.com/v1/forecast',start,end]]
+    : [['https://archive-api.open-meteo.com/v1/archive',start,shiftDay(recent,-1)],['https://api.open-meteo.com/v1/forecast',recent,end]];
+  for(const [base,a,b] of parts){
+    const url=`${base}?latitude=${lat}&longitude=${lon}&start_date=${a}&end_date=${b}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
+    const r=await fetch(url); if(!r.ok) throw new Error('weather '+r.status);
+    const j=await r.json(), d=j.daily; if(!d||!d.time) throw new Error('weather data');
+    d.time.forEach((t,i)=>{ if(d.temperature_2m_max[i]!=null) out[t]={ c:d.weather_code[i], lo:Math.round(d.temperature_2m_min[i]), hi:Math.round(d.temperature_2m_max[i]), city }; });
+  }
+  return out;
+}
+function shiftDay(d,n){ const x=new Date(d+'T00:00:00Z'); x.setUTCDate(x.getUTCDate()+n); return x.toISOString().slice(0,10); }
+function wxOf(d){ return (entries[d]&&entries[d].wx) || wxCache[d] || null; }
+function renderWx(){
+  const box=$('wxLine'), d=curDay, today=ymd(new Date());
+  if(!d || d>=today){ box.classList.add('hidden'); return; }   // 오늘·미래는 아직 확정 전
+  box.classList.remove('hidden');
+  const w=wxOf(d), city=(w&&w.city)||'서울';
+  const sel=`<select id="wxCity" aria-label="도시">${Object.keys(WX_CITIES).map(c=>`<option${c===city?' selected':''}>${c}</option>`).join('')}</select>`;
+  if(w){ const [ic,nm]=wxInfo(w.c); box.innerHTML=`<span>${ic} ${nm}</span><span class="wx-sub">최저 ${w.lo}° / 최고 ${w.hi}°</span>${sel}`; }
+  else box.innerHTML=`<span class="wx-sub" id="wxMsg">날씨 불러오는 중…</span>${sel}`;
+  $('wxCity').onchange=()=>loadDayWx($('wxCity').value, true);
+}
+let wxSeq=0;
+async function loadDayWx(city, force){
+  const d=curDay, today=ymd(new Date()); if(!d || d>=today) return;
+  if(!force && wxOf(d)){ renderWx(); return; }
+  city=city||((wxOf(d)||{}).city)||'서울';
+  const my=++wxSeq; renderWx();
+  try{
+    const m=await fetchWxRange(d,d,city); const w=m[d];
+    if(my!==wxSeq || curDay!==d) return;
+    if(!w){ $('wxMsg')&&( $('wxMsg').textContent='이 날 날씨 정보가 없어요'); return; }
+    wxCache[d]=w;
+    const e=entries[d];
+    if(e && keepEntry(e)){ const n=entryOf(d); n.wx=w; saveEntry(n); .textContent=''; }
+    renderWx();
+  }catch(err){
+    console.error(err);
+    if(my===wxSeq && $('wxMsg')) $('wxMsg').innerHTML='날씨를 못 불러왔어요 <button class="link-btn" id="wxRetry">다시</button>';
+    if($('wxRetry')) $('wxRetry').onclick=()=>loadDayWx(city, true);
+  }
+}
+// 지난 일기(기록이 있는 날)에 날씨 한꺼번에 채우기 — 이미 날씨가 있는 날은 건드리지 않음
+$('wxFillBtn').onclick=async()=>{
+  const today=ymd(new Date());
+  const todo=Object.keys(entries).filter(d=>d<today && hasContent(entries[d]) && !entries[d].wx).sort();
+  if(!todo.length){ toast('날씨를 채울 일기가 없어요 (모두 채워져 있어요)', 2500); return; }
+  if(!confirm(`일기가 있는 ${todo.length}일에 날씨(서울 기준)를 채울까요?\n도시가 다른 날은 나중에 그 날짜 화면에서 도시를 바꾸면 돼요.`)) return;
+  const btn=$('wxFillBtn'), old=btn.textContent; btn.disabled=true;
+  let done=0, fail=0;
+  try{
+    // 1년 단위로 나눠서 요청
+    const years=[...new Set(todo.map(d=>d.slice(0,4)))];
+    for(const y of years){
+      const ds=todo.filter(d=>d.startsWith(y)); btn.textContent=`불러오는 중… ${y}년`;
+      let m; try{ m=await fetchWxRange(ds[0], ds[ds.length-1], '서울'); }catch(e){ console.error(e); fail+=ds.length; continue; }
+      const list=[]; for(const d of ds){ if(m[d]){ const n=entryOf(d); n.wx=m[d]; list.push(n); } else fail++; }
+      if(list.length){ await commitEntries(list); done+=list.length; }
+    }
+  } finally { btn.disabled=false; btn.textContent=old; }
+  toast(`${done}일에 날씨를 채웠어요${fail?` (${fail}일은 못 불러왔어요)`:''}`, 4000);
+  if(curDay) renderWx();
+};
+
 function openDay(d){
   curDay=d; daySel=null; dayOrd=false; syncMonths();
   $('dayTitle').textContent=fmtKo(d);
   const [pv,nx]=neighborDays(d); $('dayPrev').disabled=!pv; $('dayNext').disabled=!nx;
   renderLike();
   renderDayPhotos(); renderDayTags();
+  renderWx(); loadDayWx();
   $('diary').value=entryOf(d).text;
   requestAnimationFrame(fitDiary);
   renderOnThisDay(d);
