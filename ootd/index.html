@@ -3182,7 +3182,7 @@ async function drawCollage(){
     // 사진 고르기 (날짜 섞어서 n장)
     const pool=days.slice(); for(let i=pool.length-1;i>0;i--){ const j=(r()*(i+1))|0; [pool[i],pool[j]]=[pool[j],pool[i]]; }
     const pick=pool.slice(0,cg.n);
-    const cols = cg.n===4?2 : cg.n===6?2 : 3, rows=Math.ceil(cg.n/cols), cw=W/cols, ch=(H-160)/rows;
+    const cols = cg.cut ? Math.ceil(cg.n/2) : (cg.n===4?2 : cg.n===6?2 : 3), rows=Math.ceil(cg.n/cols), cw=W/cols, ch=H/rows;   // 오리기: 사람이 세로로 길어서 2줄로 촘촘히
     const fs=firstSeenMap();
     const items=[];
     for(let i=0;i<pick.length;i++){
@@ -3195,30 +3195,37 @@ async function drawCollage(){
       }
       if(!img){ const full=await getFull(ph.id).catch(()=>null); img=await loadImg(full||ph.thumb); }
       if(!img) continue;
-      const col=i%cols, row=(i/cols)|0, scale=(cut?1.05:0.98)+r()*0.28;
-      const maxW=cw*scale, maxH=ch*scale*1.08, k=Math.min(maxW/img.width, maxH/img.height);
-      const w=img.width*k, h=img.height*k;
-      const cx=col*cw+cw/2+(r()-0.5)*cw*0.35 + (row%2? cw*0.08:-cw*0.08), cy=100+row*ch+ch/2+(r()-0.5)*ch*0.3;
-      items.push({d,img,cut,w,h,cx:Math.max(w*0.35,Math.min(W-w*0.35,cx)),cy,rot:(r()<0.5?-1:1)*(0.04+r()*0.17),seed:(r()*1e9)|0});
+      const col=i%cols, row=(i/cols)|0, stag=(row%2? 1:-1)*cw*0.07;
+      let w,h,sx=0,sy=0,sw=img.width,sh=img.height;
+      if(cut){   // 오려 낸 사람: 칸보다 크게 키워서 서로 겹치게 (빈 곳 없이)
+        const k=Math.max(ch*1.22/img.height, 0.01), kw=Math.min(k, cw*1.7/img.width);
+        w=img.width*kw; h=img.height*kw;
+      } else {   // 사진: 칸을 꽉 채우도록 잘라서 크게 (여백 없이 겹쳐 붙임)
+        w=cw*(1.2+r()*0.14); h=ch*(1.2+r()*0.14);
+        const ia=img.width/img.height, ta=w/h;
+        if(ia>ta){ sh=img.height; sw=sh*ta; sx=(img.width-sw)/2; } else { sw=img.width; sh=sw/ta; sy=(img.height-sh)*0.3; }
+      }
+      const cx=col*cw+cw/2+stag+(r()-0.5)*cw*0.12, cy=row*ch+ch/2+(r()-0.5)*ch*0.1;
+      items.push({d,img,cut,w,h,sx,sy,sw,sh,cx,cy,rot:(r()<0.5?-1:1)*(0.03+r()*0.1),seed:(r()*1e9)|0});
     }
     for(let i=items.length-1;i>0;i--){ const j=(r()*(i+1))|0; [items[i],items[j]]=[items[j],items[i]]; }   // 겹치는 순서
     for(const it of items){
       const pr=rng(it.seed);
       ctx.save(); ctx.translate(it.cx,it.cy); ctx.rotate(it.rot);
       ctx.shadowColor='rgba(0,0,0,.32)'; ctx.shadowBlur=34; ctx.shadowOffsetY=14;
-      if(it.cut){ ctx.drawImage(it.img,-it.w/2,-it.h/2,it.w,it.h); ctx.restore(); continue; }   // 오려 낸 사람: 모양·테두리는 이미 만들어 둠
-      ctx.fillStyle='#fff'; cgPath(ctx,it.w+26,it.h+26,cg.shape,rng(it.seed)); ctx.fill();   // 스티커 흰 테두리
+      if(it.cut){ ctx.drawImage(it.img,0,0,it.img.width,it.img.height,-it.w/2,-it.h/2,it.w,it.h); ctx.restore(); continue; }   // 오려 낸 사람: 모양·테두리는 이미 만들어 둠
+      ctx.fillStyle='#fff'; cgPath(ctx,it.w+18,it.h+18,cg.shape,rng(it.seed)); ctx.fill();   // 스티커 흰 테두리
       ctx.shadowColor='transparent';
       cgPath(ctx,it.w,it.h,cg.shape,rng(it.seed)); ctx.clip();
-      ctx.drawImage(it.img,-it.w/2,-it.h/2,it.w,it.h);
+      ctx.drawImage(it.img,it.sx,it.sy,it.sw,it.sh,-it.w/2,-it.h/2,it.w,it.h);
       ctx.restore();
     }
     // 스티커: 날짜·날씨, new!
     for(const it of items){
       const e=entries[it.d], w=e&&e.wx;
       const label=`${+it.d.slice(5,7)}/${+it.d.slice(8)}`+(w?`  ${wxInfo(w.c)[0]} ${w.hi}°`:'');
-      cgPill(ctx,label,it.cx-it.w*0.46,it.cy+it.h*0.38,(r()-0.5)*0.2,{bg:dark?'#fff':'#111',fg:dark?'#111':'#fff',size:30});
-      if(e && (e.tags||[]).some(t=>fs[t]===it.d && !isGone(t))) cgPill(ctx,'new!',it.cx+it.w*0.12,it.cy-it.h*0.46,0.12,{bg:'#111',fg:'#fff',size:34});
+      cgPill(ctx,label,Math.max(14,Math.min(W-330,it.cx-it.w*0.42)),Math.max(60,Math.min(H-90,it.cy+it.h*0.36)),(r()-0.5)*0.2,{bg:dark?'#fff':'#111',fg:dark?'#111':'#fff',size:30});
+      if(e && (e.tags||[]).some(t=>fs[t]===it.d && !isGone(t))) cgPill(ctx,'new!',Math.max(14,Math.min(W-150,it.cx+it.w*0.1)),Math.max(14,Math.min(H-90,it.cy-it.h*0.44)),0.12,{bg:'#111',fg:'#fff',size:34});
     }
     // 계절 이모지 + 제목
     const season=[ '❄️','❄️','🌸','🌸','🌷','☀️','☀️','🌊','🍂','🍁','🍁','⛄' ][mm-1];
