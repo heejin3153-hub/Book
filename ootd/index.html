@@ -2858,7 +2858,10 @@ document.addEventListener('keydown', e=>{
   if($('daySheet').classList.contains('open') && a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.closest('#daySheet')){ a.blur(); return; }   // 글 쓰는 중이면 입력만 빠져나옴
   for(const id of ['textImportSheet','addSheet','toTagSheet','searchSheet','menuSheet','tagSheet','daySheet']) if($(id).classList.contains('open')) return closeSheet(id);
 });
-let tt; function toast(m, ms=2200){
+let tt; function hideToast(){ clearTimeout(tt); $('toast').classList.remove('show'); }
+// 화면 어디든 누르면(탭 포함) 알림 말풍선은 바로 사라짐 — 누른 버튼은 그대로 동작
+document.addEventListener('pointerdown', ()=>{ if($('toast').classList.contains('show')) hideToast(); }, true);
+function toast(m, ms=2200){
   const t=$('toast'); t.textContent=m;
   // 사진 크게 보기에서는 사진 아래쪽, 버튼 줄 바로 위에 / 그 밖에는 화면 아래쪽(＋ 버튼보다 위)
   const bar=$('viewer').classList.contains('open') ? $('viewer').querySelector('.bar') : null;
@@ -2922,6 +2925,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
   const t=b.dataset.tab;
   if(tlSel) setTlSel(false);
+  hideToast();
   $('calView').classList.toggle('hidden', t!=='cal');
   $('closetView').classList.toggle('hidden', t!=='closet');
   $('statsView').classList.toggle('hidden', t!=='stats');
