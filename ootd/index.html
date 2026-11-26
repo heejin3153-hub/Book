@@ -329,6 +329,10 @@
   .rc-h{ font-size:13px; font-weight:800; margin:14px 0 4px; }
   .rc-row{ display:flex; justify-content:space-between; gap:8px; padding:8px 2px; border-bottom:1px solid var(--border); font-size:13.5px; cursor:pointer; }
   .rc-row .c{ font-weight:800; color:var(--accent-dark); white-space:nowrap; } .rc-row .s{ color:var(--text-muted); font-size:12px; }
+  .wxf-days{ display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; }
+  .wxf-day{ flex:0 0 auto; min-width:64px; border:1.5px solid var(--border-2); background:var(--bg); color:var(--text); border-radius:12px; padding:7px 6px; text-align:center; cursor:pointer; font-family:inherit; }
+  .wxf-day.on{ border-color:var(--accent); background:var(--accent-soft); }
+  .wxf-day .dd{ font-size:11.5px; font-weight:800; color:var(--text-muted); } .wxf-day .ic{ font-size:20px; line-height:1.3; } .wxf-day .tt{ font-size:11.5px; font-weight:700; }
   .wxf-ctl{ display:flex; gap:12px; flex-wrap:wrap; font-size:13px; font-weight:700; align-items:center; }
   .wxf-row{ display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); cursor:pointer; align-items:flex-start; }
   .wxf-row img{ width:46px; height:62px; object-fit:cover; border-radius:8px; flex:none; background:var(--bg); }
@@ -707,6 +711,10 @@
 <div class="sheet-bg" id="wxFindSheet" style="z-index:58">
   <div class="sheet" role="dialog" aria-modal="true">
     <div class="sheet-h"><div class="t">🌡 날씨로 착장 찾기</div><button class="icon-sq" data-close aria-label="닫기">✕</button></div>
+    <div class="wxf-ctl" style="margin-bottom:8px"><label>도시 <select class="sel" id="wxfCity"></select></label><span class="saved" id="wxfFcMsg"></span></div>
+    <div class="saved" style="margin:0 0 6px;font-weight:700">① 예보에서 고르기 (오늘부터 7일)</div>
+    <div class="wxf-days" id="wxfDays"></div>
+    <div class="saved" style="margin:12px 0 6px;font-weight:700">② 직접 정하기</div>
     <div class="wxf-ctl">
       <label>최고기온 <select class="sel" id="wxfHi"></select></label>
       <label>범위 <select class="sel" id="wxfRange"><option value="2">±2°</option><option value="3" selected>±3°</option><option value="5">±5°</option></select></label>
@@ -2988,33 +2996,61 @@ function wornNote(day, addedTags){
 }
 
 /* ---- 1. 날씨로 착장 찾기 ---- */
-let wxfKind='all';
+let wxfKind='all', wxfCity='서울', wxfPick=null;   // wxfPick: 예보에서 고른 날 {d,hi,lo,c}
+const wxfFc={};   // 도시 → 예보 7일
+async function loadForecast(city){
+  if(wxfFc[city] && Date.now()-wxfFc[city].t<30*60e3) return wxfFc[city].days;
+  const [lat,lon]=WX_CITIES[city]||WX_CITIES['서울'];
+  const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=7&timezone=auto`);
+  if(!r.ok) throw new Error('forecast '+r.status);
+  const j=await r.json(), d=j.daily; if(!d||!d.time) throw new Error('forecast data');
+  const days=d.time.map((t,i)=>({d:t,c:d.weather_code[i],lo:Math.round(d.temperature_2m_min[i]),hi:Math.round(d.temperature_2m_max[i])}));
+  wxfFc[city]={t:Date.now(),days}; return days;
+}
+function renderFcDays(days){
+  const box=$('wxfDays'), today=ymd(new Date());
+  box.innerHTML=days.map(x=>{ const [ic]=wxInfo(x.c), lab=x.d===today?'오늘':dayDiff(x.d,today)===1?'내일':`${+x.d.slice(5,7)}/${+x.d.slice(8)}(${dowKo(x.d)})`;
+    return `<button class="wxf-day${wxfPick&&wxfPick.d===x.d?' on':''}" data-d="${x.d}"><div class="dd">${lab}</div><div class="ic">${ic}</div><div class="tt">${x.lo}°/${x.hi}°</div></button>`; }).join('');
+}
+async function refreshForecast(){
+  $('wxfFcMsg').textContent='예보 불러오는 중…'; $('wxfDays').innerHTML='';
+  try{ const days=await loadForecast(wxfCity); $('wxfFcMsg').textContent=''; renderFcDays(days); }
+  catch(e){ console.error(e); $('wxfFcMsg').innerHTML='예보를 못 불러왔어요 <button class="link-btn" id="wxfFcRetry">다시</button>'; $('wxfFcRetry').onclick=refreshForecast; }
+}
 function openWxFind(baseHi){
   const sel=$('wxfHi'); if(!sel.options.length) sel.innerHTML=[...Array(51)].map((_,i)=>`<option value="${i-12}">${i-12}°</option>`).join('');
+  const cs=$('wxfCity'); if(!cs.options.length) cs.innerHTML=Object.keys(WX_CITIES).map(c=>`<option>${c}</option>`).join('');
+  cs.value=wxfCity; wxfPick=null;
   if(baseHi==null){ let best=null; for(const d in entries){ const w=entries[d].wx; if(w && (!best||d>best.d)) best={d,hi:w.hi}; } baseHi=best?best.hi:15; }
   sel.value=String(Math.max(-12,Math.min(38,baseHi)));
-  renderWxFind(); openSheet('wxFindSheet');
+  renderWxFind(); openSheet('wxFindSheet'); refreshForecast();
 }
 function renderWxFind(){
   const hi=+$('wxfHi').value, rg=+$('wxfRange').value, pm=photosByDate(), rows=[];
+  const lo = wxfPick ? wxfPick.lo : null;
   let haveWx=0;
   for(const d in entries){ const e=entries[d], w=e.wx; if(!w) continue; haveWx++;
     if(!(e.tags||[]).length) continue;
     if(Math.abs(w.hi-hi)>rg) continue;
     if(wxfKind==='wet' && !isWetCode(w.c)) continue; if(wxfKind==='dry' && isWetCode(w.c)) continue;
-    rows.push({d,e,w,diff:Math.abs(w.hi-hi)});
+    rows.push({d,e,w,diff:Math.abs(w.hi-hi)+(lo==null?0:Math.abs(w.lo-lo)*0.5)});
   }
   rows.sort((a,b)=>a.diff-b.diff || (a.d<b.d?1:-1));
   [...$('wxfKind').children].forEach(b=>b.classList.toggle('on', b.dataset.k===wxfKind));
+  [...$('wxfDays').children].forEach(b=>b.classList.toggle('on', !!wxfPick && b.dataset.d===wxfPick.d));
   if(!haveWx){ $('wxfInfo').textContent=''; $('wxfList').innerHTML='<div class="empty-msg">날씨가 저장된 일기가 없어요<br>⋯ 설정 → "지난 일기에 날씨 채우기"를 먼저 눌러주세요</div>'; return; }
-  $('wxfInfo').textContent=`최고기온 ${hi-rg}°~${hi+rg}° 였던 날 ${rows.length}일 (기온이 가까운 순)`;
+  const lead = wxfPick ? `${wxfPick.d===ymd(new Date())?'오늘':dayDiff(wxfPick.d,ymd(new Date()))===1?'내일':fmtKo(wxfPick.d,false)} ${wxfCity} 날씨(${wxfPick.lo}°/${wxfPick.hi}°)와 비슷했던 날` : `최고기온 ${hi-rg}°~${hi+rg}° 였던 날`;
+  $('wxfInfo').textContent=`${lead} ${rows.length}일 (기온이 가까운 순)`;
   $('wxfList').innerHTML = rows.length ? rows.slice(0,80).map(r=>{
     const ph=(pm[r.d]||[])[0], [ic,nm]=wxInfo(r.w.c);
     return `<div class="wxf-row" data-d="${r.d}">${ph?`<img src="${ph.thumb}" alt="">`:''}<div style="min-width:0"><div><span class="d">${fmtKo(r.d,true)}</span><span class="w">${ic} ${nm} ${r.w.lo}°/${r.w.hi}°</span></div><div class="t">${r.e.tags.map(t=>'#'+esc(t)).join('  ')}</div></div></div>`; }).join('')
-    : '<div class="empty-msg">이 날씨에 입은 기록이 없어요</div>';
+    : '<div class="empty-msg">이 날씨에 입은 기록이 없어요<br>범위를 ±5°로 넓혀 보세요</div>';
 }
+$('wxfDays').onclick=e=>{ const b=e.target.closest('[data-d]'); if(!b) return; const x=(wxfFc[wxfCity]||{days:[]}).days.find(v=>v.d===b.dataset.d); if(!x) return;
+  wxfPick=x; $('wxfHi').value=String(Math.max(-12,Math.min(38,x.hi))); wxfKind=isWetCode(x.c)?'wet':'all'; renderWxFind(); };
+$('wxfCity').onchange=()=>{ wxfCity=$('wxfCity').value; wxfPick=null; renderWxFind(); refreshForecast(); };
 $('wxFindBtn').onclick=()=>openWxFind(curDay?(wxOf(curDay)||{}).hi:null);
-$('wxfHi').onchange=$('wxfRange').onchange=renderWxFind;
+$('wxfHi').onchange=()=>{ wxfPick=null; renderWxFind(); }; $('wxfRange').onchange=renderWxFind;
 $('wxfKind').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; wxfKind=b.dataset.k; renderWxFind(); };
 $('wxfList').onclick=e=>{ const r=e.target.closest('[data-d]'); if(!r) return; navStack.length=0; openDay(r.dataset.d); };
 
