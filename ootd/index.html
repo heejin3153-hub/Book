@@ -729,7 +729,7 @@
       <span class="saved">장수</span><span class="seg" id="cgN"><button data-v="4">4</button><button data-v="6" class="on">6</button><button data-v="9">9</button></span>
       <span class="saved">모양</span><span class="seg" id="cgShape"><button data-v="free" class="on">자유형</button><button data-v="round">둥글게</button><button data-v="rect">사각</button></span>
       <span class="saved">오리기</span><span class="seg" id="cgCut"><button data-v="off" class="on">끄기</button><button data-v="on">✂️ 사람만</button></span>
-      <span class="saved">배경</span><span class="seg" id="cgBg"><button data-v="cream" class="on">크림</button><button data-v="grey">회색</button><button data-v="pink">핑크</button><button data-v="black">블랙</button></span>
+      <span class="saved">배경</span><span class="seg" id="cgBg"><button data-v="photo" class="on">그달 사진</button><button data-v="cream">크림</button><button data-v="grey">회색</button><button data-v="pink">핑크</button><button data-v="black">블랙</button></span>
     </div>
     <p class="saved" id="cgMsg" style="text-align:center;margin:8px 0"></p>
     <canvas id="cgCanvas" width="1080" height="1920"></canvas>
@@ -3074,7 +3074,7 @@ $('recapBody').onclick=e=>{ const r=e.target.closest('[data-d]'); if(!r) return;
 $('recapCollage').onclick=()=>{ closeSheet('recapSheet'); openCollage(rc.mode==='month' ? `${rc.y}-${pad(rc.m+1)}` : `${rc.y}-${pad(rc.m+1)}`); };
 
 /* ---- 4. OOTD 콜라주 (사진을 스티커처럼 오려 겹쳐 붙인 이미지) ---- */
-const cg={ mk:'', n:6, shape:'free', bg:'cream', seed:1, busy:false, cut:false };
+const cg={ mk:'', n:6, shape:'free', bg:'photo', seed:1, busy:false, cut:false };
 /* ---- 사람만 오리기: 기기 안에서 돌아가는 MediaPipe 인물 분리 (사진이 밖으로 나가지 않음) ---- */
 const MP_VER='0.10.14';
 const MP_BASE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}`;
@@ -3108,6 +3108,35 @@ async function segmentPerson(canvas){
     if(score(best)<0){ best={ ...best, data:best.data.map(v=>1-v) }; }
     return best;
   } finally { (res.confidenceMasks||[]).forEach(m=>{ try{ m.close(); }catch(e){} }); if(res.close) try{ res.close(); }catch(e){} }
+}
+
+/* ---- 배경용 사진: 그 달의 OOTD가 아닌 사진 중 가장 예쁜(선명하고 색감 좋은) 것 ---- */
+const beautyCache=new Map();
+async function beautyScore(ph){
+  if(beautyCache.has(ph.id)) return beautyCache.get(ph.id);
+  const im=await loadImg(ph.thumb); let sc=0;
+  if(im){
+    const w=48,h=Math.max(8,Math.round(48*im.height/im.width)), c=document.createElement('canvas'); c.width=w; c.height=h;
+    const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(im,0,0,w,h); const d=x.getImageData(0,0,w,h).data;
+    let n=w*h, sr=0,sg=0,sb=0,srg=0,syb=0,srg2=0,syb2=0,lum=[],grad=0;
+    for(let i=0;i<n;i++){ const R=d[i*4],G=d[i*4+1],B=d[i*4+2]; const rg=R-G, yb=(R+G)/2-B; srg+=rg; syb+=yb; srg2+=rg*rg; syb2+=yb*yb; lum.push(0.299*R+0.587*G+0.114*B); }
+    const mrg=srg/n, myb=syb/n, colorful=Math.sqrt(Math.max(0,srg2/n-mrg*mrg)+Math.max(0,syb2/n-myb*myb))+0.3*Math.sqrt(mrg*mrg+myb*myb);
+    for(let y=1;y<h;y++) for(let xx=1;xx<w;xx++){ const i=y*w+xx; grad+=Math.abs(lum[i]-lum[i-1])+Math.abs(lum[i]-lum[i-w]); }
+    grad/=n; const mean=lum.reduce((a,b)=>a+b,0)/n, expo=1-Math.min(1,Math.abs(mean-125)/125);
+    sc = Math.min(colorful,80)/80*0.4 + Math.min(grad,20)/20*0.35 + expo*0.25;
+    if(im.width>im.height) sc*=1.0; else sc*=0.97;
+  }
+  beautyCache.set(ph.id,sc); return sc;
+}
+async function pickBackground(pm, mk, r, cover){
+  // 그 달 사진 중, 대표(OOTD)로 쓰는 사진을 뺀 나머지 (OOTD 안 찍은 날 사진 + 같은 날의 두 번째 이후 사진)
+  const coverIds=new Set(cover), cand=[];
+  for(const d in pm){ if(!d.startsWith(mk)) continue; pm[d].forEach((ph,i)=>{ if(!coverIds.has(ph.id) && (noCover(d)||i>0)) cand.push(ph); }); }
+  if(!cand.length) return null;
+  const scored=[]; for(const ph of cand.slice(0,40)) scored.push({ph,sc:await beautyScore(ph)});
+  scored.sort((a,b)=>b.sc-a.sc);
+  const top=scored.slice(0,Math.min(3,scored.length));
+  return top[(r()*top.length)|0].ph;   // 상위 3장 중 무작위 → 다시 섞기 하면 바뀜
 }
 const cutCache=new Map();   // 사진 id → 오려 낸 캔버스(없으면 null)
 async function getCutout(ph){
@@ -3171,7 +3200,8 @@ async function drawCollage(){
     const st=months.get(cg.mk), cv=$('cgCanvas'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
     const pm=photosByDate();
     const days=Object.keys(pm).filter(d=>d.startsWith(cg.mk) && !noCover(d)).sort();
-    const bgc={cream:'#ecebe6',grey:'#cfd1cc',pink:'#f4d6dc',black:'#141414'}[cg.bg], dark=cg.bg==='black';
+    let bgNote='', bgKey=cg.bg==='photo'?'cream':cg.bg;
+    const bgc={cream:'#ecebe6',grey:'#cfd1cc',pink:'#f4d6dc',black:'#141414'}[bgKey]; let dark=bgKey==='black';
     ctx.fillStyle=bgc; ctx.fillRect(0,0,W,H);
     if(!st||!st.loaded){ $('cgMsg').textContent='사진을 불러오는 중이에요…'; return; }
     if(!days.length){ $('cgMsg').textContent='이 달에는 OOTD 사진이 없어요'; return; }
@@ -3182,6 +3212,18 @@ async function drawCollage(){
     // 사진 고르기 (날짜 섞어서 n장)
     const pool=days.slice(); for(let i=pool.length-1;i>0;i--){ const j=(r()*(i+1))|0; [pool[i],pool[j]]=[pool[j],pool[i]]; }
     const pick=pool.slice(0,cg.n);
+    if(cg.bg==='photo'){
+      const bph=await pickBackground(pm, cg.mk, r, pick.map(d=>pm[d][0].id));
+      if(bph){
+        const full=await getFull(bph.id).catch(()=>null), bim=await loadImg(full||bph.thumb);
+        if(bim){
+          const k=Math.max(W/bim.width,H/bim.height), bw=bim.width*k, bh=bim.height*k;
+          ctx.drawImage(bim,(W-bw)/2,(H-bh)/2,bw,bh);
+          ctx.fillStyle='rgba(255,255,255,.12)'; ctx.fillRect(0,0,W,H);   // 살짝 밝게 → 스티커가 돋보이게
+          dark=false;
+        }
+      } else { bgNote='이 달에는 OOTD가 아닌 사진이 없어서 크림 배경으로 했어요'; }
+    }
     const cols = cg.cut ? Math.ceil(cg.n/2) : (cg.n===4?2 : cg.n===6?2 : 3), rows=Math.ceil(cg.n/cols), cw=W/cols, ch=H/rows;   // 오리기: 사람이 세로로 길어서 2줄로 촘촘히
     const fs=firstSeenMap();
     const items=[];
@@ -3231,7 +3273,7 @@ async function drawCollage(){
     const season=[ '❄️','❄️','🌸','🌸','🌷','☀️','☀️','🌊','🍂','🍁','🍁','⛄' ][mm-1];
     ctx.save(); ctx.translate(W*(0.16+r()*0.1),H*(0.44+r()*0.1)); ctx.rotate(-0.25); ctx.font='170px serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(season,0,0); ctx.restore();
     cgPill(ctx,`OOTD · ${yy}.${pad(mm)}`,40,36,-0.03,{bg:dark?'#fff':'#111',fg:dark?'#111':'#fff',size:46});
-    $('cgMsg').textContent='';
+    $('cgMsg').textContent=bgNote;
   } finally { cg.busy=false; if(cg.again){ cg.again=false; drawCollage(); } }
 }
 $('collageBtn').onclick=()=>openCollage(mkey(view.y,view.m));
