@@ -98,13 +98,13 @@
   .day .cam{ position:absolute; left:50%; bottom:6px; transform:translateX(-50%); font-size:10px; opacity:.7; white-space:nowrap; }
   .day.today{ border:2px solid var(--accent); }
   /* 일기 안 쓴 날 */
-  .day.no-text{ border:2px solid #e5484d; }
-  .day.no-record{ border:2px dashed rgba(229,72,77,.55); }
+  .day.no-text{ border:1.5px solid rgba(229,72,77,.6); }
+  .day.no-record{ border:1.5px dashed rgba(229,72,77,.32); }
   .cal-legend{ display:flex; justify-content:center; gap:14px; margin-top:10px; font-size:11.5px; color:var(--text-muted); font-weight:600; flex-wrap:wrap; }
   .cal-legend span{ display:inline-flex; align-items:center; gap:5px; }
   .cal-legend .lg{ display:inline-block; width:14px; height:14px; border-radius:4px; }
-  .cal-legend .lg.no-text{ border:2px solid #e5484d; }
-  .cal-legend .lg.no-record{ border:2px dashed rgba(229,72,77,.55); }
+  .cal-legend .lg.no-text{ border:1.5px solid rgba(229,72,77,.6); }
+  .cal-legend .lg.no-record{ border:1.5px dashed rgba(229,72,77,.4); }
   .day .cnt{ position:absolute; right:4px; bottom:4px; z-index:1; background:rgba(0,0,0,0.55); color:#fff; font-size:10px; font-weight:700; border-radius:8px; padding:1px 5px; }
   .day .note-dot{ position:absolute; left:50%; bottom:8px; transform:translateX(-50%); width:6px; height:6px; border-radius:50%; background:var(--accent); }
   .grid.loading .day:not(.empty){ animation:pulse 1.1s ease-in-out infinite; }
@@ -171,6 +171,17 @@
   .btn-row{ display:flex; gap:8px; flex-wrap:wrap; }
   /* 옷장 */
   .closet{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px 8px; }
+  @media (max-width:600px){
+    .subtitle{ display:none; }                         /* 4: 폰에서는 부제목 숨김 (설정에서 문구는 그대로 유지) */
+    h1.title{ margin-bottom:16px; }
+    #calView{ padding-bottom:92px; }                   /* 3: ＋ 버튼이 범례를 가리지 않게 */
+    .cal-legend{ padding-right:78px; justify-content:flex-start; gap:10px; }
+    #statsView .filters{ gap:5px; flex-wrap:nowrap; }  /* 6: 통계 선택칸을 한 줄로 */
+    #statsView .filters .sel{ padding:6px 20px 6px 9px; font-size:11.5px; min-width:0; flex:1 1 0; background-position:right 6px center; }
+    #statsView .filters .seg button{ padding:5px 8px; font-size:11.5px; }
+    #statsView .filters .seg{ flex:none; }
+  }
+  #dayTags .tag{ cursor:pointer; padding:9px 12px; }
   @media (min-width:560px){ .closet{ grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px 10px; } }
   .closet-item{ display:flex; flex-direction:column; justify-content:flex-start; align-self:start; width:100%; min-width:0; border:none; background:none; padding:0; text-align:left; cursor:pointer; color:var(--text); font:inherit; }
   .closet-item .im{ width:100%; aspect-ratio:3/4; border-radius:10px; overflow:hidden; background:var(--bg); border:1px solid var(--border); }
@@ -577,7 +588,7 @@
     <div class="photos" id="dayPhotos"></div>
     <label class="nocover hidden" id="noCoverRow"><input type="checkbox" id="noCoverChk"> OOTD 안 찍은 날</label>
     </div><div class="day-right">
-    <div class="sec-label day-tags-label"><span>옷 태그</span><span class="saved" id="savedMark"></span></div>
+    <div class="sec-label day-tags-label"><span>옷 태그 <span class="saved" style="font-weight:500">· 눌러서 빼기·바꾸기</span></span><span class="saved" id="savedMark"></span></div>
     <div class="tags" id="dayTags"></div>
     <div class="tag-input-wrap">
       <input class="tag-input" id="tagInput" placeholder="#태그 입력 후 엔터 (예: Prada_부츠)" autocomplete="off" autocapitalize="off" enterkeyhint="done">
@@ -1273,7 +1284,7 @@ $('wxFillBtn').onclick=async()=>{
 
 function openDay(d){
   curDay=d; daySel=null; dayOrd=false; syncMonths();
-  $('dayTitle').textContent=fmtKo(d);
+  $('dayTitle').textContent=fmtKo(d, d.slice(0,4)!==String(new Date().getFullYear()));   // 올해는 연도 생략 → 아이폰에서도 한 줄
   const [pv,nx]=neighborDays(d); $('dayPrev').disabled=!pv; $('dayNext').disabled=!nx;
   renderLike();
   renderDayPhotos(); renderDayTags();
@@ -1562,9 +1573,8 @@ function renderDayTags(){
   const e=entryOf(curDay);
   if(!e.tags.length){ box.innerHTML='<span class="saved">아직 태그가 없어요</span>'; return; }
   sortTags(e.tags).forEach(t=>{
-    const s=document.createElement('span'); s.className='tag'; s.innerHTML=`<span class="tname" style="cursor:pointer">#${esc(t)}</span><button aria-label="이 날에서 태그 빼기">✕</button>`;
-    s.querySelector('button').onclick=()=>{ const en=entryOf(curDay); en.text=$('diary').value; en.tags=en.tags.filter(x=>x!==t); saveEntry(en); renderDayTags(); };
-    s.querySelector('.tname').onclick=()=>{ flushDiary(); dayTagDialog(t); };
+    const s=document.createElement('span'); s.className='tag'; s.innerHTML=`<span class="tname">#${esc(t)}</span>`;
+    s.onclick=()=>{ flushDiary(); dayTagDialog(t); };   // 태그를 누르면 팝업: 이 날에서 빼기 / 이름·분류 바꾸기
     box.appendChild(s);
   });
 }
