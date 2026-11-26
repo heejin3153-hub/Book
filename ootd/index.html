@@ -320,6 +320,22 @@
   .wx-line .wx-sub{ color:var(--text-muted); font-weight:500; }
   .wx-line select{ border:1.5px solid var(--border-2); border-radius:8px; background:var(--bg); color:var(--text); padding:4px 6px; font-size:12.5px; font-family:inherit; }
   .wx-line .link-btn{ font-size:12.5px; }
+  .cal-tools{ display:flex; gap:6px; margin:0 0 10px; }
+  .cal-tools .btn{ flex:1; padding:8px 4px; font-size:12.5px; white-space:nowrap; }
+  .recap-nav{ display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:12px; font-size:16px; }
+  .rc-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
+  .rc-box{ background:var(--bg); border:1px solid var(--border); border-radius:12px; text-align:center; padding:10px 4px; }
+  .rc-box .n{ font-size:22px; font-weight:800; } .rc-box .l{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+  .rc-h{ font-size:13px; font-weight:800; margin:14px 0 4px; }
+  .rc-row{ display:flex; justify-content:space-between; gap:8px; padding:8px 2px; border-bottom:1px solid var(--border); font-size:13.5px; cursor:pointer; }
+  .rc-row .c{ font-weight:800; color:var(--accent-dark); white-space:nowrap; } .rc-row .s{ color:var(--text-muted); font-size:12px; }
+  .wxf-ctl{ display:flex; gap:12px; flex-wrap:wrap; font-size:13px; font-weight:700; align-items:center; }
+  .wxf-row{ display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); cursor:pointer; align-items:flex-start; }
+  .wxf-row img{ width:46px; height:62px; object-fit:cover; border-radius:8px; flex:none; background:var(--bg); }
+  .wxf-row .d{ font-size:13.5px; font-weight:800; } .wxf-row .w{ font-size:12px; color:var(--text-muted); margin-left:6px; font-weight:600; }
+  .wxf-row .t{ font-size:12px; color:var(--text-muted); margin-top:3px; word-break:break-all; line-height:1.45; }
+  .cg-opts{ display:grid; grid-template-columns:auto 1fr; gap:6px 10px; align-items:center; margin-bottom:6px; }
+  #cgCanvas{ display:block; width:min(100%,340px); height:auto; margin:6px auto 0; border-radius:12px; box-shadow:0 6px 24px rgba(0,0,0,.18); background:#ddd; }
   .ti-card{ border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:14px; background:var(--bg); }
   .ti-card.done{ opacity:.55; }
   .ti-photo{ margin-bottom:10px; text-align:center; }
@@ -464,6 +480,7 @@
       </div>
       <div class="month-meta"><span id="monthMeta"></span> <button class="link-btn" id="todayBtn">오늘</button>
         <span class="seg cal-mode" id="calMode"><button data-v="ootd">OOTD만</button><button data-v="all">전체 사진</button></span></div>
+      <div class="cal-tools"><button class="btn ghost" id="recapBtn">📅 이달 회고</button><button class="btn ghost" id="collageBtn">🎨 콜라주</button><button class="btn ghost" id="wxFindBtn">🌡 날씨로 찾기</button></div>
       <div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
       <div class="grid" id="grid"></div>
       <div class="cal-legend hidden" id="calLegend"><span><i class="lg no-text"></i>사진 있고 일기 글 없음</span><span><i class="lg no-record"></i>사진·일기 글 없음</span></div>
@@ -675,6 +692,48 @@
     <div class="sec-label"><span>기존 태그에서 고르기</span><span class="saved">자주 쓴 순</span></div>
     <div id="ttList" style="max-height:38vh;overflow-y:auto"></div>
     <button class="btn primary" id="ttApply" style="width:100%;margin-top:14px"></button>
+  </div>
+</div>
+
+<!-- 이달 회고 -->
+<div class="sheet-bg" id="recapSheet" style="z-index:58">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h"><div class="t">📅 회고</div><button class="icon-sq" data-close aria-label="닫기">✕</button></div>
+    <div class="seg" id="recapMode" style="display:flex;margin-bottom:10px"><button data-m="month" class="on" style="flex:1">월간</button><button data-m="year" style="flex:1">연간</button></div>
+    <div class="recap-nav"><button class="nav-btn" id="recapPrev" aria-label="이전">‹</button><b id="recapLabel"></b><button class="nav-btn" id="recapNext" aria-label="다음">›</button></div>
+    <div id="recapBody"></div>
+    <button class="btn primary" id="recapCollage" style="width:100%;margin-top:14px">🎨 이 기간 콜라주 만들기</button>
+  </div>
+</div>
+
+<!-- 날씨로 착장 찾기 -->
+<div class="sheet-bg" id="wxFindSheet" style="z-index:58">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h"><div class="t">🌡 날씨로 착장 찾기</div><button class="icon-sq" data-close aria-label="닫기">✕</button></div>
+    <div class="wxf-ctl">
+      <label>최고기온 <select class="sel" id="wxfHi"></select></label>
+      <label>범위 <select class="sel" id="wxfRange"><option value="2">±2°</option><option value="3" selected>±3°</option><option value="5">±5°</option></select></label>
+    </div>
+    <div class="seg" id="wxfKind" style="display:flex;margin:10px 0"><button data-k="all" class="on" style="flex:1">전체</button><button data-k="dry" style="flex:1">맑음·흐림</button><button data-k="wet" style="flex:1">비·눈</button></div>
+    <p class="saved" id="wxfInfo" style="margin:0 0 6px"></p>
+    <div id="wxfList"></div>
+  </div>
+</div>
+
+<!-- 콜라주 -->
+<div class="sheet-bg" id="collageSheet" style="z-index:58">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-h"><div class="t">🎨 OOTD 콜라주</div><button class="icon-sq" data-close aria-label="닫기">✕</button></div>
+    <div class="recap-nav"><button class="nav-btn" id="cgPrev" aria-label="이전 달">‹</button><b id="cgMonthLbl"></b><button class="nav-btn" id="cgNext" aria-label="다음 달">›</button></div>
+    <div class="cg-opts">
+      <span class="saved">장수</span><span class="seg" id="cgN"><button data-v="4">4</button><button data-v="6" class="on">6</button><button data-v="9">9</button></span>
+      <span class="saved">모양</span><span class="seg" id="cgShape"><button data-v="free" class="on">자유형</button><button data-v="round">둥글게</button><button data-v="rect">사각</button></span>
+      <span class="saved">배경</span><span class="seg" id="cgBg"><button data-v="cream" class="on">크림</button><button data-v="grey">회색</button><button data-v="pink">핑크</button><button data-v="black">블랙</button></span>
+    </div>
+    <p class="saved" id="cgMsg" style="text-align:center;margin:8px 0"></p>
+    <canvas id="cgCanvas" width="1080" height="1920"></canvas>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn ghost" id="cgShuffle" style="flex:1;padding:13px">🔀 다시 섞기</button><button class="btn primary" id="cgSave" style="flex:1;padding:13px">💾 저장 · 공유</button></div>
+    <p class="hint" style="margin-top:10px">이 달 사진에서 골라 스티커처럼 겹쳐 붙여요. 사진 배경을 오려 내는 건 아니고, 모양만 오려 붙이는 방식이에요.</p>
   </div>
 </div>
 
@@ -925,6 +984,7 @@ async function isDuplicate(date, sig, pending, exceptId){
 
 /* ================= 상태 / 유틸 ================= */
 let entries={};
+let cgKeep=null;
 let gapKeepMonth=null;   // 빈 날 탭에서 계속 받아 둘 달들 (배열)
 let view=(()=>{ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
 let curDay=null, viewerPhoto=null, viewerList=[], viewerIdx=0, pendingDay=null;
@@ -965,6 +1025,7 @@ function syncMonths(){
   const want=new Set([shiftMonth(center,-1), center, shiftMonth(center,1)]);
   if(curDay) want.add(monthOfDate(curDay));
   if(gapKeepMonth) for(const k of gapKeepMonth) want.add(k);
+  if(cgKeep) want.add(cgKeep);
   for(const k of want) subscribeMonth(k);
   for(const [k,st] of months) if(!want.has(k) && st.unsub){ st.unsub(); st.unsub=null; }
 }
@@ -1236,7 +1297,7 @@ function renderWx(){
   box.classList.remove('hidden');
   const w=wxOf(d), city=(w&&w.city)||'서울';
   const sel=`<select id="wxCity" aria-label="도시">${Object.keys(WX_CITIES).map(c=>`<option${c===city?' selected':''}>${c}</option>`).join('')}</select>`;
-  if(w){ const [ic,nm]=wxInfo(w.c); box.innerHTML=`<span>${ic} ${nm}</span><span class="wx-sub">최저 ${w.lo}° / 최고 ${w.hi}°</span>${sel}`; }
+  if(w){ const [ic,nm]=wxInfo(w.c); box.innerHTML=`<span>${ic} ${nm}</span><span class="wx-sub">최저 ${w.lo}° / 최고 ${w.hi}°</span>${sel}<button class="link-btn" id="wxSimilar">비슷한 날씨에 입은 것</button>`; $('wxSimilar').onclick=()=>openWxFind(w.hi); }
   else box.innerHTML=`<span class="wx-sub" id="wxMsg">날씨 불러오는 중…</span>${sel}`;
   $('wxCity').onchange=()=>loadDayWx($('wxCity').value, true);
 }
@@ -1582,7 +1643,7 @@ function addTags(raw){
   const parts = raw.includes('#') ? raw.split('#') : raw.split(/[,\n]/);
   const e=entryOf(curDay); e.text=$('diary').value; let added=0;
   for(const p of parts){ const t=normTag(p); if(t && !e.tags.includes(t)){ e.tags.push(t); added++; } }
-  if(added){ saveEntry(e); renderDayTags(); }
+  if(added){ saveEntry(e); renderDayTags(); wornNote(e.date, parts.map(normTag).filter(t=>t && e.tags.includes(t))); }
 }
 
 // 태그 자동완성 (자주 쓴 순)
@@ -1601,7 +1662,8 @@ function updateSuggest(){
   const box=$('suggest');
   if(!sugItems.length || document.activeElement!==$('tagInput')){ hideSuggest(); return; }
   sugIdx=-1;
-  box.innerHTML=sugItems.map((t,i)=>`<button type="button" data-i="${i}"><span>#${esc(t)}</span><span class="k">${c[t]}회</span></button>`).join('');
+  const lw=lastWornMap(curDay);
+  box.innerHTML=sugItems.map((t,i)=>`<button type="button" data-i="${i}"><span>#${esc(t)}</span><span class="k">${c[t]}회${lw[t]?' · '+agoText(dayDiff(curDay,lw[t])):''}</span></button>`).join('');
   box.classList.remove('hidden');
 }
 function hideSuggest(){ $('suggest').classList.add('hidden'); sugIdx=-1; }
@@ -2837,6 +2899,7 @@ function navBack(){
 }
 function closeSheet(id){
   if(id==='daySheet'){ flushDiary(); curDay=null; daySel=null; hideSuggest(); }
+  if(id==='collageSheet') cgKeep=null;
   if(id==='tagSheet'){ lookIOs.forEach(io=>io.disconnect()); lookIOs=[]; hideLookSuggest(); }
   $(id).classList.remove('open');
   if(!$('statsView').classList.contains('hidden')) renderStats();
@@ -2920,6 +2983,184 @@ function renderGaps(){
 $('gapMode').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; gapMode=b.dataset.m; renderGaps(); if(gapMode==='text') syncMonths(); };
 $('gapPeriod').onchange=()=>{ gapPeriod=$('gapPeriod').value; renderGaps(); };
 $('gapList').onclick=e=>{ const r=e.target.closest('[data-d]'); if(!r) return; navStack.length=0; openDay(r.dataset.d); };
+
+/* ================= 스마트 기능: 날씨로 착장 찾기 · 회고 · 입은 날 알림 · 콜라주 ================= */
+const dayDiff=(a,b)=>Math.round((new Date(a+'T00:00:00Z')-new Date(b+'T00:00:00Z'))/864e5);
+const agoText=n=> n<=0?'오늘' : n<=60 ? n+'일 전' : Math.round(n/30)+'개월 전';
+const isWetCode=c=> (c>=51&&c<=67)||(c>=71&&c<=86)||c>=95;
+const dowKo=d=>'일월화수목금토'[new Date(d+'T00:00:00').getDay()];
+
+/* ---- 3. 태그 입력할 때: 마지막으로 입은 날 · 반복되는 조합 알림 ---- */
+function lastWornMap(day){   // 태그 → day 이전 가장 최근에 입은 날
+  const m={}; for(const d in entries){ if(d>=day) continue; for(const t of entries[d].tags||[]) if(!m[t]||d>m[t]) m[t]=d; } return m;
+}
+function wornNote(day, addedTags){
+  try{
+    const last=lastWornMap(day), notes=[];
+    for(const t of addedTags){ if(last[t]){ const n=dayDiff(day,last[t]); if(n<=14) notes.push(`#${t} ${agoText(n)}에도 입었어요`); } }
+    const e=entries[day]; let combo='';
+    if(e && e.tags.length>=3){
+      const mine=new Set(e.tags.filter(t=>!isGone(t)));
+      for(const d in entries){ const n=dayDiff(day,d); if(n<1||n>30) continue;
+        const shared=(entries[d].tags||[]).filter(t=>mine.has(t)).length;
+        if(shared>=3 && shared>=Math.ceil(mine.size*0.6)){ combo=`${fmtKo(d,false)}와 같은 조합이에요 (${shared}개 겹침)`; break; } }
+    }
+    const msg=combo||notes.slice(0,2).join(' · ');
+    if(msg) toast('👀 '+msg, 3800);
+  }catch(err){ console.error(err); }
+}
+
+/* ---- 1. 날씨로 착장 찾기 ---- */
+let wxfKind='all';
+function openWxFind(baseHi){
+  const sel=$('wxfHi'); if(!sel.options.length) sel.innerHTML=[...Array(51)].map((_,i)=>`<option value="${i-12}">${i-12}°</option>`).join('');
+  if(baseHi==null){ let best=null; for(const d in entries){ const w=entries[d].wx; if(w && (!best||d>best.d)) best={d,hi:w.hi}; } baseHi=best?best.hi:15; }
+  sel.value=String(Math.max(-12,Math.min(38,baseHi)));
+  renderWxFind(); openSheet('wxFindSheet');
+}
+function renderWxFind(){
+  const hi=+$('wxfHi').value, rg=+$('wxfRange').value, pm=photosByDate(), rows=[];
+  let haveWx=0;
+  for(const d in entries){ const e=entries[d], w=e.wx; if(!w) continue; haveWx++;
+    if(!(e.tags||[]).length) continue;
+    if(Math.abs(w.hi-hi)>rg) continue;
+    if(wxfKind==='wet' && !isWetCode(w.c)) continue; if(wxfKind==='dry' && isWetCode(w.c)) continue;
+    rows.push({d,e,w,diff:Math.abs(w.hi-hi)});
+  }
+  rows.sort((a,b)=>a.diff-b.diff || (a.d<b.d?1:-1));
+  [...$('wxfKind').children].forEach(b=>b.classList.toggle('on', b.dataset.k===wxfKind));
+  if(!haveWx){ $('wxfInfo').textContent=''; $('wxfList').innerHTML='<div class="empty-msg">날씨가 저장된 일기가 없어요<br>⋯ 설정 → "지난 일기에 날씨 채우기"를 먼저 눌러주세요</div>'; return; }
+  $('wxfInfo').textContent=`최고기온 ${hi-rg}°~${hi+rg}° 였던 날 ${rows.length}일 (기온이 가까운 순)`;
+  $('wxfList').innerHTML = rows.length ? rows.slice(0,80).map(r=>{
+    const ph=(pm[r.d]||[])[0], [ic,nm]=wxInfo(r.w.c);
+    return `<div class="wxf-row" data-d="${r.d}">${ph?`<img src="${ph.thumb}" alt="">`:''}<div style="min-width:0"><div><span class="d">${fmtKo(r.d,true)}</span><span class="w">${ic} ${nm} ${r.w.lo}°/${r.w.hi}°</span></div><div class="t">${r.e.tags.map(t=>'#'+esc(t)).join('  ')}</div></div></div>`; }).join('')
+    : '<div class="empty-msg">이 날씨에 입은 기록이 없어요</div>';
+}
+$('wxFindBtn').onclick=()=>openWxFind(curDay?(wxOf(curDay)||{}).hi:null);
+$('wxfHi').onchange=$('wxfRange').onchange=renderWxFind;
+$('wxfKind').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; wxfKind=b.dataset.k; renderWxFind(); };
+$('wxfList').onclick=e=>{ const r=e.target.closest('[data-d]'); if(!r) return; navStack.length=0; openDay(r.dataset.d); };
+
+/* ---- 2. 월간·연간 회고 ---- */
+let rc={ mode:'month', y:new Date().getFullYear(), m:new Date().getMonth() };
+function firstSeenMap(){ const f={}; for(const d of Object.keys(entries).sort()) for(const t of entries[d].tags||[]) if(!f[t]) f[t]=d; return f; }
+function openRecap(){ rc.y=view.y; rc.m=view.m; renderRecap(); openSheet('recapSheet'); }
+function renderRecap(){
+  [...$('recapMode').children].forEach(b=>b.classList.toggle('on', b.dataset.m===rc.mode));
+  const a = rc.mode==='month' ? `${rc.y}-${pad(rc.m+1)}-01` : `${rc.y}-01-01`;
+  const z = rc.mode==='month' ? `${rc.y}-${pad(rc.m+1)}-${pad(new Date(rc.y,rc.m+1,0).getDate())}` : `${rc.y}-12-31`;
+  $('recapLabel').textContent = rc.mode==='month' ? `${rc.y}년 ${rc.m+1}월` : `${rc.y}년`;
+  const list=Object.keys(entries).filter(d=>d>=a && d<=z).sort().map(d=>[d,entries[d]]);
+  const rec=list.filter(([d,e])=>hasContent(e)), diary=list.filter(([d,e])=>(e.text||'').trim()), liked=list.filter(([d,e])=>e.liked);
+  const cnt={}; for(const [d,e] of rec) for(const t of e.tags||[]) cnt[t]=(cnt[t]||0)+1;
+  const top=Object.entries(cnt).sort((x,y)=>y[1]-x[1]||x[0].localeCompare(y[0])).slice(0,5);
+  const fs=firstSeenMap(), fresh=Object.keys(fs).filter(t=>fs[t]>=a && fs[t]<=z && !isGone(t));
+  const wxs=list.map(([d,e])=>e.wx).filter(Boolean);
+  const wet=wxs.filter(w=>isWetCode(w.c)).length;
+  const avg=k=>Math.round(wxs.reduce((s,w)=>s+w[k],0)/wxs.length);
+  let h=`<div class="rc-grid"><div class="rc-box"><div class="n">${rec.length}</div><div class="l">기록한 날</div></div><div class="rc-box"><div class="n">${diary.length}</div><div class="l">일기 쓴 날</div></div><div class="rc-box"><div class="n">${liked.length}</div><div class="l">♥ 좋아요</div></div></div>`;
+  if(wxs.length) h+=`<div class="rc-h">🌤 날씨 (기록 ${wxs.length}일 기준)</div><div class="rc-row" style="cursor:default"><span>평균 기온</span><span class="c">최저 ${avg('lo')}° / 최고 ${avg('hi')}°</span></div><div class="rc-row" style="cursor:default"><span>비·눈 온 날</span><span class="c">${wet}일</span></div>`;
+  h+='<div class="rc-h">👕 가장 많이 입은 옷</div>'+(top.length?top.map(([t,n],i)=>`<div class="rc-row" style="cursor:default"><span>${i+1}. #${esc(t)}</span><span class="c">${n}회</span></div>`).join(''):'<div class="saved">아직 없어요</div>');
+  h+=`<div class="rc-h">✨ 이 기간에 처음 입은 옷 ${fresh.length}개</div>`+(fresh.length?fresh.slice(0,12).map(t=>`<div class="rc-row" style="cursor:default"><span>#${esc(t)}</span><span class="s">${fmtKo(fs[t],false)}</span></div>`).join('')+(fresh.length>12?`<div class="saved" style="padding:6px 2px">…외 ${fresh.length-12}개</div>`:''):'<div class="saved">없어요</div>');
+  h+=`<div class="rc-h">♥ 좋아요한 일기</div>`+(liked.length?liked.slice(0,15).map(([d,e])=>`<div class="rc-row" data-d="${d}"><span style="min-width:0">${fmtKo(d,false)} <span class="s">${esc(((e.text||'').trim().split('\n')[0]||'').slice(0,28))}</span></span></div>`).join(''):'<div class="saved">없어요</div>');
+  $('recapBody').innerHTML=h;
+}
+function stepRecap(n){ if(rc.mode==='month'){ const d=new Date(rc.y,rc.m+n,1); rc.y=d.getFullYear(); rc.m=d.getMonth(); } else rc.y+=n; renderRecap(); }
+$('recapBtn').onclick=openRecap;
+$('recapPrev').onclick=()=>stepRecap(-1); $('recapNext').onclick=()=>stepRecap(1);
+$('recapMode').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; rc.mode=b.dataset.m; renderRecap(); };
+$('recapBody').onclick=e=>{ const r=e.target.closest('[data-d]'); if(!r) return; navStack.length=0; openDay(r.dataset.d); };
+$('recapCollage').onclick=()=>{ closeSheet('recapSheet'); openCollage(rc.mode==='month' ? `${rc.y}-${pad(rc.m+1)}` : `${rc.y}-${pad(rc.m+1)}`); };
+
+/* ---- 4. OOTD 콜라주 (사진을 스티커처럼 오려 겹쳐 붙인 이미지) ---- */
+const cg={ mk:'', n:6, shape:'free', bg:'cream', seed:1, busy:false };
+function rng(seed){ let s=seed>>>0; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
+function cgPath(ctx,w,h,shape,r){
+  const rad = shape==='rect' ? [10,10,10,10] : shape==='round' ? [90,90,90,90] : [60+r()*190,60+r()*190,60+r()*190,60+r()*190];
+  const [a,b,c,d]=rad.map(v=>Math.min(v,w/2,h/2)), x=-w/2, y=-h/2;
+  ctx.beginPath(); ctx.moveTo(x+a,y); ctx.lineTo(x+w-b,y); ctx.quadraticCurveTo(x+w,y,x+w,y+b); ctx.lineTo(x+w,y+h-c); ctx.quadraticCurveTo(x+w,y+h,x+w-c,y+h);
+  ctx.lineTo(x+d,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-d); ctx.lineTo(x,y+a); ctx.quadraticCurveTo(x,y,x+a,y); ctx.closePath();
+}
+function loadImg(src){ return new Promise(res=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>res(null); im.src=src; }); }
+function cgPill(ctx,text,x,y,rot,{bg='#111',fg='#fff',size=34}={}){
+  ctx.font=`800 ${size}px -apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif`;
+  const w=ctx.measureText(text).width+size*1.1, h=size*1.7;
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot); ctx.shadowColor='rgba(0,0,0,.25)'; ctx.shadowBlur=10; ctx.shadowOffsetY=4; ctx.fillStyle=bg;
+  ctx.translate(w/2,h/2); const r=h/2; ctx.beginPath(); ctx.moveTo(-w/2+r,-h/2); ctx.lineTo(w/2-r,-h/2); ctx.arc(w/2-r,0,r,-Math.PI/2,Math.PI/2); ctx.lineTo(-w/2+r,h/2); ctx.arc(-w/2+r,0,r,Math.PI/2,Math.PI*1.5); ctx.closePath(); ctx.fill();
+  ctx.shadowColor='transparent'; ctx.fillStyle=fg; ctx.textBaseline='middle'; ctx.textAlign='center'; ctx.fillText(text,0,size*0.06); ctx.restore();
+}
+function openCollage(mk){
+  cg.mk=mk||mkey(view.y,view.m); cg.seed=(Math.random()*1e9)|0; cgKeep=cg.mk; openSheet('collageSheet'); drawCollage();
+}
+async function drawCollage(){
+  if(cg.busy) return; cg.busy=true;
+  try{
+    cgKeep=cg.mk; syncMonths();
+    const [yy,mm]=cg.mk.split('-').map(Number); $('cgMonthLbl').textContent=`${yy}년 ${mm}월`;
+    [['cgN',cg.n],['cgShape',cg.shape],['cgBg',cg.bg]].forEach(([id,v])=>[...$(id).children].forEach(b=>b.classList.toggle('on', b.dataset.v===String(v))));
+    const st=months.get(cg.mk), cv=$('cgCanvas'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+    const pm=photosByDate();
+    const days=Object.keys(pm).filter(d=>d.startsWith(cg.mk) && !noCover(d)).sort();
+    const bgc={cream:'#ecebe6',grey:'#cfd1cc',pink:'#f4d6dc',black:'#141414'}[cg.bg], dark=cg.bg==='black';
+    ctx.fillStyle=bgc; ctx.fillRect(0,0,W,H);
+    if(!st||!st.loaded){ $('cgMsg').textContent='사진을 불러오는 중이에요…'; return; }
+    if(!days.length){ $('cgMsg').textContent='이 달에는 OOTD 사진이 없어요'; return; }
+    $('cgMsg').textContent='';
+    const r=rng(cg.seed);
+    // 종이 질감 느낌의 잔점
+    for(let i=0;i<3500;i++){ ctx.fillStyle=`rgba(${dark?255:0},${dark?255:0},${dark?255:0},${(0.02+r()*0.04).toFixed(3)})`; ctx.fillRect(r()*W,r()*H,1+r()*2,1+r()*2); }
+    // 사진 고르기 (날짜 섞어서 n장)
+    const pool=days.slice(); for(let i=pool.length-1;i>0;i--){ const j=(r()*(i+1))|0; [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    const pick=pool.slice(0,cg.n);
+    const cols = cg.n===4?2 : cg.n===6?2 : 3, rows=Math.ceil(cg.n/cols), cw=W/cols, ch=(H-160)/rows;
+    const fs=firstSeenMap();
+    const items=[];
+    for(let i=0;i<pick.length;i++){
+      const d=pick[i], ph=pm[d][0];
+      const full=await getFull(ph.id).catch(()=>null);
+      const img=await loadImg(full||ph.thumb); if(!img) continue;
+      const col=i%cols, row=(i/cols)|0, scale=0.98+r()*0.28;
+      const maxW=cw*scale, maxH=ch*scale*1.08, k=Math.min(maxW/img.width, maxH/img.height);
+      const w=img.width*k, h=img.height*k;
+      const cx=col*cw+cw/2+(r()-0.5)*cw*0.35 + (row%2? cw*0.08:-cw*0.08), cy=100+row*ch+ch/2+(r()-0.5)*ch*0.3;
+      items.push({d,img,w,h,cx:Math.max(w*0.35,Math.min(W-w*0.35,cx)),cy,rot:(r()<0.5?-1:1)*(0.04+r()*0.17),seed:(r()*1e9)|0});
+    }
+    for(let i=items.length-1;i>0;i--){ const j=(r()*(i+1))|0; [items[i],items[j]]=[items[j],items[i]]; }   // 겹치는 순서
+    for(const it of items){
+      const pr=rng(it.seed);
+      ctx.save(); ctx.translate(it.cx,it.cy); ctx.rotate(it.rot);
+      ctx.shadowColor='rgba(0,0,0,.32)'; ctx.shadowBlur=34; ctx.shadowOffsetY=14;
+      ctx.fillStyle='#fff'; cgPath(ctx,it.w+26,it.h+26,cg.shape,rng(it.seed)); ctx.fill();   // 스티커 흰 테두리
+      ctx.shadowColor='transparent';
+      cgPath(ctx,it.w,it.h,cg.shape,rng(it.seed)); ctx.clip();
+      ctx.drawImage(it.img,-it.w/2,-it.h/2,it.w,it.h);
+      ctx.restore();
+    }
+    // 스티커: 날짜·날씨, new!
+    for(const it of items){
+      const e=entries[it.d], w=e&&e.wx;
+      const label=`${+it.d.slice(5,7)}/${+it.d.slice(8)}`+(w?`  ${wxInfo(w.c)[0]} ${w.hi}°`:'');
+      cgPill(ctx,label,it.cx-it.w*0.46,it.cy+it.h*0.38,(r()-0.5)*0.2,{bg:dark?'#fff':'#111',fg:dark?'#111':'#fff',size:30});
+      if(e && (e.tags||[]).some(t=>fs[t]===it.d && !isGone(t))) cgPill(ctx,'new!',it.cx+it.w*0.12,it.cy-it.h*0.46,0.12,{bg:'#111',fg:'#fff',size:34});
+    }
+    // 계절 이모지 + 제목
+    const season=[ '❄️','❄️','🌸','🌸','🌷','☀️','☀️','🌊','🍂','🍁','🍁','⛄' ][mm-1];
+    ctx.save(); ctx.translate(W*(0.16+r()*0.1),H*(0.44+r()*0.1)); ctx.rotate(-0.25); ctx.font='170px serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(season,0,0); ctx.restore();
+    cgPill(ctx,`OOTD · ${yy}.${pad(mm)}`,40,36,-0.03,{bg:dark?'#fff':'#111',fg:dark?'#111':'#fff',size:46});
+  } finally { cg.busy=false; }
+}
+$('collageBtn').onclick=()=>openCollage(mkey(view.y,view.m));
+$('cgPrev').onclick=()=>{ cg.mk=shiftMonth(cg.mk,-1); drawCollage(); };
+$('cgNext').onclick=()=>{ cg.mk=shiftMonth(cg.mk,1); drawCollage(); };
+$('cgShuffle').onclick=()=>{ cg.seed=(Math.random()*1e9)|0; drawCollage(); };
+[['cgN','n',Number],['cgShape','shape',String],['cgBg','bg',String]].forEach(([id,key,cv])=>$(id).onclick=e=>{ const b=e.target.closest('button'); if(!b) return; cg[key]=cv(b.dataset.v); drawCollage(); });
+$('cgSave').onclick=async()=>{
+  const blob=await new Promise(res=>$('cgCanvas').toBlob(res,'image/png')); if(!blob){ toast('이미지를 만들지 못했어요'); return; }
+  const file=new File([blob],`ootd-collage-${cg.mk}.png`,{type:'image/png'});
+  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file]}); return; } }catch(err){ if(err&&err.name==='AbortError') return; }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('이미지를 저장했어요', 2000);
+};
 
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
