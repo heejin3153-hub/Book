@@ -334,6 +334,16 @@
   .wxf-day.on{ border-color:var(--accent); background:var(--accent-soft); }
   .wxf-day .dd{ font-size:11.5px; font-weight:800; color:var(--text-muted); } .wxf-day .ic{ font-size:20px; line-height:1.3; } .wxf-day .tt{ font-size:11.5px; font-weight:700; }
   .wxf-ctl{ display:flex; gap:12px; flex-wrap:wrap; font-size:13px; font-weight:700; align-items:center; }
+  .wxf-top{ background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin:6px 0 10px; }
+  .wxf-top .h{ font-size:12.5px; font-weight:800; margin-bottom:6px; }
+  .wxf-top .ln{ display:flex; gap:8px; padding:4px 0; font-size:12.5px; line-height:1.5; }
+  .wxf-top .cat{ flex:none; width:58px; font-weight:800; color:var(--accent-dark); }
+  .wxf-top .it{ min-width:0; word-break:break-all; } .wxf-top .it b{ color:var(--text-muted); font-weight:700; }
+  .wxf-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  @media (min-width:560px){ .wxf-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); } }
+  .wxf-cell{ position:relative; aspect-ratio:3/4; border-radius:10px; overflow:hidden; cursor:pointer; background:var(--bg); border:1px solid var(--border); }
+  .wxf-cell img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .wxf-cell .cap{ position:absolute; left:0; right:0; bottom:0; padding:14px 6px 5px; background:linear-gradient(transparent,rgba(0,0,0,.65)); color:#fff; font-size:11px; font-weight:700; line-height:1.3; }
   .wxf-row{ display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); cursor:pointer; align-items:flex-start; }
   .wxf-row img{ width:46px; height:62px; object-fit:cover; border-radius:8px; flex:none; background:var(--bg); }
   .wxf-row .d{ font-size:13.5px; font-weight:800; } .wxf-row .w{ font-size:12px; color:var(--text-muted); margin-left:6px; font-weight:600; }
@@ -972,6 +982,7 @@ async function isDuplicate(date, sig, pending, exceptId){
 
 /* ================= 상태 / 유틸 ================= */
 let entries={};
+let wxfKeep=null;
 let gapKeepMonth=null;   // 빈 날 탭에서 계속 받아 둘 달들 (배열)
 let view=(()=>{ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
 let curDay=null, viewerPhoto=null, viewerList=[], viewerIdx=0, pendingDay=null;
@@ -1012,6 +1023,7 @@ function syncMonths(){
   const want=new Set([shiftMonth(center,-1), center, shiftMonth(center,1)]);
   if(curDay) want.add(monthOfDate(curDay));
   if(gapKeepMonth) for(const k of gapKeepMonth) want.add(k);
+  if(wxfKeep) for(const k of wxfKeep) want.add(k);
   for(const k of want) subscribeMonth(k);
   for(const [k,st] of months) if(!want.has(k) && st.unsub){ st.unsub(); st.unsub=null; }
 }
@@ -1047,6 +1059,7 @@ function refresh(){
   if($('daySheet').classList.contains('open') && curDay){ renderDayPhotos(); renderDayTags(); }
   if(!$('tagSheet').classList.contains('open')){
     if(!$('gapsView').classList.contains('hidden')) renderGaps();
+    if($('wxFindSheet').classList.contains('open')) renderWxFind();
     if(!$('statsView').classList.contains('hidden')) renderStats();
     if(!$('closetView').classList.contains('hidden')) renderCloset();
     if(!$('tagsView').classList.contains('hidden') && !document.querySelector('.tl-edit')) renderTagList();
@@ -2885,6 +2898,7 @@ function navBack(){
 }
 function closeSheet(id){
   if(id==='daySheet'){ flushDiary(); curDay=null; daySel=null; hideSuggest(); }
+  if(id==='wxFindSheet') wxfKeep=null;
   if(id==='tagSheet'){ lookIOs.forEach(io=>io.disconnect()); lookIOs=[]; hideLookSuggest(); }
   $(id).classList.remove('open');
   if(!$('statsView').classList.contains('hidden')) renderStats();
@@ -3026,25 +3040,38 @@ function openWxFind(baseHi){
   renderWxFind(); openSheet('wxFindSheet'); refreshForecast();
 }
 function renderWxFind(){
-  const hi=+$('wxfHi').value, rg=+$('wxfRange').value, pm=photosByDate(), rows=[];
+  const hi=+$('wxfHi').value, rg=+$('wxfRange').value, pm=photosByDate(), cand=[];
   const lo = wxfPick ? wxfPick.lo : null;
   let haveWx=0;
   for(const d in entries){ const e=entries[d], w=e.wx; if(!w) continue; haveWx++;
-    if(!(e.tags||[]).length) continue;
+    if(!(e.tags||[]).length || noCover(d)) continue;
     if(Math.abs(w.hi-hi)>rg) continue;
     if(wxfKind==='wet' && !isWetCode(w.c)) continue; if(wxfKind==='dry' && isWetCode(w.c)) continue;
-    rows.push({d,e,w,diff:Math.abs(w.hi-hi)+(lo==null?0:Math.abs(w.lo-lo)*0.5)});
+    cand.push({d,e,w,diff:Math.abs(w.hi-hi)+(lo==null?0:Math.abs(w.lo-lo)*0.5)});
   }
-  rows.sort((a,b)=>a.diff-b.diff || (a.d<b.d?1:-1));
+  cand.sort((a,b)=>a.diff-b.diff || (a.d<b.d?1:-1));
   [...$('wxfKind').children].forEach(b=>b.classList.toggle('on', b.dataset.k===wxfKind));
   [...$('wxfDays').children].forEach(b=>b.classList.toggle('on', !!wxfPick && b.dataset.d===wxfPick.d));
   if(!haveWx){ $('wxfInfo').textContent=''; $('wxfList').innerHTML='<div class="empty-msg">날씨가 저장된 일기가 없어요<br>⋯ 설정 → "지난 일기에 날씨 채우기"를 먼저 눌러주세요</div>'; return; }
+  // 사진은 달별로 불러오므로, 후보가 있는 달(가까운 순 18개월까지)을 불러 둠
+  const need=[]; for(const r of cand){ const m=r.d.slice(0,7); if(!need.includes(m)) need.push(m); if(need.length>=18) break; }
+  const before=(wxfKeep||[]).join(); wxfKeep=need; if(need.join()!==before) syncMonths();
+  const loadedAll=need.every(m=>{ const st=months.get(m); return st&&st.loaded; });
+  // OOTD 사진이 있는 날만 (사진 없는 일기는 건너뜀)
+  const rows=cand.filter(r=>{ const m=months.get(r.d.slice(0,7)); return m&&m.loaded && (pm[r.d]||[]).length; });
   const lead = wxfPick ? `${wxfPick.d===ymd(new Date())?'오늘':dayDiff(wxfPick.d,ymd(new Date()))===1?'내일':fmtKo(wxfPick.d,false)} ${wxfCity} 날씨(${wxfPick.lo}°/${wxfPick.hi}°)와 비슷했던 날` : `최고기온 ${hi-rg}°~${hi+rg}° 였던 날`;
-  $('wxfInfo').textContent=`${lead} ${rows.length}일 (기온이 가까운 순)`;
-  $('wxfList').innerHTML = rows.length ? rows.slice(0,80).map(r=>{
-    const ph=(pm[r.d]||[])[0], [ic,nm]=wxInfo(r.w.c);
-    return `<div class="wxf-row" data-d="${r.d}">${ph?`<img src="${ph.thumb}" alt="">`:''}<div style="min-width:0"><div><span class="d">${fmtKo(r.d,true)}</span><span class="w">${ic} ${nm} ${r.w.lo}°/${r.w.hi}°</span></div><div class="t">${r.e.tags.map(t=>'#'+esc(t)).join('  ')}</div></div></div>`; }).join('')
-    : '<div class="empty-msg">이 날씨에 입은 기록이 없어요<br>범위를 ±5°로 넓혀 보세요</div>';
+  $('wxfInfo').textContent = `${lead} · 사진 있는 ${rows.length}일${loadedAll?'':' (사진 불러오는 중…)'}`;
+  if(!rows.length){ $('wxfList').innerHTML = loadedAll ? '<div class="empty-msg">이 날씨에 OOTD 사진이 있는 기록이 없어요<br>범위를 ±5°로 넓혀 보세요</div>' : '<div class="empty-msg">사진을 불러오는 중이에요…</div>'; return; }
+  // 분류별 TOP3 (사진 있는 날 기준, 지금은 없는 옷(X_)은 뺌)
+  const cnt={}; for(const r of rows) for(const t of r.e.tags) if(!isGone(t)) cnt[t]=(cnt[t]||0)+1;
+  const groups={}; for(const t in cnt){ const c=catOf(t)||'기타'; (groups[c] ||= []).push(t); }
+  const cats=Object.keys(groups).sort((a,b)=>{ const ra=a==='기타'?99:catRank(groups[a][0]), rb=b==='기타'?99:catRank(groups[b][0]); return ra-rb || a.localeCompare(b); });
+  const nm=t=>{ const { parts, end }=coreParts(t); const core=parts.slice(0,end>1&&catOf(t)?end-1:end).join(' '); return core; };
+  const top = cats.map(c=>{ const arr=groups[c].sort((x,y)=>cnt[y]-cnt[x]||x.localeCompare(y)).slice(0,3);
+    return `<div class="ln"><span class="cat">${esc(c)}</span><span class="it">${arr.map((t,i)=>`${i+1}. ${esc(nm(t))} <b>${cnt[t]}회</b>`).join('<br>')}</span></div>`; }).join('');
+  const grid = rows.slice(0,60).map(r=>{ const ph=pm[r.d][0], [ic]=wxInfo(r.w.c);
+    return `<div class="wxf-cell" data-d="${r.d}"><img src="${ph.thumb}" alt="" loading="lazy"><div class="cap">${fmtKo(r.d,false)}<br>${ic} ${r.w.lo}°/${r.w.hi}°</div></div>`; }).join('');
+  $('wxfList').innerHTML = `<div class="wxf-top"><div class="h">👕 이 날씨에 가장 많이 입은 옷 TOP3 (분류별)</div>${top||'<div class="saved">태그가 없어요</div>'}</div><div class="wxf-grid">${grid}</div>`+(rows.length>60?`<p class="saved" style="text-align:center;margin-top:8px">가까운 순 60일만 보여줘요</p>`:'');
 }
 $('wxfDays').onclick=e=>{ const b=e.target.closest('[data-d]'); if(!b) return; const x=(wxfFc[wxfCity]||{days:[]}).days.find(v=>v.d===b.dataset.d); if(!x) return;
   wxfPick=x; $('wxfHi').value=String(Math.max(-12,Math.min(38,x.hi))); wxfKind=isWetCode(x.c)?'wet':'all'; renderWxFind(); };
@@ -3052,7 +3079,7 @@ $('wxfCity').onchange=()=>{ wxfCity=$('wxfCity').value; wxfPick=null; renderWxFi
 $('wxFindBtn').onclick=()=>openWxFind(curDay?(wxOf(curDay)||{}).hi:null);
 $('wxfHi').onchange=()=>{ wxfPick=null; renderWxFind(); }; $('wxfRange').onchange=renderWxFind;
 $('wxfKind').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; wxfKind=b.dataset.k; renderWxFind(); };
-$('wxfList').onclick=e=>{ const r=e.target.closest('[data-d]'); if(!r) return; navStack.length=0; openDay(r.dataset.d); };
+$('wxfList').onclick=e=>{ const r=e.target.closest('.wxf-cell[data-d]'); if(!r) return; navStack.length=0; openDay(r.dataset.d); };
 
 /* ---- 2. 월간·연간 회고 ---- */
 let rc={ mode:'month', y:new Date().getFullYear(), m:new Date().getMonth() };
